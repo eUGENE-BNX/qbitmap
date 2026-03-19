@@ -1,0 +1,139 @@
+###############################################
+# MediaMTX - WebRTC Gateway Configuration
+# Server: 91.98.90.57 (rtcgateway)
+###############################################
+
+logLevel: info
+logDestinations: [stdout]
+
+###############################################
+# API Server (for recording control)
+###############################################
+api: yes
+apiAddress: :9997
+apiAllowOrigins: ["https://qbitmap.com", "https://stream.qbitmap.com"]
+apiTrustedProxies: ["91.99.219.248"]
+apiEncryption: false
+
+###############################################
+# Playback Server (for recorded video access)
+###############################################
+playback: yes
+playbackAddress: :9996
+
+###############################################
+# Metrics Server (Prometheus format)
+###############################################
+metrics: yes
+metricsAddress: :9998
+
+###############################################
+# RTSP Server
+###############################################
+rtsp: yes
+rtspTransports: [tcp]
+rtspAddress: :8554
+
+###############################################
+# WebRTC Server
+###############################################
+webrtc: yes
+webrtcAddress: :8889
+webrtcEncryption: no
+webrtcServerKey: ""
+webrtcServerCert: ""
+webrtcAllowOrigins: ["https://qbitmap.com", "https://stream.qbitmap.com"]
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: :8189
+webrtcIPsFromInterfaces: yes
+webrtcIPsFromInterfacesList: []
+webrtcAdditionalHosts: [91.98.90.57]
+
+###############################################
+# HLS - Primary viewing protocol (fMP4)
+###############################################
+hls: yes
+hlsAddress: :8888
+hlsEncryption: no
+hlsAllowOrigins: ['*']
+hlsTrustedProxies: []
+hlsVariant: fmp4
+hlsSegmentCount: 7
+hlsSegmentDuration: 1s
+hlsSegmentMaxSize: 50M
+hlsMuxerCloseAfter: 60s
+hlsAlwaysRemux: false
+
+###############################################
+# RTMP - Enabled for GoPro, OBS, etc.
+###############################################
+rtmp: yes
+rtmpAddress: :1935
+
+###############################################
+# SRT - Disabled (not needed)
+###############################################
+srt: no
+
+###############################################
+# Path Defaults
+###############################################
+pathDefaults:
+  sourceProtocol: tcp
+  overridePublisher: no
+  record: no
+  recordPath: /recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+  recordFormat: fmp4
+  recordPartDuration: 1s
+  recordSegmentDuration: 1h
+  recordDeleteAfter: 360h
+
+###############################################
+# Paths - Managed dynamically via API
+# Cameras are added from qbitmap-backend
+###############################################
+paths:
+
+###############################################
+# Authentication
+###############################################
+authMethod: internal
+authInternalUsers:
+  # Backend server: full access (API, metrics, read, playback)
+  - user: any
+    pass:
+    ips: [91.99.219.248]
+    permissions:
+      - action: api
+        path:
+      - action: metrics
+        path:
+      - action: read
+        path:
+      - action: playback
+        path:
+  # Localhost: full access (API, metrics, pprof, read, publish, playback)
+  - user: any
+    pass:
+    ips: [127.0.0.1, '::1']
+    permissions:
+      - action: api
+        path:
+      - action: metrics
+        path:
+      - action: pprof
+        path:
+      - action: read
+        path:
+      - action: publish
+        path:
+      - action: playback
+        path:
+  # External users: publish only (RTMP from GoPro/OBS)
+  # Path names are cryptographically random - unguessable
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: publish
+        path:

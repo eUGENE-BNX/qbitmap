@@ -1,0 +1,431 @@
+:root {
+    color-scheme: light;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #f6f7fb;
+}
+
+#map {
+    position: absolute;
+    inset: 0;
+}
+
+/* MapLibre Controls - Center right controls vertically */
+.maplibregl-ctrl-top-right {
+    top: 50% !important;
+    transform: translateY(-50%);
+}
+
+@media (max-width: 480px) {
+    .maplibregl-ctrl-top-right {
+        top: 50% !important;
+        transform: translateY(-50%);
+    }
+}
+
+/* Satellite Toggle Button */
+.satellite-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 29px;
+    height: 29px;
+    padding: 0;
+    border: none;
+    background: #fff;
+    cursor: pointer;
+    color: #333;
+    transition: all 0.2s ease;
+}
+
+.satellite-toggle-btn:hover {
+    background: #f0f0f0;
+}
+
+.satellite-toggle-btn.active {
+    background: #3b82f6;
+    color: #fff;
+}
+
+.satellite-toggle-btn.active:hover {
+    background: #2563eb;
+}
+
+.satellite-toggle-btn svg {
+    pointer-events: none;
+}
+
+/* Layers Dropdown */
+.layers-dropdown-wrapper {
+    position: relative !important;
+    overflow: visible !important;
+}
+
+.layers-dropdown {
+    display: none;
+    position: absolute;
+    right: 100%;
+    top: 0;
+    margin-right: 8px;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    min-width: 160px;
+    z-index: 10;
+    overflow: hidden;
+}
+
+.layers-dropdown.open {
+    display: flex;
+}
+
+.layers-dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    gap: 12px;
+}
+
+.layers-dropdown-item:hover {
+    background: #f3f4f6;
+}
+
+.layers-dropdown-item + .layers-dropdown-item {
+    border-top: 1px solid #f0f0f0;
+}
+
+.layers-dropdown-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.layers-toggle {
+    width: 32px;
+    height: 18px;
+    background: #d1d5db;
+    border-radius: 9px;
+    position: relative;
+    transition: background 0.2s ease;
+    flex-shrink: 0;
+}
+
+.layers-toggle.active {
+    background: #86efac;
+}
+
+.layers-toggle-knob {
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.layers-toggle.active .layers-toggle-knob {
+    transform: translateX(14px);
+}
+
+/* Satellite Toast Notification */
+.satellite-toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10000;
+    opacity: 0;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    max-width: 90%;
+    text-align: center;
+}
+
+.satellite-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ==================== ONVIF EVENT ANIMATIONS ==================== */
+
+/* Camera blink animation for motion detection */
+@keyframes camera-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.2); }
+}
+
+.camera-blink {
+  animation: camera-blink 0.5s ease-in-out 6;
+}
+
+/* Notification fade in/out animation */
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(10px); }
+  10% { opacity: 1; transform: translateY(0); }
+  90% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+
+/* ONVIF notification styles - Icon only square */
+.onvif-notification {
+  pointer-events: none;
+  position: fixed;
+  z-index: 10000;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 5px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  animation: onvifSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), onvifFadeOut 0.4s ease-in 4.6s forwards;
+}
+
+.onvif-notification .notification-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.onvif-notification .notification-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: #64748b;
+}
+
+/* Event type specific icon colors */
+.onvif-notification.person-icon .notification-icon svg { fill: #3b82f6; }
+.onvif-notification.pet-icon .notification-icon svg { fill: #f59e0b; }
+.onvif-notification.vehicle-icon .notification-icon svg { fill: #10b981; }
+.onvif-notification.motion-icon .notification-icon svg { fill: #8b5cf6; }
+.onvif-notification.warning-icon .notification-icon svg { fill: #ef4444; }
+
+@keyframes onvifSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes onvifFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ==================== FIND MY LOCATION ==================== */
+
+/* Spin animation for loading */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin-animation {
+    animation: spin 1s linear infinite;
+}
+
+.find-location-btn.active {
+    background: #3b82f6 !important;
+    color: #fff !important;
+}
+
+/* Location status overlay */
+.location-status-overlay {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(0, 0, 0, 0.9);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    max-width: 90%;
+    text-align: center;
+}
+
+.location-status-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+
+.location-status-overlay.error {
+    background: rgba(239, 68, 68, 0.95);
+}
+
+/* Pulsing location marker */
+.location-pulse-container {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pulse-ring {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 3px solid rgba(59, 130, 246, 0.7);
+    animation: pulse-expand 2s ease-out infinite;
+}
+
+.pulse-ring.delay-1 {
+    animation-delay: 0.5s;
+}
+
+.pulse-ring.delay-2 {
+    animation-delay: 1s;
+}
+
+@keyframes pulse-expand {
+    0% {
+        width: 20px;
+        height: 20px;
+        opacity: 1;
+    }
+    100% {
+        width: 100px;
+        height: 100px;
+        opacity: 0;
+    }
+}
+
+.pulse-center {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: #3b82f6;
+    border-radius: 50%;
+    border: 3px solid white;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+/* Accuracy circle */
+.location-accuracy-circle {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.12);
+    border: 2px solid rgba(59, 130, 246, 0.4);
+    transition: all 0.5s ease-out;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+}
+
+/* User location popup */
+.user-location-popup-container .maplibregl-popup-content {
+    background: rgba(15, 23, 42, 0.95);
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.user-location-popup-container .maplibregl-popup-tip {
+    border-top-color: rgba(15, 23, 42, 0.95);
+}
+
+/* Popup should not interfere with marker hover */
+.user-location-popup-container.no-pointer-events {
+    pointer-events: none;
+}
+
+.user-location-popup-container.no-pointer-events .maplibregl-popup-tip {
+    border-left-color: rgba(15, 23, 42, 0.95);
+    border-top-color: transparent;
+}
+
+.user-location-popup {
+    text-align: center;
+}
+
+.user-location-popup .popup-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.user-location-popup .popup-info {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.user-location-popup .popup-cameras::before {
+    content: '📷 ';
+}
+
+.user-location-popup .popup-accuracy::before {
+    content: '📍 ';
+}
+
+/* ==================== TRAFFIC CAM TAG ==================== */
+.traffic-cam-tag {
+    display: none;
+    background: rgba(220, 38, 38, 0.9);
+    color: #fff;
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-size: 7px;
+    font-weight: 600;
+    letter-spacing: 0.25px;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(220, 38, 38, 0.4);
+    animation: traffic-cam-blink 1.2s ease-in-out infinite;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.traffic-cam-tag.visible {
+    display: block;
+}
+
+.traffic-cam-tag:hover {
+    transform: scale(1.1);
+}
+
+@keyframes traffic-cam-blink {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 1px 4px rgba(220, 38, 38, 0.4);
+    }
+    50% {
+        opacity: 0.6;
+        box-shadow: 0 1px 8px rgba(220, 38, 38, 0.8);
+    }
+}

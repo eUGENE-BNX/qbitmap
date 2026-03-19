@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QBitmap | System Status</title>
+  <meta name="description" content="Real-time system status monitoring for QBitmap services">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/favicon.png">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/status.css?v=6">
+</head>
+<body>
+  <div class="status-container">
+    <!-- Header -->
+    <header class="status-header">
+      <a href="/" class="logo" data-text="QBitmap">
+        <span>QBitmap</span>
+      </a>
+      <h1>System Status</h1>
+      <div class="overall-status" id="overall-status">
+        <span class="status-indicator"></span>
+        <span class="status-text">Checking...</span>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="status-main">
+      <!-- Network Graph -->
+      <div class="graph-section">
+        <div class="graph-container" id="graph-container">
+          <!-- SVG for connection lines -->
+          <svg class="connections-svg" id="connections-svg"></svg>
+          <!-- Service nodes will be rendered here -->
+          <div class="nodes-container" id="nodes-container"></div>
+          <!-- Data packets for animation -->
+          <div class="packets-container" id="packets-container"></div>
+        </div>
+      </div>
+
+      <!-- Summary Stats -->
+      <div class="summary-section" id="summary-section">
+        <div class="summary-card">
+          <span class="summary-value" id="online-count">-</span>
+          <span class="summary-label">Online</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-value" id="offline-count">-</span>
+          <span class="summary-label">Offline</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-value" id="avg-response">-</span>
+          <span class="summary-label">Avg Response</span>
+        </div>
+      </div>
+
+      <!-- Service List (for details and mobile) -->
+      <div class="services-section">
+        <h2>Services</h2>
+        <div class="services-list" id="services-list">
+          <!-- Service cards will be rendered here -->
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="status-footer">
+      <div class="footer-left">
+        <span class="last-updated">
+          Last updated: <span id="last-update">--</span>
+        </span>
+        <span class="auto-refresh">
+          Auto-refresh: <span id="refresh-countdown">30</span>s
+        </span>
+      </div>
+      <div class="footer-right">
+        <button class="refresh-btn" id="refresh-btn" title="Refresh now">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Service Detail Modal -->
+  <div class="modal-overlay" id="service-modal">
+    <div class="modal-content">
+      <button class="modal-close" id="modal-close">&times;</button>
+      <div class="modal-header">
+        <div class="modal-icon" id="modal-icon"></div>
+        <div class="modal-title">
+          <h3 id="modal-name">Service Name</h3>
+          <p id="modal-description">Service description</p>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="detail-row">
+          <span class="detail-label">Status</span>
+          <span class="detail-value" id="modal-status">--</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Host</span>
+          <span class="detail-value monospace" id="modal-host">--</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Response Time</span>
+          <span class="detail-value" id="modal-response-time">--</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Last Check</span>
+          <span class="detail-value" id="modal-last-check">--</span>
+        </div>
+        <div class="detail-row" id="modal-error-row" style="display: none;">
+          <span class="detail-label">Error</span>
+          <span class="detail-value error" id="modal-error">--</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/config.js"></script>
+  <script src="/js/status/index.js"></script>
+  <script src="/js/status/graph.js"></script>
+  <script src="/js/status/animations.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      StatusSystem.init();
+    });
+  </script>
+</body>
+</html>

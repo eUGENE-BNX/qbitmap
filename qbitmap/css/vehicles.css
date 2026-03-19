@@ -1,0 +1,335 @@
+/**
+ * Vehicle Popup & Edit Modal Styles
+ */
+
+/* Vehicle Popup - Follows vehicle on map */
+.vehicle-popup {
+  position: fixed;
+  z-index: 1000;
+  background: #1a1a2e;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  transform: translate(-50%, -100%);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  overflow: hidden;
+}
+
+.vehicle-popup.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Popup arrow */
+.vehicle-popup::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 8px solid transparent;
+  border-top-color: #1a1a2e;
+  border-bottom: 0;
+}
+
+/* Header with edit and close buttons */
+.vehicle-popup-header {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: flex;
+  gap: 4px;
+}
+
+.vehicle-popup-mjpeg,
+.vehicle-popup-edit,
+.vehicle-popup-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.vehicle-popup-mjpeg:hover,
+.vehicle-popup-edit:hover,
+.vehicle-popup-close:hover {
+  background: rgba(0,0,0,0.8);
+}
+
+/* MJPEG active state */
+.vehicle-popup-mjpeg.active {
+  background: #e74c3c;
+  animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(231, 76, 60, 0); }
+}
+
+.vehicle-popup-close {
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* Camera area - 320x180 */
+.vehicle-popup-camera {
+  width: 320px;
+  height: 180px;
+  background: #111;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Mobile: 25% smaller (240x135) */
+@media (max-width: 768px) {
+  .vehicle-popup-camera {
+    width: 240px;
+    height: 135px;
+  }
+
+  .vehicle-plate {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .vehicle-popup-mjpeg,
+  .vehicle-popup-edit,
+  .vehicle-popup-close {
+    width: 24px;
+    height: 24px;
+  }
+
+  .vehicle-popup-mjpeg svg,
+  .vehicle-popup-edit svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+/* Plate overlay on image - top left */
+.vehicle-plate {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  font-family: 'Arial Black', 'Helvetica Neue', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #000;
+  background: #fff;
+  padding: 4px 10px;
+  border-radius: 3px;
+  border: 2px solid #000;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.camera-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 14px;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+}
+
+.camera-feed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-feed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+/* Edit Modal */
+.vehicle-edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+}
+
+.vehicle-edit-modal.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.vehicle-edit-modal .modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+}
+
+.vehicle-edit-modal .modal-content {
+  position: relative;
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+}
+
+.vehicle-edit-modal h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  color: #1a1a2e;
+}
+
+.vehicle-edit-modal .form-group {
+  margin-bottom: 16px;
+}
+
+.vehicle-edit-modal label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+}
+
+.vehicle-edit-modal input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.vehicle-edit-modal input:focus {
+  outline: none;
+  border-color: #4a90a4;
+}
+
+.vehicle-edit-modal small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #888;
+}
+
+.vehicle-edit-modal .modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+.vehicle-edit-modal .btn-secondary {
+  padding: 10px 20px;
+  background: #f0f0f0;
+  color: #333;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.vehicle-edit-modal .btn-secondary:hover {
+  background: #e0e0e0;
+}
+
+.vehicle-edit-modal .btn-primary {
+  padding: 10px 20px;
+  background: #4a90a4;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.vehicle-edit-modal .btn-primary:hover {
+  background: #3a7a94;
+}
+
+/* Camera Dropdown in Edit Modal */
+.vehicle-edit-modal .camera-loading {
+  padding: 12px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+}
+
+.vehicle-edit-modal .camera-auth-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+}
+
+.vehicle-edit-modal .camera-auth-warning span {
+  font-size: 13px;
+  color: #856404;
+}
+
+.vehicle-edit-modal .camera-error {
+  padding: 12px;
+  background: #f8d7da;
+  color: #721c24;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.vehicle-edit-modal select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.vehicle-edit-modal select:focus {
+  outline: none;
+  border-color: #4a90a4;
+}
+
+.vehicle-edit-modal .btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}

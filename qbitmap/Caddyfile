@@ -1,0 +1,143 @@
+# QBitmap - Türkiye Haritası Uygulaması
+qbitmap.com {
+	handle /status {
+		rewrite * /status.html
+		file_server
+	}
+
+	handle /admin {
+		rewrite * /admin.html
+		file_server
+	}
+
+	# WHEP Proxy - HTTP WHEP sunucularına HTTPS üzerinden erişim
+	handle /whep-proxy/* {
+		uri strip_prefix /whep-proxy
+		reverse_proxy {
+			to {http.request.uri.query.target}
+			header_up Host {http.request.host}
+		}
+	}
+
+	# Capture Service Proxy - AI frame yakalama servisi
+	handle /capture/* {
+		reverse_proxy http://91.98.90.57:3002
+	}
+
+	# Capture Service Frame Proxy
+	handle /frame/* {
+		reverse_proxy http://91.98.90.57:3002
+	}
+
+	# PMTiles Tile Server
+	handle_path /tiles/* {
+		reverse_proxy localhost:8081
+	}
+
+	# Backend uploads - camera faces etc
+	handle /uploads/* {
+		root * /opt/qbitmap-backend
+		file_server
+	}
+
+	root * /opt/qbitmap
+	file_server
+
+	# Skip compression for 3D models (already compressed, causes QUIC issues)
+	@not3d {
+		not path *.glb *.gltf *.bin
+	}
+	encode @not3d gzip zstd
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(self), microphone=(self), camera=(self)"
+	}
+
+	@pmtiles path *.pmtiles
+	header @pmtiles {
+		Content-Type "application/vnd.pmtiles"
+		Cache-Control "public, max-age=86400, stale-while-revalidate=3600"
+	}
+
+	@gltf path *.gltf
+	header @gltf Content-Type "model/gltf+json"
+
+	@glb path *.glb
+	header @glb {
+		Content-Type "model/gltf-binary"
+		Cache-Control "public, max-age=604800"
+	}
+
+	@gltfbin path *.bin
+	header @gltfbin Content-Type "application/octet-stream"
+
+	@vendor path /vendor/*.js /vendor/*.css /vendor/*.woff /vendor/*.woff2
+	header @vendor Cache-Control "public, max-age=31536000, immutable"
+
+	# WASM and large bundles - immutable cache (filenames contain hashes)
+	@wasm path *.wasm *.mjs
+	header @wasm Cache-Control "public, max-age=31536000, immutable"
+
+	@app path /js/*.js /js/**/*.js /css/*.css
+	header @app Cache-Control "public, max-age=3600, must-revalidate"
+
+	@media path *.png *.jpg *.jpeg *.gif *.svg *.ico *.webp *.woff *.woff2
+	header @media Cache-Control "public, max-age=604800, immutable"
+
+	@html path *.html /
+	header @html Cache-Control "no-cache, must-revalidate"
+}
+
+# QBitmap Backend API Server
+stream.qbitmap.com {
+	# Disable HTTP/3 upgrade via Alt-Svc header
+	header Alt-Svc "clear"
+
+	# WHEP endpoint - MediaMTX WebRTC (must be before catch-all)
+	@whep path_regexp whep ^/([^/]+)/whep$
+	handle @whep {
+		reverse_proxy http://91.98.90.57:8889 {
+			header_up Host {http.request.host}
+		}
+	}
+
+	# All other requests go to backend
+	handle {
+		reverse_proxy localhost:3000
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	header /api/* Cache-Control "no-store, no-cache, must-revalidate"
+
+	encode gzip zstd
+
+	request_body {
+		max_size 25MB
+	}
+}
+
+# QBitmap H3 Grid Service
+h3.qbitmap.com {
+	reverse_proxy 46.224.128.93:3100
+	encode gzip zstd
+}
+
+# QBitmap HLS Streaming (CDN origin)
+hls.qbitmap.com {
+	reverse_proxy 91.98.90.57:8888
+
+	@playlist path_regexp \.m3u8$
+	header @playlist Cache-Control "public, max-age=1"
+
+	@segment path_regexp \.(m4s|ts|mp4)$
+	header @segment Cache-Control "public, max-age=3600"
+
+	encode gzip
+}

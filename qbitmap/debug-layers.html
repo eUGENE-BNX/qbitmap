@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PMTiles Layer Inspector</title>
+  <link rel="stylesheet" href="/vendor/maplibre-gl.css">
+  <style>
+    body { margin: 0; padding: 0; font-family: monospace; font-size: 12px; }
+    #map { position: absolute; top: 0; right: 0; bottom: 0; left: 50%; }
+    #sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 50%; overflow-y: auto; padding: 15px; background: #1e1e1e; color: #d4d4d4; }
+    h3 { color: #4ec9b0; margin-top: 20px; }
+    h4 { color: #dcdcaa; margin-top: 15px; }
+    pre { background: #2d2d2d; padding: 12px; overflow-x: auto; font-size: 11px; border-left: 3px solid #007acc; margin: 10px 0; }
+    .layer-item { background: #252526; padding: 8px; margin: 5px 0; border-left: 3px solid #4ec9b0; }
+    .error { color: #f48771; }
+    .success { color: #4ec9b0; }
+    .info { color: #9cdcfe; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h3>PMTiles Inspector - qbitmap.com</h3>
+    <div id="status">Loading...</div>
+    <div id="content"></div>
+  </div>
+  <div id="map"></div>
+
+  <script src="/vendor/maplibre-gl.js"></script>
+  <script src="/vendor/pmtiles-umd.js"></script>
+  <script src="/vendor/protomaps-themes-base.js"></script>
+
+  <script>
+    const status = document.getElementById('status');
+    const content = document.getElementById('content');
+
+    function log(msg, type = 'info') {
+      console.log(msg);
+      status.innerHTML = `<span class="${type}">${msg}</span>`;
+    }
+
+    const { PMTiles, Protocol } = window.pmtiles;
+    const pmtilesUrl = `${location.origin}/maps/tr.pmtiles`;
+    const protocol = new Protocol();
+    maplibregl.addProtocol("pmtiles", protocol.tile);
+    const pmtilesSource = new PMTiles(pmtilesUrl);
+    protocol.add(pmtilesSource);
+
+    log('Fetching PMTiles metadata...');
+
+    // Get metadata first
+    pmtilesSource.getMetadata().then(metadata => {
+      log('Metadata loaded successfully', 'success');
+
+      let html = '<h3>📦 PMTiles Metadata</h3>';
+      html += `<pre>${JSON.stringify(metadata, null, 2)}</pre>`;
+
+      if (metadata.vector_layers) {
+        html += '<h3>🗺️ Vector Layers in PMTiles</h3>';
+        metadata.vector_layers.forEach((layer, i) => {
+          html += `<div class="layer-item">`;
+          html += `<strong>${i + 1}. ${layer.id}</strong><br>`;
+          if (layer.description) html += `Description: ${layer.description}<br>`;
+          if (layer.minzoom !== undefined) html += `Min Zoom: ${layer.minzoom}<br>`;
+          if (layer.maxzoom !== undefined) html += `Max Zoom: ${layer.maxzoom}<br>`;
+          if (layer.fields) {
+            html += `<strong>Fields:</strong><br>`;
+            html += `<pre style="margin-left: 10px;">${JSON.stringify(layer.fields, null, 2)}</pre>`;
+          }
+          html += `</div>`;
+        });
+      } else {
+        html += '<p class="error">⚠️ No vector_layers found in metadata</p>';
+      }
+
+      content.innerHTML = html;
+    }).catch(err => {
+      log('Error loading metadata: ' + err.message, 'error');
+      content.innerHTML = `<pre class="error">${err.stack}</pre>`;
+    });
+
+    const sourceId = "protomaps";
+    const baseLayers = window.protomaps_themes_base.default(sourceId, "light");
+
+    const sanitizedLayers = baseLayers.map(layer => {
+      if (layer.type === "symbol" && layer.layout && layer.layout["text-font"]) {
+        return { ...layer, layout: { ...layer.layout, "text-font": ["Noto Sans Medium"] } };
+      }
+      return layer;
+    });
+
+    const style = {
+      version: 8,
+      glyphs: "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
+      sprite: "https://protomaps.github.io/basemaps-assets/sprites/v4/light",
+      sources: {
+        [sourceId]: { type: "vector", url: `pmtiles://${pmtilesUrl}` }
+      },
+      layers: sanitizedLayers,
+    };
+
+    const map = new maplibregl.Map({
+      container: "map",
+      style,
+      center: [35.0, 39.0],
+      zoom: 6.5
+    });
+
+    map.on("load", () => {
+      log('Map loaded', 'success');
+
+      const styleObj = map.getStyle();
+
+      let layerHtml = '<h3>🎨 Active Style Layers</h3>';
+      layerHtml += `<p class="info">Total: ${styleObj.layers.length} layers</p>`;
+
+      const groupedLayers = {};
+      styleObj.layers.forEach(layer => {
+        const type = layer.type;
+        if (!groupedLayers[type]) groupedLayers[type] = [];
+        groupedLayers[type].push(layer);
+      });
+
+      Object.entries(groupedLayers).forEach(([type, layers]) => {
+        layerHtml += `<h4>${type} (${layers.length})</h4>`;
+        layers.forEach(layer => {
+          layerHtml += `<div style="margin-left: 15px; padding: 3px 0;">`;
+          layerHtml += `${layer.id}`;
+          if (layer['source-layer']) layerHtml += ` <span class="info">[${layer['source-layer']}]</span>`;
+          layerHtml += `</div>`;
+        });
+      });
+
+      content.innerHTML += layerHtml;
+    });
+
+    map.on("error", (e) => {
+      log('Map error: ' + e.error.message, 'error');
+    });
+  </script>
+</body>
+</html>

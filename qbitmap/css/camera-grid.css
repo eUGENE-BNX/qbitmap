@@ -1,0 +1,509 @@
+/**
+ * QBitmap - Camera Grid Overlay Styles
+ * 3x2 grid view for simultaneous camera monitoring
+ */
+
+/* ========================================
+   Camera Grid Overlay
+   ======================================== */
+
+.camera-grid-overlay {
+  position: fixed;
+  top: 60px;
+  right: 60px;
+  z-index: 1500;
+  display: none;
+  background: rgba(26, 26, 26, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.camera-grid-overlay.visible {
+  display: block;
+  animation: gridFadeIn 0.25s ease;
+}
+
+@keyframes gridFadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Grid Container - 3x3 layout */
+.camera-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 180px);
+  grid-template-rows: repeat(3, 101px);
+  gap: 2px;
+}
+
+/* Individual Grid Cell */
+.camera-grid-cell {
+  width: 180px;
+  height: 101px;
+  background: #0a0a0a;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.camera-grid-cell:hover {
+  background: #1a1a1a;
+}
+
+/* Empty Cell State */
+.camera-grid-cell.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.camera-grid-cell.empty .cell-add-icon {
+  width: 32px;
+  height: 32px;
+  border: 2px dashed #444;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.camera-grid-cell.empty:hover .cell-add-icon {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.camera-grid-cell.empty .cell-hint {
+  font-size: 10px;
+  color: #555;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+/* Video Element in Cell */
+.camera-grid-cell video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Cell Header Overlay */
+.cell-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 8px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.camera-grid-cell:hover .cell-header {
+  opacity: 1;
+}
+
+.cell-name {
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.cell-live-badge {
+  font-size: 8px;
+  font-weight: 700;
+  color: #4caf50;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+/* Cell Remove Button */
+.cell-remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  border-radius: 4px;
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.camera-grid-cell:hover .cell-remove-btn {
+  opacity: 1;
+}
+
+.cell-remove-btn:hover {
+  background: #c00;
+  color: #fff;
+}
+
+/* Loading State */
+.camera-grid-cell.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-grid-cell.loading .cell-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Error State */
+.camera-grid-cell.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-grid-cell.error::after {
+  content: "Baglanti hatasi";
+  font-size: 10px;
+  color: #ef4444;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+/* ========================================
+   Camera Selector Modal
+   ======================================== */
+
+.camera-selector-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+}
+
+.camera-selector-modal.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.camera-selector-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.camera-selector-content {
+  position: relative;
+  width: 320px;
+  max-width: calc(100% - 32px);
+  max-height: 400px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.camera-selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.camera-selector-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.camera-selector-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: #f0f0f0;
+  border-radius: 6px;
+  font-size: 18px;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-selector-close:hover {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.camera-selector-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.camera-selector-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #888;
+  font-size: 14px;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.camera-selector-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.camera-selector-item:hover {
+  background: #f5f5f5;
+}
+
+.camera-selector-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.camera-selector-item.disabled:hover {
+  background: transparent;
+}
+
+.camera-selector-item .camera-icon {
+  width: 32px;
+  height: 32px;
+  background: #f0f0f0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  flex-shrink: 0;
+}
+
+.camera-selector-item .camera-icon.whep {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+}
+
+.camera-selector-item .camera-icon.city {
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  color: #fff;
+}
+
+.camera-selector-item .camera-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.camera-selector-item .camera-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.camera-selector-item .camera-type {
+  font-size: 11px;
+  color: #888;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+/* Grid Toggle Button Style */
+.grid-camera-btn.active {
+  background: #3b82f6 !important;
+  color: #fff !important;
+}
+
+/* ========================================
+   Drag Handle
+   ======================================== */
+
+.camera-grid-drag-handle {
+  height: 14px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.08), transparent);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px 8px 0 0;
+}
+
+.camera-grid-drag-handle:active {
+  cursor: grabbing;
+}
+
+.camera-grid-drag-handle::before {
+  content: '';
+  width: 32px;
+  height: 4px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+.camera-grid-overlay.dragging {
+  user-select: none;
+}
+
+/* ========================================
+   In-Place Zoom
+   ======================================== */
+
+.camera-zoom-popup {
+  position: fixed;
+  /* Size is set dynamically via JS to match grid dimensions */
+  background: #0a0a0a;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.1);
+  z-index: 1600;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s ease;
+  transform-origin: center center;
+}
+
+.camera-zoom-popup.zooming-in {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.camera-zoom-popup.zoomed {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.camera-zoom-popup.zooming-out {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.camera-zoom-popup video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-zoom-popup .zoom-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 8px 12px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.camera-zoom-popup:hover .zoom-header {
+  opacity: 1;
+}
+
+.camera-zoom-popup .zoom-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.camera-zoom-popup .zoom-title .live-dot {
+  width: 6px;
+  height: 6px;
+  background: #4caf50;
+  border-radius: 50%;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.camera-zoom-popup .zoom-hint {
+  font-size: 10px;
+  color: rgba(255,255,255,0.6);
+}
+
+/* ========================================
+   Responsive Adjustments
+   ======================================== */
+
+@media (max-width: 900px) {
+  .camera-grid-overlay {
+    right: 50px;
+  }
+
+  .camera-grid {
+    grid-template-columns: repeat(3, 140px);
+    grid-template-rows: repeat(3, 79px);
+  }
+
+  .camera-grid-cell {
+    width: 140px;
+    height: 79px;
+  }
+}
+
+@media (max-width: 500px) {
+  .camera-grid-overlay {
+    top: 50px;
+    right: 10px;
+    left: 10px;
+  }
+
+  .camera-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, auto);
+  }
+
+  .camera-grid-cell {
+    width: 100%;
+    aspect-ratio: 16/9;
+    height: auto;
+  }
+}

@@ -1,0 +1,637 @@
+/* Top Header Bar */
+#top-header {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+}
+
+
+/* Header Left Group */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+/* Auth Container */
+#auth-container {
+  /* No fixed positioning - handled by parent flex */
+}
+
+/* Login Button */
+.login-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #3c4043;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.login-button:hover {
+  background: #f8f9fa;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.login-button svg {
+  flex-shrink: 0;
+}
+
+/* QBitmap Logo Control - In header, same height as login button */
+.qbitmap-logo-control {
+  height: 36px;
+  background: white;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.qbitmap-logo-control img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.qbitmap-logo-control .logo-text {
+  font-family: 'Inter', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  letter-spacing: -0.5px;
+}
+
+.qbitmap-logo-control:hover {
+  background: #f8f9fa;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+@media (max-width: 768px) {
+  .qbitmap-logo-control .logo-text {
+    display: none;
+  }
+  .qbitmap-logo-control {
+    padding: 0 6px;
+  }
+}
+
+/* Right side controls container */
+.right-side-controls {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Dropdown panel (hidden by default) */
+#right-menu-panel {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#right-menu-panel.open,
+#right-menu-panel.broadcast-active {
+  display: flex;
+}
+
+/* Maplibre controls inside our panel - remove default margins */
+#right-menu-panel .maplibregl-ctrl {
+  margin: 0;
+}
+
+#right-menu-panel .maplibregl-ctrl-group {
+  box-shadow: none;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+}
+
+/* Layers control extracted from panel - direct child of right-side-controls */
+.right-side-controls > .layers-dropdown-wrapper {
+  margin: 0;
+  box-shadow: none;
+  border-radius: 4px;
+  overflow: visible;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+}
+
+/* Right side button (shared style for mic, broadcast, camera-switch, resolution) */
+.mic-button-right {
+  width: 29px;
+  height: 29px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: none;
+  border-radius: 4px;
+  color: #333;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+  transition: background 0.2s, color 0.2s;
+}
+
+.mic-button-right:hover {
+  background: #f8f9fa;
+  color: #1a1a1a;
+}
+
+.mic-button-right.active {
+  background: #d93025;
+  color: white;
+  animation: pulse-mic 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-mic {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* User Menu */
+.user-menu {
+  position: relative;
+}
+
+.user-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  transition: box-shadow 0.2s;
+}
+
+.user-button:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #3c4043;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-arrow {
+  color: #5f6368;
+  transition: transform 0.2s;
+}
+
+/* User Dropdown */
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 280px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.2s ease;
+}
+
+.user-dropdown.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.dropdown-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+}
+
+.dropdown-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #202124;
+}
+
+.dropdown-email {
+  font-size: 13px;
+  color: #5f6368;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #e8eaed;
+  margin: 0;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: #3c4043;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: left;
+}
+
+.dropdown-item:hover {
+  background: #f1f3f4;
+}
+
+.dropdown-item svg {
+  color: #5f6368;
+}
+
+.dropdown-item:last-child {
+  border-radius: 0 0 8px 8px;
+}
+
+/* Notification Toast */
+.auth-notification {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  padding: 12px 24px;
+  background: #323232;
+  color: white;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  opacity: 0;
+  transition: all 0.3s ease;
+  z-index: 10000;
+}
+
+.auth-notification.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.auth-notification.success {
+  background: #1e8e3e;
+}
+
+.auth-notification.error {
+  background: #d93025;
+}
+
+/* Voice Feedback Toast */
+.voice-feedback {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #1a1a1a;
+  color: white;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  opacity: 0;
+  transition: all 0.3s ease;
+  z-index: 10000;
+  max-width: 90vw;
+}
+
+.voice-feedback.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.voice-feedback.error {
+  background: #d93025;
+}
+
+.voice-feedback.info {
+  background: #1a73e8;
+}
+
+.voice-feedback svg {
+  flex-shrink: 0;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .user-name {
+    font-size: 11px;
+    max-width: 80px;
+  }
+
+  .user-button {
+    padding: 4px 8px;
+  }
+
+  .login-button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .login-button span {
+    display: none;
+  }
+
+  .biometric-btn span {
+    display: flex !important;
+  }
+}
+
+/* ===============================
+   Biometric Face Recognition
+   =============================== */
+
+/* Auth buttons container */
+.auth-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Biometric Button - FaceID with icon and text */
+.biometric-btn {
+  height: 36px;
+  padding: 0 10px;
+  gap: 4px;
+  justify-content: center;
+}
+
+.biometric-btn svg {
+  color: #5f6368;
+}
+
+.biometric-btn span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #5f6368;
+}
+
+/* Mic Button - Square like biometric */
+.mic-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
+.mic-btn svg {
+  color: #5f6368;
+}
+
+.mic-btn.active {
+  background: #d93025;
+}
+
+.mic-btn.active svg {
+  color: white;
+}
+
+/* Broadcast Float Controls - inside right-side-controls */
+.broadcast-float-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Hide broadcast float button when not active */
+.broadcast-float-controls #broadcast-button:not(.active) {
+  display: none;
+}
+
+/* Broadcast Button - Active (streaming) */
+#broadcast-button.active {
+  background: #d93025;
+  animation: pulse-broadcast 1.5s ease-in-out infinite;
+}
+
+#broadcast-button.active svg {
+  color: white;
+  fill: white;
+  stroke: white;
+}
+
+@keyframes pulse-broadcast {
+  0%, 100% { box-shadow: 0 2px 6px rgba(217, 48, 37, 0.3); }
+  50% { box-shadow: 0 2px 12px rgba(217, 48, 37, 0.6); }
+}
+
+/* Dropdown badge on user button */
+.user-button .video-msg-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #d93025;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  border-radius: 8px;
+  text-align: center;
+  padding: 0 4px;
+  pointer-events: none;
+}
+
+.user-button {
+  position: relative;
+}
+
+/* Dropdown item active state for broadcast */
+#broadcast-dropdown-item.broadcasting {
+  color: #d93025;
+}
+
+#broadcast-dropdown-item.broadcasting svg {
+  color: #d93025;
+  fill: #d93025;
+}
+
+/* Biometric Modal */
+.biometric-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 60px;
+  background: rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+
+.biometric-modal.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.biometric-content {
+  background: #e8e8e8;
+  border-radius: 8px;
+  padding: 4px;
+  width: auto;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.biometric-header {
+  display: none; /* Hidden - no header needed */
+}
+
+.biometric-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #202124;
+}
+
+.biometric-header .close-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #5f6368;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.15s;
+}
+
+.biometric-header .close-btn:hover {
+  background: #f1f3f4;
+}
+
+/* Camera preview */
+.camera-preview {
+  position: relative;
+  width: 480px;
+  height: 360px;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.camera-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* Mirror effect */
+}
+
+/* Face detection overlay canvas */
+#biometric-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transform: scaleX(-1); /* Mirror to match video */
+}
+
+/* Status message - overlay on video */
+.biometric-status {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  background: rgba(0,0,0,0.7);
+  border-radius: 4px;
+  font-size: 13px;
+  color: #ccc;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.biometric-status.success {
+  color: #34a853;
+  background: rgba(0,0,0,0.8);
+}
+
+.biometric-status.error {
+  color: #ea4335;
+  background: rgba(0,0,0,0.8);
+}
+
+/* Action buttons - hidden */
+.biometric-actions {
+  display: none;
+}
+
+/* Responsive biometric */
+@media (max-width: 520px) {
+  .biometric-modal {
+    padding-top: 60px;
+  }
+
+  .biometric-content {
+    width: auto;
+    max-width: calc(100vw - 24px);
+    padding: 3px;
+  }
+
+  .camera-preview {
+    width: 280px;
+    height: 210px;
+  }
+
+  .biometric-status {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .face-guide {
+    width: 150px;
+    height: 200px;
+  }
+}

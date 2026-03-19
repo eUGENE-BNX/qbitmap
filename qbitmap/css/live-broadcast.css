@@ -1,0 +1,189 @@
+/* ============================================
+   Live Broadcast - Location Dialog & Hint
+   ============================================ */
+
+/* Fullscreen overlay */
+.broadcast-location-dialog {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: loc-dialog-in 0.2s ease-out;
+}
+
+@keyframes loc-dialog-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.location-dialog-content {
+  background: rgba(30, 30, 40, 0.95);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  max-width: 320px;
+  width: 90%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.location-dialog-icon {
+  margin-bottom: 12px;
+}
+
+.location-dialog-text {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.location-dialog-hint {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+
+.location-dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.location-dialog-btn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  color: #fff;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.location-dialog-btn:hover {
+  opacity: 0.9;
+}
+
+.location-dialog-btn.primary {
+  background: #4caf50;
+}
+
+.location-dialog-btn.primary:hover {
+  background: #43a047;
+}
+
+.location-dialog-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.location-dialog-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Map pick hint bar (matches video-msg-location-hint style) */
+.broadcast-location-hint {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 20, 30, 0.9);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 1500;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  animation: broadcast-hint-in 0.3s ease-out;
+  white-space: nowrap;
+}
+
+@keyframes broadcast-hint-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.broadcast-location-hint .hint-icon {
+  display: flex;
+  align-items: center;
+}
+
+.broadcast-location-hint .hint-cancel {
+  margin-left: 12px;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: none;
+  color: #ccc;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.broadcast-location-hint .hint-cancel:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   Locate Me - Pulsing Dot Marker
+   ============================================ */
+
+.locate-me-marker {
+  position: relative;
+  width: 16px;
+  height: 16px;
+}
+
+.locate-me-dot {
+  width: 16px;
+  height: 16px;
+  background: #4285f4;
+  border: 2.5px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 1;
+}
+
+.locate-me-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  background: rgba(66, 133, 244, 0.3);
+  border-radius: 50%;
+  animation: locate-pulse 2s ease-out infinite;
+}
+
+@keyframes locate-pulse {
+  0% {
+    width: 16px;
+    height: 16px;
+    opacity: 1;
+  }
+  100% {
+    width: 48px;
+    height: 48px;
+    opacity: 0;
+  }
+}
+
+/* Locate button searching state */
+#locate-me-button.searching {
+  background: #4285f4;
+  color: white;
+  animation: pulse-mic 1.5s ease-in-out infinite;
+}

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -c:*)",
+      "Read(//home/eugene/Documents/CODES/**)",
+      "WebFetch(domain:mediamtx.org)",
+      "WebFetch(domain:h3geo.org)",
+      "WebFetch(domain:deck.gl)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:unpkg.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:developers.google.com)",
+      "Read(//home/eugene/Documents/CODES/qbitmap/**)"
+    ],
+    "additionalDirectories": [
+      "/home/eugene/Documents/CODES/h3-service/src",
+      "/home/eugene/Documents/CODES/h3-service"
+    ]
+  }
+}

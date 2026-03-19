@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  mediamtx:
+    build: .
+    container_name: mediamtx
+    restart: always
+    network_mode: host
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+      - ./recordings:/recordings
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
+        reservations:
+          memory: 256M

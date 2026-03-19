@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rsync:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(node -e:*)",
+      "Bash(NODE_ENV=production node:*)",
+      "Bash(node --check:*)",
+      "Bash(ssh:*)",
+      "Bash(curl:*)",
+      "Bash(./deploy.sh:*)",
+      "Bash(ls:*)",
+      "Bash(/home/eugene/Documents/CODES/qbitmap/js/camera-system/ai-monitoring.js )",
+      "Bash(/home/eugene/Documents/CODES/qbitmap/js/camera-system/popup.js )",
+      "Bash(/home/eugene/Documents/CODES/qbitmap/index.html )",
+      "Bash(root@91.99.219.248:/opt/qbitmap/)",
+      "Bash(scp:*)",
+      "Bash(grep:*)",
+      "Bash(chmod:*)",
+      "Bash(jq:*)",
+      "Bash(ffprobe:*)",
+      "Bash(wc:*)",
+      "Bash(npm install:*)",
+      "Bash(du -sh:*)",
+      "Bash(dig:*)",
+      "Bash(nc:*)",
+      "Bash(timeout 3 bash:*)",
+      "Bash(python3:*)",
+      "Bash(sqlite3:*)",
+      "Bash(xxd:*)",
+      "Bash(npm pack:*)",
+      "Bash(tar:*)",
+      "Bash(openssl s_client:*)",
+      "Bash(openssl x509:*)",
+      "Bash(ping:*)",
+      "Read(//home/eugene/Documents/CODES/qbitmap-backend/**)",
+      "Bash(echo \")",
+      "Bash(xargs:*)",
+      "WebFetch(domain:googlechrome.github.io)",
+      "WebFetch(domain:docs.vllm.ai)"
+    ],
+    "additionalDirectories": [
+      "/home/eugene/Documents/CODES/qbitmap-backend/src/utils",
+      "/home/eugene/Documents/CODES/qbitmap-backend/src"
+    ]
+  }
+}

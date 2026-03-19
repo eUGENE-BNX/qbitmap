@@ -1,0 +1,57 @@
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Helper: Require env var in production, allow fallback in development
+function requireEnv(name, devFallback) {
+  const value = process.env[name];
+  if (value) return value;
+
+  if (isProduction) {
+    console.error(`\n❌ FATAL: Missing required environment variable: ${name}`);
+    console.error(`   Set it in your .env file or environment.\n`);
+    process.exit(1);
+  }
+
+  console.warn(`⚠️  DEV MODE: Using fallback for ${name}`);
+  return devFallback;
+}
+
+module.exports = {
+  server: {
+    host: '0.0.0.0',
+    port: process.env.PORT || 3000
+  },
+  cors: {
+    origin: isProduction
+      ? ['https://qbitmap.com', 'https://stream.qbitmap.com']
+      : ['http://localhost:3000', 'http://localhost:8080', 'http://127.0.0.1:3000'],
+    credentials: true,
+    exposedHeaders: ['X-Config-Version'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Device-ID', 'X-Device-Token', 'X-Config-Version']
+  },
+  oauth: {
+    google: {
+      clientId: requireEnv('GOOGLE_CLIENT_ID', 'dev-google-client-id'),
+      clientSecret: requireEnv('GOOGLE_CLIENT_SECRET', 'dev-google-client-secret'),
+      callbackUri: isProduction
+        ? 'https://stream.qbitmap.com/auth/google/callback'
+        : 'http://localhost:3000/auth/google/callback'
+    }
+  },
+  jwt: {
+    secret: requireEnv('JWT_SECRET', 'dev-jwt-secret-not-for-production'),
+    expiresIn: '7d'
+  },
+  auth: {
+    sharedSecret: requireEnv('DEVICE_SHARED_SECRET', 'dev-shared-secret')
+  },
+  frontend: {
+    url: process.env.FRONTEND_URL || (isProduction ? 'https://qbitmap.com' : 'http://localhost:8080')
+  },
+  googlePlaces: {
+    apiKey: requireEnv('GOOGLE_PLACES_API_KEY', 'dev-google-places-key'),
+    defaultRadius: 30,
+    maxResultCount: 10,
+    cacheTTLDays: 30
+  }
+};

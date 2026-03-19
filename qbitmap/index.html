@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang=tr>
+<head>
+  <meta charset=utf-8>
+  <meta name=viewport content=width=device-width, initial-scale=1.0>
+  <meta name=description content=QBitmap - Vision Network>
+  <title>QBitmap | Vision Network</title>
+  <link rel=icon href=data:,>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-5Y929W13D6"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-5Y929W13D6', { send_page_view: false });
+  </script>
+
+  <!-- Preload critical resources -->
+  <link rel=preload href=/vendor/maplibre-gl.css as=style>
+  <link rel=preload href=/vendor/maplibre-gl.js as=script>
+  <link rel=preload href=/vendor/pmtiles-umd.js as=script>
+
+  <!-- Stylesheets -->
+  <link rel=stylesheet href=/vendor/maplibre-gl.css>
+  <link rel=stylesheet href=/css/style.css?v=20260206>
+  <link rel=stylesheet href=/css/modal.css?v=20260206>
+  <link rel=stylesheet href=/css/cameras-settings.css?v=20260217b>
+  <link rel=stylesheet href=/css/auth.css?v=20260215d>
+  <link rel=stylesheet href=/css/my-cameras.css?v=20260206>
+  <link rel=stylesheet href=/css/user-profile.css?v=20260206>
+  <link rel=stylesheet href=/css/camera-grid.css?v=20260206>
+  <link rel=stylesheet href=/css/vehicles.css?v=20260206>
+  <link rel=stylesheet href=/css/tesla-dashcam.css?v=20260301>
+  <link rel=stylesheet href=/css/video-message.css?v=20260217b>
+  <link rel=stylesheet href=/css/comments.css?v=20260215>
+  <link rel=stylesheet href=/css/live-broadcast.css?v=20260215>
+  <!-- Plyr Video Player -->
+  <link rel=stylesheet href=https://cdn.plyr.io/3.8.4/plyr.css>
+</head>
+<body>
+  <div id=map></div>
+
+  <!-- Top Header Bar -->
+  <div id="top-header">
+    <div class="header-left">
+      <div class="qbitmap-logo-control" title="QBitmap">
+        <img src="/logo.png" alt="QBitmap">
+        <span class="logo-text">QBitmap</span>
+      </div>
+      <div id="auth-container"></div>
+      <div class="vmsg-search-bar" id="vmsg-search-toggle">
+        <svg class="vmsg-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="vmsg-search-bar-input" id="vmsg-search-bar-input"
+               placeholder="Arama yap..." autocomplete="off" maxlength="100">
+      </div>
+    </div>
+  </div>
+  
+
+  <!-- ================= MODAL PENCERE BAŞLANGIÇ ================= -->
+  <div id="imageModal" class="modal" role="dialog" aria-modal="true" aria-label="Görüntü önizleme">
+    <span class="close" role="button" aria-label="Kapat" tabindex="0">&times;</span>
+    <img class="modal-content" id="modalImage" alt="">
+    <div id="caption"></div>
+  </div>
+  <!-- ================== MODAL PENCERE BİTİŞ ================== -->
+
+  <!-- ================= BIOMETRIC MODAL BAŞLANGIÇ ================= -->
+  <div id="biometric-modal" class="biometric-modal" role="dialog" aria-modal="true" aria-label="Yüz tanıma ile giriş" onclick="if(event.target===this)BiometricAuth.close()">
+    <div class="biometric-content">
+      <div class="camera-preview">
+        <video id="biometric-video" playsinline aria-label="Kamera görüntüsü"></video>
+        <canvas id="biometric-canvas" style="display:none;" aria-hidden="true"></canvas>
+        <canvas id="biometric-overlay" aria-hidden="true"></canvas>
+        <div class="biometric-status" id="biometric-status" role="status" aria-live="polite">Yüzünüzü kameraya gösterin</div>
+      </div>
+    </div>
+  </div>
+  <!-- ================== BIOMETRIC MODAL BİTİŞ ================== -->
+
+  <!-- Scripts in optimal loading order -->
+  <script src=/vendor/hls.min.js></script>
+  <script src=/vendor/maplibre-gl.js></script>
+  <script src=/vendor/pmtiles-umd.js></script>
+  <script src=/vendor/basemaps.js></script>
+  <!-- H3 Hexagonal Grid (h3-js must load before deck.gl) -->
+  <script src="https://unpkg.com/h3-js@4.1.0/dist/h3-js.umd.js"></script>
+  <script src="https://unpkg.com/deck.gl@9.0.0/dist.min.js"></script>
+  <!-- Three.js r182 ES Module with Import Map -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script src=/js/labels.js?v=20260206></script>
+  <script src=/js/voice-commands.js?v=20260206></script>
+  <script src=/js/config.js?v=20260206></script>
+  <script src=/js/utils.js?v=20260206></script>
+  <script src=/js/analytics.js?v=20260225></script>
+  <script type="module" src="/js/3d-models.js?v=20260206"></script>
+  <script type="module" src="/js/particle-cube.js?v=20260206"></script>
+  <script defer src=/js/map.js?v=20260221></script>
+  <script defer src=/js/user-location.js?v=20260215></script>
+
+  <script defer src=/js/voice-control.js?v=20260213></script>
+  <script defer src=/js/auth.js?v=20260215d></script>
+  <script defer src=/js/live-broadcast.js?v=20260217c></script>
+  <script defer src=/js/comments.js?v=20260214></script>
+  <script defer src=/js/video-message.js?v=20260217e></script>
+  <!-- FaceID scripts loaded on demand by biometric-auth.js -->
+  <script defer src=/js/biometric-auth.js?v=20260206></script>
+  <script defer src=/js/user-profile.js?v=20260206></script>
+  <!-- Camera System Modules -->
+  <script defer src=/js/camera-system/index.js?v=20260206></script>
+  <script defer src=/js/camera-system/websocket.js?v=20260206></script>
+  <script defer src=/js/camera-system/camera-layer.js?v=20260206></script>
+  <script defer src=/js/camera-system/hls-player.js?v=20260220></script>
+  <script defer src=/js/camera-system/popup.js?v=20260221></script>
+  <script defer src=/js/camera-system/settings.js?v=20260206></script>
+  <script defer src=/js/camera-system/ai-monitoring.js?v=20260206></script>
+  <script defer src=/js/camera-system/face-blur.js?v=20260206></script>
+  <script defer src=/js/camera-system/terminal.js?v=20260206></script>
+  <script defer src=/js/camera-system/recording.js?v=20260206></script>
+  <script defer src=/js/camera-system/recordings-modal.js?v=20260206></script>
+  <script defer src=/js/camera-system/face-detection.js?v=20260206></script>
+  <script defer src=/js/camera-system/clickable-zones.js?v=20260206></script>
+  <script defer src=/js/camera-system/camera-grid.js?v=20260206></script>
+  <!-- H3 Grid Layer -->
+  <script defer src=/js/h3-grid.js?v=20260222></script>
+  <script defer src=/js/h3-tron-trails.js?v=20260223></script>
+  <!-- My Cameras after Camera System -->
+  <script defer src=/js/my-cameras.js?v=20260206></script>
+  <!-- Plyr Video Player - loaded async for performance -->
+  <script async src=https://cdn.plyr.io/3.8.4/plyr.polyfilled.js></script>
+  <script>
+    // Mark that modules are loaded and start camera system
+    window.CameraSystemModulesLoaded = true;
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.startCameraSystem) window.startCameraSystem();
+      if (window.LiveBroadcast) window.LiveBroadcast.init();
+      if (window.VideoMessage) window.VideoMessage.init();
+    });
+  </script>
+  <script src=/vendor/protobuf.min.js></script>
+  <script defer src=/js/tesla-dashcam.js?v=20260301></script>
+  <script defer src=/js/vehicle-animation.js?v=20260206></script>
+  <script defer src=/js/modal.js?v=20260206></script>
+</body>
+</html>

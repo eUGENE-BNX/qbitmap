@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QBitmap Admin</title>
+  <meta name="robots" content="noindex, nofollow">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/admin.css?v=1">
+</head>
+<body>
+  <div class="admin-container" style="display: none;">
+    <!-- Header -->
+    <header class="admin-header">
+      <div class="header-left">
+        <a href="/" class="logo">
+          <img src="/logo.png" alt="QBitmap" class="logo-icon">
+          QBitmap
+        </a>
+        <span class="admin-badge">Admin</span>
+      </div>
+      <div class="header-right">
+        <span class="user-email" id="user-email">Loading...</span>
+        <a href="/" class="btn btn-ghost">Back to App</a>
+        <button class="btn btn-ghost" id="logout-btn">Logout</button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <!-- Stats Cards -->
+      <section class="stats-section">
+        <div class="stat-card">
+          <span class="stat-value" id="stat-users">-</span>
+          <span class="stat-label">Total Users</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-active">-</span>
+          <span class="stat-label">Active</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-cameras">-</span>
+          <span class="stat-label">Cameras</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-online">-</span>
+          <span class="stat-label">Online</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-ai">-</span>
+          <span class="stat-label">AI Today</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-videos">-</span>
+          <span class="stat-label">Videos</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-photos">-</span>
+          <span class="stat-label">Photos</span>
+        </div>
+      </section>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" data-tab="users">Users</button>
+        <button class="tab" data-tab="plans">Plans</button>
+        <button class="tab" data-tab="onvif">ONVIF Profiles</button>
+        <button class="tab" data-tab="ai">AI Settings</button>
+        <button class="tab" data-tab="voice">Voice Call</button>
+        <button class="tab" data-tab="messages">Messages</button>
+        <button class="tab" data-tab="places">Places</button>
+      </div>
+
+      <!-- Users Tab -->
+      <section class="tab-content active" id="tab-users">
+        <div class="toolbar">
+          <input type="text" class="search-input" id="user-search" placeholder="Search by email or name...">
+          <select class="filter-select" id="plan-filter">
+            <option value="">All Plans</option>
+          </select>
+          <select class="filter-select" id="status-filter">
+            <option value="">All Status</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="users-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Plan</th>
+                <th>Cameras</th>
+                <th>Status</th>
+                <th>Last Login</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <!-- Users will be rendered here -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination" id="users-pagination">
+          <!-- Pagination will be rendered here -->
+        </div>
+      </section>
+
+      <!-- Plans Tab -->
+      <section class="tab-content" id="tab-plans">
+        <div class="toolbar">
+          <button class="btn btn-primary" id="add-plan-btn">+ New Plan</button>
+        </div>
+
+        <div class="plans-grid" id="plans-grid">
+          <!-- Plans will be rendered here -->
+        </div>
+      </section>
+
+      <!-- ONVIF Templates Tab -->
+      <section class="tab-content" id="tab-onvif">
+        <div class="toolbar">
+          <button class="btn btn-primary" id="add-onvif-btn">+ New Profile</button>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="onvif-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Model Name</th>
+                <th>Manufacturer</th>
+                <th>ONVIF Port</th>
+                <th>Supported Events</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="onvif-tbody">
+              <!-- ONVIF templates will be rendered here -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- AI Settings Tab -->
+      <section class="tab-content" id="tab-ai">
+        <div class="settings-card">
+          <h3>AI Vision Settings</h3>
+          <p class="hint">Varsayilan AI ayarlari. Kamera ayarlarindan kamera bazli override edilebilir.</p>
+
+          <div class="form-group">
+            <label>AI Service URL</label>
+            <input type="text" id="ai-service-url" class="form-input" placeholder="http://92.44.163.139:8001">
+            <p class="hint">Base URL for vLLM API (global - tum kameralar icin gecerli)</p>
+          </div>
+
+          <div class="form-group">
+            <label>Vision Model Name (Varsayilan)</label>
+            <input type="text" id="ai-vision-model" class="form-input" placeholder="Qwen/Qwen3-VL-8B-Instruct-FP8">
+            <p class="hint">Varsayilan model. Kamera ayarlarindan kamera bazli degistirilebilir.</p>
+          </div>
+
+          <div class="form-group">
+            <label>AI Monitoring Prompt (Varsayilan)</label>
+            <textarea id="ai-monitoring-prompt" class="form-input" rows="10" placeholder="Acil durum algılama prompt'u..."></textarea>
+            <p class="hint">Varsayilan izleme promptu. Kamera ayarlarinda bos birakilan kameralar bunu kullanir.</p>
+          </div>
+
+          <div class="form-group">
+            <label>AI Search Prompt (Varsayilan)</label>
+            <textarea id="ai-search-prompt" class="form-input" rows="3" placeholder="bu resimde ne görüyorsun..."></textarea>
+            <p class="hint">Varsayilan arama promptu. Kamera ayarlarinda bos birakilan kameralar bunu kullanir.</p>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Max Tokens (Varsayilan)</label>
+              <input type="number" id="ai-max-tokens" class="form-input" min="128" max="4096" value="1024">
+              <p class="hint">Varsayilan token limiti. Kamera bazli override edilebilir.</p>
+            </div>
+            <div class="form-group">
+              <label>Temperature (Varsayilan)</label>
+              <input type="number" id="ai-temperature" class="form-input" min="0" max="2" step="0.1" value="0.7">
+              <p class="hint">Varsayilan temperature. Kamera bazli override edilebilir.</p>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" id="save-ai-settings-btn">Save AI Settings</button>
+            <span class="save-status" id="ai-save-status"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Voice Call Settings Tab -->
+      <section class="tab-content" id="tab-voice">
+        <div class="settings-card">
+          <h3>Voice Call Settings (Matrix)</h3>
+          <p class="hint">Configure Matrix voice call integration for ONVIF events</p>
+
+          <div class="form-group">
+            <label>Entangle API URL</label>
+            <input type="text" id="voice-api-url" class="form-input" placeholder="http://91.98.131.74:8000">
+            <p class="hint">Base URL for Matrix/Entangle API</p>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Matrix Room ID</label>
+              <input type="text" id="voice-room-id" class="form-input" placeholder="!roomid:server.network">
+            </div>
+            <div class="form-group">
+              <label>Target User</label>
+              <input type="text" id="voice-target-user" class="form-input" placeholder="@callbot:server.network">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Default Sample Type</label>
+              <select id="voice-sample-type" class="form-select">
+                <option value="human">human</option>
+                <option value="person">person</option>
+                <option value="fire">fire</option>
+              </select>
+              <p class="hint">Audio sample played during call</p>
+            </div>
+            <div class="form-group">
+              <label>Cooldown (seconds)</label>
+              <input type="number" id="voice-cooldown" class="form-input" min="5" max="300" value="30">
+              <p class="hint">Wait time between calls per camera</p>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Auto Hangup After (ms)</label>
+              <input type="number" id="voice-auto-hangup" class="form-input" min="5000" max="120000" value="30000">
+              <p class="hint">Auto end call after this duration</p>
+            </div>
+            <div class="form-group">
+              <label>Call Timeout (ms)</label>
+              <input type="number" id="voice-call-timeout" class="form-input" min="10000" max="180000" value="60000">
+              <p class="hint">Max wait time for call to connect</p>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" id="save-voice-settings-btn">Save Voice Settings</button>
+            <span class="save-status" id="voice-save-status"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Messages Tab (Video + Photo) -->
+      <section class="tab-content" id="tab-messages">
+        <div class="toolbar">
+          <input type="text" class="search-input" id="msg-search" placeholder="Search by description, AI analysis, or sender...">
+          <select class="filter-select" id="msg-type-filter">
+            <option value="">All Types</option>
+            <option value="video">Videos</option>
+            <option value="photo">Photos</option>
+          </select>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="messages-table">
+            <thead>
+              <tr>
+                <th style="width:70px">Thumb</th>
+                <th>Description</th>
+                <th>Sender</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Views</th>
+                <th>Tags</th>
+                <th>Created</th>
+                <th style="width:70px">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="messages-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination" id="messages-pagination"></div>
+      </section>
+
+      <!-- Places Tab -->
+      <section class="tab-content" id="tab-places">
+        <div class="settings-card">
+          <h3>Google Places API Ayarlari</h3>
+          <p class="hint">Video/foto mesajlarda mekan etiketleme icin Google Places API yapilandirmasi.</p>
+
+          <div class="form-group">
+            <label>Arama Yaricapi (metre)</label>
+            <input type="number" id="places-radius" class="form-input" min="10" max="500" value="30">
+          </div>
+
+          <div class="form-group">
+            <label>Maks Sonuc Sayisi</label>
+            <input type="number" id="places-max-results" class="form-input" min="1" max="20" value="10">
+          </div>
+
+          <div class="form-group">
+            <label>Mekan Tipleri</label>
+            <textarea id="places-included-types" class="form-input" rows="3"
+              placeholder="restaurant, cafe, store, gas_station..."></textarea>
+            <p class="hint">Virgul ile ayrilmis Google Places tipleri. Ornek: restaurant, cafe, store, gas_station, supermarket, pharmacy, hotel, bar, museum, mosque</p>
+          </div>
+
+          <div class="form-group">
+            <label>Fallback Tipleri</label>
+            <textarea id="places-fallback-types" class="form-input" rows="2"
+              placeholder="shopping_mall, supermarket, park..."></textarea>
+            <p class="hint">Birincil tipler sonuc donmezse bu tipler denenir. Virgul ile ayirin.</p>
+          </div>
+
+          <button class="btn btn-primary" id="save-places-settings-btn">Kaydet</button>
+          <span class="save-status" id="places-settings-status"></span>
+        </div>
+
+        <div class="settings-card" style="margin-top:16px;">
+          <h3>Cache Istatistikleri</h3>
+          <div class="places-stats-grid" id="places-stats">Yukleniyor...</div>
+          <button class="btn btn-danger" id="clear-places-cache-btn" style="margin-top:12px;">Cache Temizle</button>
+        </div>
+
+        <div class="toolbar" style="margin-top:16px;">
+          <input type="text" class="search-input" id="places-search" placeholder="Mekan ara...">
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="places-table">
+            <thead>
+              <tr>
+                <th style="width:40px">Ikon</th>
+                <th>Mekan Adi</th>
+                <th>Koordinat</th>
+                <th>Tipler</th>
+                <th>Etiket</th>
+                <th style="width:80px">Islemler</th>
+              </tr>
+            </thead>
+            <tbody id="places-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination" id="places-pagination"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- User Edit Modal -->
+  <div class="modal-overlay" id="user-modal">
+    <div class="modal-content">
+      <button class="modal-close" id="user-modal-close">&times;</button>
+      <div class="modal-header">
+        <div class="modal-avatar" id="modal-avatar"></div>
+        <div class="modal-title">
+          <h3 id="modal-user-name">User Name</h3>
+          <p id="modal-user-email">user@example.com</p>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Plan</label>
+          <select id="modal-plan" class="form-select"></select>
+        </div>
+
+        <div class="form-group">
+          <label>Role</label>
+          <select id="modal-role" class="form-select">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="modal-active">
+            <span>Account Active</span>
+          </label>
+        </div>
+
+        <hr>
+
+        <h4>Feature Overrides</h4>
+        <p class="hint">Leave unchecked to use plan defaults</p>
+
+        <div class="override-grid">
+          <div class="override-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="override-cameras-enabled">
+              <span>Max Cameras</span>
+            </label>
+            <input type="number" id="override-cameras" class="form-input small" min="-1">
+          </div>
+
+          <div class="override-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="override-whep-enabled">
+              <span>Max WHEP</span>
+            </label>
+            <input type="number" id="override-whep" class="form-input small" min="-1">
+          </div>
+
+          <div class="override-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="override-ai-enabled">
+              <span>AI Analysis</span>
+            </label>
+            <input type="number" id="override-ai" class="form-input small" min="-1" placeholder="daily limit">
+          </div>
+
+          <div class="override-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="override-face-enabled">
+              <span>Face Recognition</span>
+            </label>
+            <input type="number" id="override-faces" class="form-input small" min="-1" placeholder="per camera">
+          </div>
+
+          <div class="override-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="override-recording-enabled">
+              <span>Recording Hours</span>
+            </label>
+            <input type="number" id="override-recording" class="form-input small" min="-1">
+          </div>
+
+          <div class="override-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="override-voice-call">
+              <span>Voice Call</span>
+            </label>
+          </div>
+
+          <div class="override-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="override-voice-control">
+              <span>Voice Control</span>
+            </label>
+          </div>
+
+          <div class="override-item">
+            <label class="checkbox-label">
+              <input type="checkbox" id="override-public-sharing">
+              <span>Public Sharing</span>
+            </label>
+          </div>
+        </div>
+
+        <hr>
+
+        <div class="form-group">
+          <label>Admin Notes</label>
+          <textarea id="modal-notes" class="form-textarea" rows="3" placeholder="Internal notes about this user..."></textarea>
+        </div>
+
+        <div class="usage-section">
+          <h4>Current Usage</h4>
+          <div class="usage-grid" id="modal-usage">
+            <!-- Usage stats will be rendered here -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="clear-overrides-btn">Clear Overrides</button>
+        <button class="btn btn-ghost" id="user-modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="user-modal-save">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plan Edit Modal -->
+  <div class="modal-overlay" id="plan-modal">
+    <div class="modal-content">
+      <button class="modal-close" id="plan-modal-close">&times;</button>
+      <div class="modal-header">
+        <h3 id="plan-modal-title">Edit Plan</h3>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Plan Name (ID)</label>
+            <input type="text" id="plan-name" class="form-input" placeholder="e.g., premium">
+          </div>
+          <div class="form-group">
+            <label>Display Name</label>
+            <input type="text" id="plan-display-name" class="form-input" placeholder="e.g., Premium">
+          </div>
+        </div>
+
+        <h4>Camera Limits</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Max Cameras (-1 = unlimited)</label>
+            <input type="number" id="plan-max-cameras" class="form-input" min="-1">
+          </div>
+          <div class="form-group">
+            <label>Max WHEP Cameras</label>
+            <input type="number" id="plan-max-whep" class="form-input" min="-1">
+          </div>
+        </div>
+
+        <h4>AI Features</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="plan-ai-enabled">
+              <span>AI Analysis Enabled</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label>Daily AI Limit</label>
+            <input type="number" id="plan-ai-limit" class="form-input" min="-1">
+          </div>
+        </div>
+
+        <h4>Face Recognition</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="plan-face-enabled">
+              <span>Face Recognition Enabled</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label>Max Faces per Camera</label>
+            <input type="number" id="plan-max-faces" class="form-input" min="-1">
+          </div>
+        </div>
+
+        <h4>Recording</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="plan-recording-enabled">
+              <span>Recording Enabled</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label>Max Recording Hours/Month</label>
+            <input type="number" id="plan-max-recording" class="form-input" min="-1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Recording Retention Days</label>
+          <input type="number" id="plan-retention-days" class="form-input" min="1">
+        </div>
+
+        <h4>User Features</h4>
+        <div class="form-row checkboxes">
+          <label class="checkbox-label">
+            <input type="checkbox" id="plan-voice-call">
+            <span>Voice Call</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="plan-voice-control">
+            <span>Voice Control</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="plan-public-sharing">
+            <span>Public Sharing</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="plan-priority-support">
+            <span>Priority Support</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="delete-plan-btn">Delete Plan</button>
+        <button class="btn btn-ghost" id="plan-modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="plan-modal-save">Save Plan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ONVIF Template Modal -->
+  <div class="modal-overlay" id="onvif-modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <button class="modal-close" id="onvif-modal-close">&times;</button>
+      <div class="modal-header">
+        <h3 id="onvif-modal-title">New ONVIF Profile</h3>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Model Name *</label>
+          <input type="text" id="onvif-model-name" class="form-input" placeholder="e.g., Tapo C100">
+        </div>
+
+        <div class="form-group">
+          <label>Manufacturer *</label>
+          <input type="text" id="onvif-manufacturer" class="form-input" placeholder="e.g., TP-Link">
+        </div>
+
+        <div class="form-group">
+          <label>Default ONVIF Port</label>
+          <input type="number" id="onvif-port" class="form-input" value="2020" min="1" max="65535">
+          <p class="hint">Common ports: Tapo=2020, Generic=80 or 8080</p>
+        </div>
+
+        <div class="form-group">
+          <label>Supported Events</label>
+          <div class="checkbox-grid">
+            <label class="checkbox-label">
+              <input type="checkbox" id="onvif-event-motion" checked>
+              <span>Motion</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="onvif-event-human">
+              <span>Human</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="onvif-event-pet">
+              <span>Pet</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="onvif-event-vehicle">
+              <span>Vehicle</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="onvif-event-tamper">
+              <span>Tamper</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="onvif-event-line">
+              <span>Line Crossing</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="delete-onvif-btn" style="display: none;">Delete</button>
+        <button class="btn btn-ghost" id="onvif-modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="onvif-modal-save">Save Profile</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/config.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/admin/index.js?v=4"></script>
+</body>
+</html>
