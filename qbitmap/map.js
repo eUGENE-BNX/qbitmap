@@ -1,18 +1,3 @@
-// Initialize PMTiles protocol
-const { PMTiles, Protocol } = window.pmtiles;
-const pmtilesUrl = `${location.origin}/maps/tr.pmtiles`;
-const atasehirSatelliteUrl = 'https://static.qbitmap.com/maps/Atasehir.pmtiles';
-const sincanSatelliteUrl = 'https://static.qbitmap.com/maps/Sincan02.pmtiles';
-const protocol = new Protocol();
-maplibregl.addProtocol("pmtiles", protocol.tile);
-
-// Add both PMTiles sources to protocol
-const pmtilesSource = new PMTiles(pmtilesUrl);
-const atasehirSource = new PMTiles(atasehirSatelliteUrl);
-const sincanSource = new PMTiles(sincanSatelliteUrl);
-protocol.add(pmtilesSource);
-protocol.add(atasehirSource);
-protocol.add(sincanSource);
 
 const sourceId = "protomaps";
 const baseLayers = basemaps.layers(sourceId, basemaps.LIGHT);
@@ -30,10 +15,10 @@ const style = {
     glyphs: "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
     sprite: "https://protomaps.github.io/basemaps-assets/sprites/v4/light",
     sources: {
-        [sourceId]: { type: "vector", url: `pmtiles://${pmtilesUrl}` },
+        [sourceId]: { type: "vector", url: `${location.origin}/tiles/tr.json` },
         "atasehir-satellite": {
             type: "raster",
-            url: `pmtiles://${atasehirSatelliteUrl}`,
+            url: "https://qbitmap.com/tiles/Atasehir.json",
             tileSize: 256,
             bounds: [29.0896, 40.9724, 29.1584, 41.0095],
             minzoom: 17,
@@ -41,7 +26,7 @@ const style = {
         },
         "sincan-satellite": {
             type: "raster",
-            url: `pmtiles://${sincanSatelliteUrl}`,
+            url: "https://qbitmap.com/tiles/Sincan02.json",
             tileSize: 256,
             bounds: [32.5483, 39.9492, 32.6114, 39.9837],
             minzoom: 17,

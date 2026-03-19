@@ -5,17 +5,6 @@ window.addEventListener('unhandledrejection', (event) => {
     }
 });
 
-// Initialize PMTiles protocol (only needed for satellite raster tiles)
-const { PMTiles, Protocol } = window.pmtiles;
-const atasehirSatelliteUrl = 'https://static.qbitmap.com/maps/Atasehir.pmtiles';
-const sincanSatelliteUrl = 'https://static.qbitmap.com/maps/Sincan02.pmtiles';
-const protocol = new Protocol();
-maplibregl.addProtocol("pmtiles", protocol.tile);
-
-const atasehirSource = new PMTiles(atasehirSatelliteUrl);
-const sincanSource = new PMTiles(sincanSatelliteUrl);
-protocol.add(atasehirSource);
-protocol.add(sincanSource);
 
 const sourceId = "protomaps";
 const baseLayers = basemaps.layers(sourceId, basemaps.LIGHT || basemaps.namedTheme("light"));
@@ -36,7 +25,7 @@ const style = {
         [sourceId]: { type: "vector", url: `${location.origin}/tiles/tr.json` },
         "atasehir-satellite": {
             type: "raster",
-            url: `pmtiles://${atasehirSatelliteUrl}`,
+            url: "https://qbitmap.com/tiles/Atasehir.json",
             tileSize: 256,
             bounds: [29.0896, 40.9724, 29.1584, 41.0095],
             minzoom: 17,
@@ -44,7 +33,7 @@ const style = {
         },
         "sincan-satellite": {
             type: "raster",
-            url: `pmtiles://${sincanSatelliteUrl}`,
+            url: "https://qbitmap.com/tiles/Sincan02.json",
             tileSize: 256,
             bounds: [32.5483, 39.9492, 32.6114, 39.9837],
             minzoom: 17,
