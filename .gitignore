@@ -48,7 +48,6 @@ qbitmap/js/faceplugin/
 qbitmap/js/*.wasm
 qbitmap/js/*.mjs
 qbitmap/*.wasm
-qbitmap/vendor/maplibre-gl.js
 
 # onvif cameras config (contains real IPs/credentials)
 onvif-events/cameras.json
