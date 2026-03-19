@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   mediamtx:
-    image: bluenviron/mediamtx:v1.17.0
+    image: bluenviron/mediamtx:1.17.0
     container_name: mediamtx
     restart: always
     network_mode: host
