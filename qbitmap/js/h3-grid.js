@@ -59,7 +59,10 @@ const H3Grid = {
     { minZoom: 10, resolution: 7 },
     { minZoom: 8,  resolution: 6 },
     { minZoom: 7,  resolution: 5 },
-    { minZoom: 0,  resolution: 4 }
+    { minZoom: 6,  resolution: 4 },
+    { minZoom: 4,  resolution: 3 },
+    { minZoom: 2,  resolution: 2 },
+    { minZoom: 0,  resolution: 1 }
   ],
 
   init(map) {
@@ -111,7 +114,7 @@ const H3Grid = {
     for (const entry of this.ZOOM_RESOLUTION_MAP) {
       if (zoom >= entry.minZoom) return entry.resolution;
     }
-    return 4;
+    return 1;
   },
 
   // Find the first non-basemap layer to insert H3 grid below it

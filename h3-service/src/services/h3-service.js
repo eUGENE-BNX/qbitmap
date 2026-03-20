@@ -12,14 +12,17 @@ const ZOOM_TO_RESOLUTION = [
   [10, 7],
   [8, 6],
   [7, 5],
-  [0, 4]
+  [6, 4],
+  [4, 3],
+  [2, 2],
+  [0, 1]
 ];
 
 function zoomToResolution(zoom) {
   for (const [minZoom, res] of ZOOM_TO_RESOLUTION) {
     if (zoom >= minZoom) return res;
   }
-  return 4;
+  return 1;
 }
 
 async function getViewportHexagons(swLat, swLng, neLat, neLng, zoom) {
