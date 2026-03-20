@@ -1,6 +1,7 @@
 const buildServer = require('./src/server');
 const config = require('./src/config');
 const { cleanupTokenCache } = require('./src/utils/jwt');
+const dbPool = require('./src/services/db-pool');
 
 let fastify;
 
@@ -36,6 +37,14 @@ async function shutdown(signal) {
   // Close Fastify server
   if (fastify) {
     await fastify.close();
+  }
+
+  // Close MySQL connection pool
+  try {
+    await dbPool.end();
+    console.log('Database pool closed');
+  } catch (err) {
+    console.error('Error closing database pool:', err);
   }
 
   console.log('Server closed');

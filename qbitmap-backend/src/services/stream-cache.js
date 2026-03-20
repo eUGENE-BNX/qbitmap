@@ -15,6 +15,9 @@ class StreamCache {
     // Stream timeout - remove inactive streams after 30 seconds
     this.streamTimeoutMs = 30000;
 
+    // Max cameras to cache simultaneously (prevent unbounded memory growth)
+    this.maxCameras = 500;
+
     // Start periodic cleanup (every 60 seconds)
     this.cleanupInterval = setInterval(() => {
       this.cleanupStaleData();
@@ -69,6 +72,16 @@ class StreamCache {
    * @param {Buffer} frameData - JPEG frame data
    */
   set(cameraId, frameData) {
+    // Evict oldest frame if at capacity
+    if (!this.frames.has(cameraId) && this.frames.size >= this.maxCameras) {
+      let oldestId = null, oldestTime = Infinity;
+      for (const [id, entry] of this.frames.entries()) {
+        const t = entry.timestamp.getTime();
+        if (t < oldestTime) { oldestTime = t; oldestId = id; }
+      }
+      if (oldestId !== null) this.frames.delete(oldestId);
+    }
+
     const entry = {
       buffer: frameData,
       timestamp: new Date(),

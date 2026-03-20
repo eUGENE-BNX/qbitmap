@@ -3,6 +3,12 @@
  * Handles recording, uploading, and displaying video messages on the map
  */
 
+function _haptic(style) {
+  if (!navigator.vibrate) return;
+  const p = { light: 10, medium: 20, heavy: 30, success: [10, 50, 20] };
+  navigator.vibrate(p[style] || 10);
+}
+
 const VideoMessage = {
   // Recording state
   isRecording: false,
@@ -189,6 +195,8 @@ const VideoMessage = {
   showPhotoCaptureModal() {
     const modal = document.createElement('div');
     modal.className = 'video-msg-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
     modal.innerHTML = `
       <div class="video-msg-modal-content">
         <div class="video-msg-video-container" id="vmsg-video-container">
@@ -212,16 +220,16 @@ const VideoMessage = {
           </button>
         </div>
         <div class="video-msg-controls photo-controls" id="vmsg-controls">
-          <button class="video-msg-btn video-msg-btn-cancel" id="vmsg-cancel" title="İptal">
+          <button class="video-msg-btn video-msg-btn-cancel" id="vmsg-cancel" title="İptal" aria-label="İptal">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
-          <button class="video-msg-btn video-msg-btn-capture" id="vmsg-capture" title="Fotoğraf Çek">
+          <button class="video-msg-btn video-msg-btn-capture" id="vmsg-capture" title="Fotoğraf Çek" aria-label="Fotoğraf çek">
             <div class="capture-inner"></div>
           </button>
-          <button class="video-msg-btn" id="vmsg-switch-cam" title="Kamerayı Değiştir">
+          <button class="video-msg-btn" id="vmsg-switch-cam" title="Kamerayı Değiştir" aria-label="Kamerayı değiştir">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M20 16v4a2 2 0 0 1-2 2h-4M4 8V4a2 2 0 0 1 2-2h4M16 4l4 4-4 4M8 20l-4-4 4-4"/>
             </svg>
@@ -291,6 +299,8 @@ const VideoMessage = {
 
     this._capturedWidth = targetW;
     this._capturedHeight = targetH;
+
+    _haptic('medium');
 
     // Stop camera
     this.mediaStream.getTracks().forEach(t => t.stop());
@@ -517,6 +527,8 @@ const VideoMessage = {
   showRecordingModal() {
     const modal = document.createElement('div');
     modal.className = 'video-msg-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
     modal.innerHTML = `
       <div class="video-msg-modal-content">
         <div class="video-msg-video-container" id="vmsg-video-container">
@@ -528,19 +540,19 @@ const VideoMessage = {
           </div>
         </div>
         <div class="video-msg-controls" id="vmsg-controls">
-          <button class="video-msg-btn video-msg-btn-cancel" id="vmsg-cancel" title="İptal">
+          <button class="video-msg-btn video-msg-btn-cancel" id="vmsg-cancel" title="İptal" aria-label="İptal">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
-          <button class="photo-flash-btn" id="video-flash" title="Flaş" style="display:none;">
+          <button class="photo-flash-btn" id="video-flash" title="Flaş" aria-label="Flaş aç/kapat" style="display:none;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
           </button>
-          <button class="video-msg-btn video-msg-btn-record" id="vmsg-record" title="Kayıt Başlat">
+          <button class="video-msg-btn video-msg-btn-record" id="vmsg-record" title="Kayıt Başlat" aria-label="Video kaydını başlat">
             <div class="rec-inner"></div>
           </button>
-          <button class="video-msg-btn" id="vmsg-switch-cam" title="Kamerayı Değiştir">
+          <button class="video-msg-btn" id="vmsg-switch-cam" title="Kamerayı Değiştir" aria-label="Kamerayı değiştir">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="1 4 1 10 7 10"/>
               <polyline points="23 20 23 14 17 14"/>
@@ -632,6 +644,7 @@ const VideoMessage = {
     this.mediaRecorder.start(1000); // Collect data every 1s
     this.isRecording = true;
     this.recordingStartTime = Date.now();
+    _haptic('medium');
 
     // Update UI
     const container = this._modalEl.querySelector('#vmsg-video-container');
@@ -642,6 +655,10 @@ const VideoMessage = {
 
     const recIndicator = this._modalEl.querySelector('#vmsg-rec-indicator');
     recIndicator.style.display = '';
+
+    // Disable camera switch during recording
+    const switchBtn = this._modalEl.querySelector('#vmsg-switch-cam');
+    if (switchBtn) { switchBtn.disabled = true; switchBtn.style.opacity = '0.3'; }
 
     // Replace record button with stop button
     const controls = this._modalEl.querySelector('#vmsg-controls');
@@ -679,6 +696,10 @@ const VideoMessage = {
     clearInterval(this.recordingTimer);
     this.recordingTimer = null;
     this.isRecording = false;
+
+    // Re-enable camera switch
+    const switchBtn = this._modalEl?.querySelector('#vmsg-switch-cam');
+    if (switchBtn) { switchBtn.disabled = false; switchBtn.style.opacity = ''; }
 
     if (this.mediaRecorder.state !== 'inactive') {
       this.mediaRecorder.stop();
@@ -1214,6 +1235,7 @@ const VideoMessage = {
     if (actions) actions.style.display = 'none';
 
     try {
+      const uploadStartTime = Date.now();
       const result = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', this.apiBase, true);
@@ -1223,7 +1245,17 @@ const VideoMessage = {
           if (e.lengthComputable && progressBar) {
             const pct = Math.round((e.loaded / e.total) * 100);
             progressBar.style.width = pct + '%';
-            if (progressText) progressText.textContent = `Yükleniyor... ${pct}%`;
+            if (progressText) {
+              const elapsed = (Date.now() - uploadStartTime) / 1000;
+              if (pct > 0 && pct < 100 && elapsed > 1) {
+                const speed = e.loaded / elapsed;
+                const remaining = Math.ceil((e.total - e.loaded) / speed);
+                const eta = remaining < 60 ? `${remaining}s` : `${Math.floor(remaining / 60)}dk ${remaining % 60}s`;
+                progressText.textContent = `Yükleniyor... ${pct}% (${eta} kaldı)`;
+              } else {
+                progressText.textContent = `Yükleniyor... ${pct}%`;
+              }
+            }
           }
         };
 
@@ -1248,6 +1280,7 @@ const VideoMessage = {
         this.updateMapLayer();
       }
 
+      _haptic('success');
       this.cleanupAndClose();
       Analytics.event('video_message_create', { type: this.isPhotoMode ? 'photo' : 'video', has_location: !!this.selectedLocation, is_private: !!this.isPrivate });
       AuthSystem.showNotification(this.isPhotoMode ? 'Foto mesaj gönderildi' : 'Video mesaj gönderildi', 'success');
@@ -2280,10 +2313,21 @@ const VideoMessage = {
         applyTransform();
       }
     }, { passive: false });
-    container.addEventListener('touchend', () => {
+    let lastTapTime = 0;
+    container.addEventListener('touchend', (e) => {
       isPanning = false;
       lastTouchDist = 0;
-    }, { passive: true });
+      // Double-tap to zoom
+      if (e.touches.length === 0) {
+        const now = Date.now();
+        if (now - lastTapTime < 300) {
+          e.preventDefault();
+          if (scale > 1) { scale = 1; panX = 0; panY = 0; } else { scale = 2.5; }
+          applyTransform();
+        }
+        lastTapTime = now;
+      }
+    }, { passive: false });
 
     // Focus for keyboard events
     overlay.tabIndex = -1;
@@ -2883,7 +2927,9 @@ const VideoMessage = {
       this._orientationHandler = null;
     }
     if (this._modalEl) {
-      this._modalEl.remove();
+      const modal = this._modalEl;
+      modal.classList.add('closing');
+      modal.addEventListener('animationend', () => modal.remove(), { once: true });
       this._modalEl = null;
     }
   }

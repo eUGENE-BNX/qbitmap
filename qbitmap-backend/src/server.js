@@ -64,6 +64,7 @@ async function buildServer() {
     crossOriginEmbedderPolicy: false, // Allow embedding external resources
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     // Additional security headers
+    hsts: { maxAge: 31536000, includeSubDomains: true }, // Force HTTPS for 1 year
     xFrameOptions: { action: 'sameorigin' }, // Prevent clickjacking
     xContentTypeOptions: true, // Prevent MIME sniffing
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
@@ -168,15 +169,17 @@ async function buildServer() {
   cleanupService.start();
 
   // Initialize WebSocket server after server is ready
-  fastify.ready(async (err) => {
+  fastify.ready((err) => {
     if (err) {
       logger.error({ err }, 'Server ready error');
       throw err;
     }
     wsService.initialize(fastify.server);
 
-    // Sync RTSP cameras with MediaMTX on startup
-    await syncRtspCamerasWithMediamtx();
+    // Sync RTSP cameras with MediaMTX on startup (non-blocking)
+    syncRtspCamerasWithMediamtx().catch(err =>
+      logger.error({ err }, 'Initial MediaMTX sync failed (will retry in 2 minutes)')
+    );
 
     // Periodic sync every 2 minutes (in case MediaMTX restarts)
     setInterval(syncRtspCamerasWithMediamtx, 2 * 60 * 1000);

@@ -437,7 +437,7 @@ const H3Grid = {
       const medal = i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'transparent';
       const userColor = this._getUserColor(u.userId);
       const avatarHtml = u.avatarUrl
-        ? `<img src="${u.avatarUrl}" style="width:32px;height:32px;border-radius:50%;flex-shrink:0;border:2px solid ${userColor.hex};" onerror="this.style.display='none'" />`
+        ? `<img src="${this._escapeHtml(u.avatarUrl)}" style="width:32px;height:32px;border-radius:50%;flex-shrink:0;border:2px solid ${userColor.hex};" onerror="this.style.display='none'" />`
         : `<div style="width:32px;height:32px;border-radius:50%;background:${userColor.hex};opacity:0.5;flex-shrink:0;"></div>`;
       const totalArea = this._formatArea(u.cellCount * res13Area);
       return `

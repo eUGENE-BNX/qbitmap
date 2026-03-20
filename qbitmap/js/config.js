@@ -79,12 +79,9 @@ const QBitmapConfig = {
     confidenceThreshold: 0.7
   },
 
-  // Voice Call Defaults (used when backend settings not configured)
-  // NOTE: These should match values in backend's .env
+  // Voice Call Defaults (non-sensitive fallbacks only)
+  // Sensitive values (apiUrl, roomId, targetUser) must come from backend settings
   voiceDefaults: {
-    apiUrl: 'http://91.98.131.74:8000',  // Voice API server
-    roomId: '!DMOAJwitQWHheVdNpI:entangle.reserve.network',
-    targetUser: '@callbot:entangle.reserve.network',
     sampleType: 'human',
     cooldown: 30,
     autoHangup: 30000,

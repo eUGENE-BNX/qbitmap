@@ -836,20 +836,22 @@ class DatabaseService {
   }
 
   async getOnvifEvents(cameraId, limit = 100) {
+    const safeLimit = Math.min(Math.max(parseInt(limit) || 100, 1), 500);
     const [rows] = await this.pool.execute(
-      `SELECT id, camera_id, event_type, event_state, event_data, \`timestamp\` FROM onvif_events WHERE camera_id = ? ORDER BY \`timestamp\` DESC LIMIT ${parseInt(limit)}`,
+      `SELECT id, camera_id, event_type, event_state, event_data, \`timestamp\` FROM onvif_events WHERE camera_id = ? ORDER BY \`timestamp\` DESC LIMIT ${safeLimit}`,
       [cameraId]
     );
     return rows;
   }
 
   async getAllRecentOnvifEvents(limit = 50) {
+    const safeLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 500);
     const [rows] = await this.pool.query(`
       SELECT oe.*, c.device_id, c.name
       FROM onvif_events oe
       JOIN cameras c ON c.id = oe.camera_id
       ORDER BY oe.\`timestamp\` DESC
-      LIMIT ${parseInt(limit)}
+      LIMIT ${safeLimit}
     `);
     return rows;
   }
@@ -1053,8 +1055,9 @@ class DatabaseService {
   }
 
   async getFaceDetectionLogs(cameraId, limit = 10) {
+    const safeLimit = Math.min(Math.max(parseInt(limit) || 10, 1), 200);
     const [rows] = await this.pool.execute(
-      `SELECT l.id, l.face_id, l.person_name, l.confidence, l.detected_at, f.face_image_url FROM face_detection_log l LEFT JOIN camera_faces f ON l.face_id = f.id WHERE l.camera_id = ? ORDER BY l.detected_at DESC LIMIT ${parseInt(limit)}`,
+      `SELECT l.id, l.face_id, l.person_name, l.confidence, l.detected_at, f.face_image_url FROM face_detection_log l LEFT JOIN camera_faces f ON l.face_id = f.id WHERE l.camera_id = ? ORDER BY l.detected_at DESC LIMIT ${safeLimit}`,
       [cameraId]
     );
     return rows;
@@ -1594,9 +1597,16 @@ class DatabaseService {
       }
     }
 
-    if (this.accessCache.size < ACCESS_CACHE_MAX_SIZE) {
-      this.accessCache.set(cacheKey, { result, time: Date.now() });
+    // Evict oldest entries when cache is full
+    if (this.accessCache.size >= ACCESS_CACHE_MAX_SIZE) {
+      const now = Date.now();
+      let oldestKey = null, oldestTime = Infinity;
+      for (const [key, entry] of this.accessCache.entries()) {
+        if (entry.time < oldestTime) { oldestTime = entry.time; oldestKey = key; }
+      }
+      if (oldestKey) this.accessCache.delete(oldestKey);
     }
+    this.accessCache.set(cacheKey, { result, time: Date.now() });
 
     return result;
   }

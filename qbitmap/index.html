@@ -2,7 +2,7 @@
 <html lang=tr>
 <head>
   <meta charset=utf-8>
-  <meta name=viewport content=width=device-width, initial-scale=1.0>
+  <meta name=viewport content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name=description content=QBitmap - Vision Network>
   <title>QBitmap | Vision Network</title>
   <link rel=icon href=data:,>
@@ -36,7 +36,7 @@
   <link rel=stylesheet href=/css/comments.css?v=20260215>
   <link rel=stylesheet href=/css/live-broadcast.css?v=20260215>
   <!-- Plyr Video Player -->
-  <link rel=stylesheet href=https://cdn.plyr.io/3.8.4/plyr.css>
+  <link rel=stylesheet href=https://cdn.plyr.io/3.8.4/plyr.css integrity="sha384-VqqE0KSv00qfHvKpRa8aov+g3xtUu2Rw0NsEmtjTOPGn/JDKVghgd56iw/VObHa7" crossorigin="anonymous">
 </head>
 <body>
   <div id=map></div>
@@ -84,8 +84,8 @@
   <script src=/vendor/maplibre-gl.js></script>
   <script src=/vendor/basemaps.js></script>
   <!-- H3 Hexagonal Grid (h3-js must load before deck.gl) -->
-  <script src="https://unpkg.com/h3-js@4.1.0/dist/h3-js.umd.js"></script>
-  <script src="https://unpkg.com/deck.gl@9.0.0/dist.min.js"></script>
+  <script src="https://unpkg.com/h3-js@4.1.0/dist/h3-js.umd.js" integrity="sha384-nKUDlg+fT0U/eEt4KWP9n034kLe/eVj6k7CVjbu6qfRhJdEyinlGajS9+9AU+UZ5" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/deck.gl@9.0.0/dist.min.js" integrity="sha384-swFovX3ZcjmbLcV6TDG5hfxTmX+r/s/2lxRXi2wD1At3LGvgDY/YkSVyzuvQmJys" crossorigin="anonymous"></script>
   <!-- Three.js r182 ES Module with Import Map -->
   <script type="importmap">
   {
@@ -134,7 +134,7 @@
   <!-- My Cameras after Camera System -->
   <script defer src=/js/my-cameras.js?v=20260206></script>
   <!-- Plyr Video Player - loaded async for performance -->
-  <script async src=https://cdn.plyr.io/3.8.4/plyr.polyfilled.js></script>
+  <script async src=https://cdn.plyr.io/3.8.4/plyr.polyfilled.js integrity="sha384-ZDYtn77N2Oxc6W8oilE9z73hj1EZqidVlQeqTwsKW19gglwyUYHMn/LzX+ewyFJD" crossorigin="anonymous"></script>
   <script>
     // Mark that modules are loaded and start camera system
     window.CameraSystemModulesLoaded = true;

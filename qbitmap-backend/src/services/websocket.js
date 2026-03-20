@@ -158,6 +158,7 @@ class WebSocketService {
       });
 
       ws.on('close', () => {
+        if (ws._authTimeout) clearTimeout(ws._authTimeout);
         clearRateLimit(ws);
         decrementIpConnection(ws.clientIp);
         this.removeClient(ws);
@@ -174,6 +175,16 @@ class WebSocketService {
 
       // Note: Initial state is sent after authentication, not on connection
       // This prevents leaking monitoring/alarm data to unauthenticated users
+
+      // [SECURITY] Close unauthenticated connections after 10 seconds
+      if (!ws.userId) {
+        ws._authTimeout = setTimeout(() => {
+          if (!ws.userId) {
+            logger.warn({ ip: clientIp }, 'Closing unauthenticated WebSocket after timeout');
+            ws.close(1008, 'Authentication timeout');
+          }
+        }, 10000);
+      }
     });
 
     // Heartbeat to detect dead connections (store interval for cleanup)

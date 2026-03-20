@@ -27,6 +27,9 @@ async function faceDetectionRoutes(fastify, options) {
   // All routes require authentication
   fastify.addHook("preHandler", authHook);
 
+  // Route-level rate limit for face detection (resource-intensive)
+  const faceRateLimit = { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } };
+
   /**
    * GET /api/face-detection/active
    * Get all cameras with face detection enabled for current user
@@ -118,7 +121,8 @@ async function faceDetectionRoutes(fastify, options) {
    * Add a reference face to a camera
    */
   fastify.post("/:deviceId/faces", {
-    preHandler: checkFaceLimitMiddleware
+    preHandler: checkFaceLimitMiddleware,
+    ...faceRateLimit
   }, async (request, reply) => {
     const { deviceId } = request.params;
     const { error, camera } = await getCameraByDeviceId(deviceId, request.user.userId);
@@ -341,7 +345,7 @@ async function faceDetectionRoutes(fastify, options) {
    * POST /api/face-detection/:deviceId/recognize
    * Recognize faces in an image (proxies to Face API with auth)
    */
-  fastify.post("/:deviceId/recognize", async (request, reply) => {
+  fastify.post("/:deviceId/recognize", { ...faceRateLimit }, async (request, reply) => {
     const { deviceId } = request.params;
 
     const { error, camera } = await getCameraByDeviceId(deviceId, request.user.userId);

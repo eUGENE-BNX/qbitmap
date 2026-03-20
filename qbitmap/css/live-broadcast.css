@@ -187,3 +187,27 @@
   color: white;
   animation: pulse-mic 1.5s ease-in-out infinite;
 }
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .location-dialog-btn {
+    padding: 14px 16px;
+    font-size: 15px;
+    min-height: 48px;
+  }
+  .broadcast-location-hint {
+    font-size: 12px;
+    padding: 6px 12px;
+    max-width: calc(100vw - 32px);
+    white-space: normal;
+    top: calc(60px + env(safe-area-inset-top, 0));
+  }
+  .broadcast-location-hint .hint-cancel {
+    padding: 6px 14px;
+    font-size: 13px;
+    min-height: 36px;
+  }
+  .location-dialog-content {
+    padding: 20px 16px;
+  }
+}

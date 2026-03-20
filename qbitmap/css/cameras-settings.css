@@ -879,30 +879,34 @@
   }
 
   .cam-btn {
-    width: 20px;
-    height: 20px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
   }
 
   .cam-btn svg {
-    width: 12px;
-    height: 12px;
+    width: 16px;
+    height: 16px;
   }
 
   .camera-popup-buttons {
-    gap: 3px;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .camera-title-line1 .camera-viewers {
+    font-size: 12px;
   }
 }
 
 @media (max-width: 700px) {
   /* Mobil: Varsayılan küçük, tıklayınca büyük */
-  .camera-frame-container {
-    width: 350px;
-    height: 197px; /* 16:9 ratio */
-  }
-
+  .camera-frame-container,
   .camera-frame-container.zoom-0 {
-    width: 350px;
-    height: 197px; /* 16:9 ratio */
+    width: calc(100vw - 24px);
+    max-width: 350px;
+    height: auto;
+    aspect-ratio: 16 / 9;
   }
 
   .camera-frame-container.camera-frame-container.zoom-1 {
@@ -917,6 +921,24 @@
     max-width: 100vw;
     height: auto;
     aspect-ratio: 16/9;
+  }
+
+  .camera-popup-buttons .terminal-btn,
+  .camera-popup-buttons .draw-zone-btn,
+  .camera-popup-buttons .toggle-zones-btn,
+  .camera-popup-buttons .blur-btn,
+  .camera-popup-buttons .ai-search-btn,
+  .camera-popup-buttons .ai-active-btn,
+  .camera-popup-buttons .ai-btn,
+  .camera-popup-buttons .search-btn,
+  .camera-popup-buttons .protocol-toggle-btn,
+  .camera-popup-buttons .mjpeg-btn,
+  .camera-popup-buttons .settings-btn,
+  .camera-popup-buttons .broadcast-switch-cam-btn,
+  .camera-popup-buttons .broadcast-res-btn,
+  .camera-popup-buttons .broadcast-ai-btn,
+  .camera-popup-buttons .broadcast-face-btn {
+    display: none !important;
   }
 
   .settings-panel {

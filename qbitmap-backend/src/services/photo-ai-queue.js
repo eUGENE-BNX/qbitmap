@@ -11,9 +11,10 @@ const { getVllmUrl, getModelName, getBackendUrl } = require('../utils/ai-config'
 const MAX_RETRIES = 2;
 const TIMEOUT = 60000; // 60s for photo analysis
 const MAX_QUEUE_SIZE = 100;
+const MAX_CONCURRENCY = 3; // Process up to 3 photos in parallel
 
 const queue = [];
-let processing = false;
+let activeCount = 0;
 
 const PROMPT = 'Bu fotografi analiz et ve Turkce olarak 300-350 karakter arasinda bir icerik aciklamasi yaz. Fotograftaki onemli gorsel ogeleri, ortami ve dikkate deger detaylari acikla. Sadece aciklama metnini yaz, baska bir sey ekleme ve Fotografta gorunmeyen bir seyi varsayma.';
 
@@ -24,30 +25,34 @@ function enqueue(messageId, fileName) {
   }
   queue.push({ messageId, fileName, retries: 0 });
   logger.info({ messageId, queueLength: queue.length }, 'Photo enqueued for AI analysis');
-  if (!processing) processNext();
+  drainQueue();
 }
 
-async function processNext() {
-  if (queue.length === 0) {
-    processing = false;
-    return;
+function drainQueue() {
+  while (queue.length > 0 && activeCount < MAX_CONCURRENCY) {
+    const item = queue.shift();
+    activeCount++;
+    processItem(item);
   }
+}
 
-  processing = true;
-  const item = queue.shift();
-
+async function processItem(item) {
   try {
     await analyzePhoto(item);
   } catch (err) {
     logger.error({ messageId: item.messageId, err: err.message, retries: item.retries }, 'Photo AI analysis failed');
-    if (item.retries < MAX_RETRIES) {
+    if (item.retries < MAX_RETRIES && queue.length < MAX_QUEUE_SIZE) {
       item.retries++;
-      queue.push(item);
-      logger.info({ messageId: item.messageId, retry: item.retries }, 'Re-queued for retry');
+      // Exponential backoff: 5s, 10s
+      const delay = 5000 * item.retries;
+      logger.info({ messageId: item.messageId, retry: item.retries, delayMs: delay }, 'Re-queued for retry with backoff');
+      setTimeout(() => { queue.push(item); drainQueue(); }, delay);
+      activeCount--;
+      return;
     }
   }
-
-  setImmediate(processNext);
+  activeCount--;
+  drainQueue();
 }
 
 async function analyzePhoto({ messageId, fileName }) {
@@ -94,7 +99,7 @@ async function analyzePhoto({ messageId, fileName }) {
 }
 
 function getStats() {
-  return { queueLength: queue.length, processing };
+  return { queueLength: queue.length, activeCount, processing: activeCount > 0 };
 }
 
 module.exports = { enqueue, getStats };

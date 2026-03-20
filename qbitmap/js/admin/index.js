@@ -1031,11 +1031,11 @@ const AdminPanel = {
       // Helper to get setting value
       const getSetting = (key) => settings.find(s => s.key === key)?.value || '';
 
-      // Populate Voice Call form fields (use config defaults if backend settings not set)
+      // Populate Voice Call form fields (sensitive values must come from backend)
       const vd = QBitmapConfig.voiceDefaults;
-      document.getElementById('voice-api-url').value = getSetting('voice_api_url') || vd.apiUrl;
-      document.getElementById('voice-room-id').value = getSetting('voice_room_id') || vd.roomId;
-      document.getElementById('voice-target-user').value = getSetting('voice_target_user') || vd.targetUser;
+      document.getElementById('voice-api-url').value = getSetting('voice_api_url') || '';
+      document.getElementById('voice-room-id').value = getSetting('voice_room_id') || '';
+      document.getElementById('voice-target-user').value = getSetting('voice_target_user') || '';
       document.getElementById('voice-sample-type').value = getSetting('voice_sample_type') || vd.sampleType;
       document.getElementById('voice-cooldown').value = getSetting('voice_cooldown') || vd.cooldown;
       document.getElementById('voice-auto-hangup').value = getSetting('voice_auto_hangup') || vd.autoHangup;

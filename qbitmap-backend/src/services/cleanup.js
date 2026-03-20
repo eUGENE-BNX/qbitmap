@@ -15,12 +15,14 @@ class CleanupService {
       this.runMaintenance();
     });
 
-    // Run stale broadcast cleanup every 60 seconds
-    this.broadcastCleanupInterval = setInterval(() => {
-      this.cleanupStaleBroadcasts();
-    }, 60 * 1000);
+    // Run stale broadcast cleanup every 60 seconds (offset by 30s to avoid collision with stream-cache cleanup)
+    setTimeout(() => {
+      this.broadcastCleanupInterval = setInterval(() => {
+        this.cleanupStaleBroadcasts();
+      }, 60 * 1000);
+    }, 30 * 1000);
 
-    console.log('Cleanup service started - maintenance every 6 hours, broadcast cleanup every 60s');
+    console.log('Cleanup service started - maintenance every 6 hours, broadcast cleanup every 60s (30s offset)');
   }
 
   async runMaintenance() {

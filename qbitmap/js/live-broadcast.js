@@ -3,6 +3,12 @@
  * Handles live video broadcasting from user's device to the map via WHIP
  */
 
+function _hapticBroadcast(style) {
+  if (!navigator.vibrate) return;
+  const p = { light: 10, medium: 20, heavy: 30, success: [10, 50, 20] };
+  navigator.vibrate(p[style] || 10);
+}
+
 const LiveBroadcast = {
   // State
   isBroadcasting: false,
@@ -229,6 +235,7 @@ const LiveBroadcast = {
         window.map.flyTo({ center: [bc.lng, bc.lat], zoom: Math.max(window.map.getZoom(), 14) });
       }
 
+      _hapticBroadcast('success');
       AuthSystem.showNotification('Canlı yayın başladı', 'success');
       Logger.log('[LiveBroadcast] Broadcasting started');
 
@@ -598,7 +605,7 @@ const LiveBroadcast = {
             </div>
           </div>
           <div class="camera-popup-buttons">
-            <button class="cam-btn broadcast-switch-cam-btn" title="Kamerayı Değiştir" style="display:${isOwnBroadcast ? 'flex' : 'none'};">
+            <button class="cam-btn broadcast-switch-cam-btn" title="Kamerayı Değiştir" aria-label="Kamerayı değiştir" style="display:${isOwnBroadcast ? 'flex' : 'none'};">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="1 4 1 10 7 10"/>
                 <polyline points="23 20 23 14 17 14"/>
@@ -606,26 +613,26 @@ const LiveBroadcast = {
                 <path d="M3.51 15A9 9 0 0 0 18.36 18.36L23 14"/>
               </svg>
             </button>
-            <button class="cam-btn broadcast-res-btn" title="Çözünürlük" style="display:${isOwnBroadcast ? 'flex' : 'none'};">
+            <button class="cam-btn broadcast-res-btn" title="Çözünürlük" aria-label="Çözünürlük değiştir" style="display:${isOwnBroadcast ? 'flex' : 'none'};">
               <span style="font-size:9px;font-weight:700;">${this.currentResolution.label}</span>
             </button>
-            <button class="cam-btn broadcast-ai-analyze-btn" title="AI Analiz" style="display:none;">
+            <button class="cam-btn broadcast-ai-analyze-btn" title="AI Analiz" aria-label="AI analiz başlat" style="display:none;">
               <span style="font-weight:900;font-size:11px;letter-spacing:-0.5px;">AI</span>
             </button>
-            <button class="cam-btn ai-search-btn broadcast-ai-btn" title="AI Arama (Alan Sec)" style="display:none;">
+            <button class="cam-btn ai-search-btn broadcast-ai-btn" title="AI Arama (Alan Sec)" aria-label="AI arama modu" style="display:none;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8"/>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 <path d="M9 11h4M11 9v4" stroke-width="1.5"/>
               </svg>
             </button>
-            <button class="cam-btn ai-search-btn broadcast-face-btn" title="Yüz Tanıma" style="display:${isLoggedIn ? 'flex' : 'none'};">
+            <button class="cam-btn ai-search-btn broadcast-face-btn" title="Yüz Tanıma" aria-label="Yüz tanıma" style="display:${isLoggedIn ? 'flex' : 'none'};">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="10" r="3"/><path d="M7 21v-2a5 5 0 0 1 10 0v2"/></svg>
             </button>
-            <button class="cam-btn record-btn broadcast-rec-btn" title="Kayıt" style="display:${isLoggedIn && this.isBroadcasting ? 'flex' : 'none'};">
+            <button class="cam-btn record-btn broadcast-rec-btn" title="Kayıt" aria-label="Kayıt başlat" style="display:${isLoggedIn && this.isBroadcasting ? 'flex' : 'none'};">
               <span class="rec-text">REC</span>
             </button>
-            <button class="cam-btn audio-btn" title="Ses">
+            <button class="cam-btn audio-btn" title="Ses" aria-label="Sesi aç/kapat">
               <svg class="audio-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                 <line x1="23" y1="9" x2="17" y2="15"></line>
@@ -636,7 +643,7 @@ const LiveBroadcast = {
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
               </svg>
             </button>
-            <button class="cam-btn close-btn" title="Kapat">
+            <button class="cam-btn close-btn" title="Kapat" aria-label="Yayını kapat">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -734,6 +741,17 @@ const LiveBroadcast = {
       if (frameContainer) {
         this._popupZoomLevel = 0;
         frameContainer.ondblclick = () => this.cycleBroadcastZoom(popupEl);
+        // Double-tap for mobile
+        let lastTapFrame = 0;
+        frameContainer.addEventListener('touchend', (e) => {
+          if (this._aiSearchMode) return;
+          const now = Date.now();
+          if (now - lastTapFrame < 300) {
+            e.preventDefault();
+            this.cycleBroadcastZoom(popupEl);
+          }
+          lastTapFrame = now;
+        }, { passive: false });
       }
 
       // Zoom: double-click on header to cycle zoom-1 -> zoom-2 -> zoom-0
@@ -743,6 +761,17 @@ const LiveBroadcast = {
           if (e.target.closest('button')) return;
           this.cycleBroadcastToZoom2(popupEl);
         };
+        // Double-tap for mobile
+        let lastTapHeader = 0;
+        header.addEventListener('touchend', (e) => {
+          if (e.target.closest('button')) return;
+          const now = Date.now();
+          if (now - lastTapHeader < 300) {
+            e.preventDefault();
+            this.cycleBroadcastToZoom2(popupEl);
+          }
+          lastTapHeader = now;
+        }, { passive: false });
       }
 
       if (whepUrl) {
@@ -874,6 +903,10 @@ const LiveBroadcast = {
    */
   async switchCamera() {
     if (!this.isBroadcasting || !this.peerConnection || !this.mediaStream) return;
+    if (this.broadcastRecording) {
+      if (typeof AuthSystem !== 'undefined') AuthSystem.showNotification('Kayıt sırasında kamera değiştirilemez', 'error');
+      return;
+    }
 
     const switchBtn = this._cameraSwitchBtn;
     if (switchBtn) switchBtn.disabled = true;
@@ -1067,6 +1100,27 @@ const LiveBroadcast = {
     videoEl.addEventListener('mousedown', this._aiSearchMouseDown);
     document.addEventListener('mousemove', this._aiSearchMouseMove);
     document.addEventListener('mouseup', this._aiSearchMouseUp);
+
+    // Touch handlers for mobile
+    this._aiSearchTouchStart = (e) => {
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      this.handleBroadcastAiMouseDown(popupEl, { clientX: t.clientX, clientY: t.clientY, preventDefault() {}, stopPropagation() {} });
+    };
+    this._aiSearchTouchMove = (e) => {
+      if (!this._aiSearchSelection?.isDrawing) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      this.handleBroadcastAiMouseMove(popupEl, { clientX: t.clientX, clientY: t.clientY });
+    };
+    this._aiSearchTouchEnd = (e) => {
+      this.handleBroadcastAiMouseUp(popupEl, e);
+    };
+
+    videoEl.addEventListener('touchstart', this._aiSearchTouchStart, { passive: false });
+    document.addEventListener('touchmove', this._aiSearchTouchMove, { passive: false });
+    document.addEventListener('touchend', this._aiSearchTouchEnd);
   },
 
   exitBroadcastAiSearch(popupEl) {
@@ -1096,6 +1150,16 @@ const LiveBroadcast = {
     }
     if (this._aiSearchMouseUp) {
       document.removeEventListener('mouseup', this._aiSearchMouseUp);
+    }
+    // Remove touch listeners
+    if (videoEl && this._aiSearchTouchStart) {
+      videoEl.removeEventListener('touchstart', this._aiSearchTouchStart);
+    }
+    if (this._aiSearchTouchMove) {
+      document.removeEventListener('touchmove', this._aiSearchTouchMove);
+    }
+    if (this._aiSearchTouchEnd) {
+      document.removeEventListener('touchend', this._aiSearchTouchEnd);
     }
 
     this.dismissBroadcastAiCard();
@@ -1252,21 +1316,34 @@ const LiveBroadcast = {
 
     document.body.appendChild(card);
 
-    // Position to right of popup
-    const popupRect = popupEl.getBoundingClientRect();
+    // Position card
     card.style.position = 'fixed';
-    card.style.left = (popupRect.right + 10) + 'px';
-    card.style.top = popupRect.top + 'px';
+    if (window.innerWidth < 700) {
+      // Mobile: bottom sheet style
+      card.style.left = '8px';
+      card.style.right = '8px';
+      card.style.bottom = '8px';
+      card.style.top = 'auto';
+      card.style.width = 'auto';
+      card.style.maxWidth = 'none';
+      card.style.maxHeight = '40vh';
+      card.style.overflowY = 'auto';
+    } else {
+      // Desktop: to right of popup
+      const popupRect = popupEl.getBoundingClientRect();
+      card.style.left = (popupRect.right + 10) + 'px';
+      card.style.top = popupRect.top + 'px';
 
-    requestAnimationFrame(() => {
-      const cardRect = card.getBoundingClientRect();
-      if (cardRect.right > window.innerWidth - 10) {
-        card.style.left = (popupRect.left - cardRect.width - 10) + 'px';
-      }
-      if (cardRect.bottom > window.innerHeight - 10) {
-        card.style.top = (window.innerHeight - cardRect.height - 10) + 'px';
-      }
-    });
+      requestAnimationFrame(() => {
+        const cardRect = card.getBoundingClientRect();
+        if (cardRect.right > window.innerWidth - 10) {
+          card.style.left = (popupRect.left - cardRect.width - 10) + 'px';
+        }
+        if (cardRect.bottom > window.innerHeight - 10) {
+          card.style.top = (window.innerHeight - cardRect.height - 10) + 'px';
+        }
+      });
+    }
 
     const closeBtn = card.querySelector('.asc-close');
     if (closeBtn) closeBtn.onclick = () => this.dismissBroadcastAiCard();
@@ -1794,9 +1871,11 @@ const LiveBroadcast = {
       const item = document.createElement('div');
       item.textContent = res.label;
       const isActive = res.label === this.currentResolution.label;
-      item.style.cssText = `padding:6px 12px;cursor:pointer;border-radius:4px;font-size:12px;font-weight:600;color:${isActive ? '#4a9eff' : '#ccc'};text-align:center;`;
+      item.style.cssText = `padding:10px 16px;cursor:pointer;border-radius:4px;font-size:14px;font-weight:600;color:${isActive ? '#4a9eff' : '#ccc'};text-align:center;min-height:44px;display:flex;align-items:center;justify-content:center;`;
       item.onmouseenter = () => { if (!isActive) item.style.background = 'rgba(255,255,255,0.1)'; };
       item.onmouseleave = () => { item.style.background = 'transparent'; };
+      item.addEventListener('touchstart', () => { if (!isActive) item.style.background = 'rgba(255,255,255,0.1)'; }, { passive: true });
+      item.addEventListener('touchend', () => { item.style.background = 'transparent'; }, { passive: true });
       item.onclick = () => {
         this.changeResolution(res);
         this.closeResolutionDropdown();
