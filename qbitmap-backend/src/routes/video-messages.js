@@ -127,7 +127,7 @@ async function videoMessageRoutes(fastify, options) {
       const fileSize = stats.size;
 
       // Generate thumbnail (fire-and-forget, don't block upload response)
-      const thumbFileName = `${messageId}_thumb.jpg`;
+      const thumbFileName = `${messageId}_thumb.webp`;
       const thumbFilePath = path.join(UPLOADS_DIR, thumbFileName);
       const thumbRelPath = `uploads/video-messages/${thumbFileName}`;
       if (isPhoto) {
@@ -351,7 +351,8 @@ async function videoMessageRoutes(fastify, options) {
         return reply.code(404).send({ error: 'Thumbnail file not found' });
       }
 
-      reply.header('Content-Type', 'image/jpeg');
+      const contentType = thumbPath.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+      reply.header('Content-Type', contentType);
       reply.header('Cache-Control', 'public, max-age=604800');
       return reply.send(fs.createReadStream(thumbPath));
     } catch (error) {

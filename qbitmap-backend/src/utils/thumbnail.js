@@ -4,7 +4,7 @@ const logger = require('./logger').child({ module: 'thumbnail' });
 
 const FFMPEG_PATH = '/usr/bin/ffmpeg';
 const THUMB_WIDTH = 320;
-const THUMB_QUALITY = 5; // JPEG quality (2-31, lower = better)
+const WEBP_QUALITY = 40;
 
 /**
  * Generate a JPEG thumbnail from a video file.
@@ -24,7 +24,8 @@ function generateThumbnail(videoPath, thumbPath) {
     '-ss', '00:00:01',
     '-vframes', '1',
     '-vf', `scale=${THUMB_WIDTH}:-1`,
-    '-q:v', String(THUMB_QUALITY),
+    '-c:v', 'libwebp',
+    '-quality', String(WEBP_QUALITY),
     '-y',
     thumbPath
   ];
@@ -66,7 +67,8 @@ function generatePhotoThumbnail(imagePath, thumbPath) {
   const args = [
     '-i', imagePath,
     '-vf', `scale=${THUMB_WIDTH}:-1`,
-    '-q:v', String(THUMB_QUALITY),
+    '-c:v', 'libwebp',
+    '-quality', String(WEBP_QUALITY),
     '-y',
     thumbPath
   ];
