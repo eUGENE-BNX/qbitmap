@@ -550,7 +550,7 @@ async function adminRoutes(fastify, options) {
    */
   fastify.put('/cameras/city/:cameraId', async (request, reply) => {
     const cameraId = parseInt(request.params.cameraId);
-    const { name, lat, lng, ai_confidence_threshold, ai_consecutive_frames, ai_capture_interval_ms,
+    const { name, lat, lng, hls_url, ai_confidence_threshold, ai_consecutive_frames, ai_capture_interval_ms,
       ai_vision_model, ai_monitoring_prompt, ai_search_prompt, ai_max_tokens, ai_temperature } = request.body;
 
     const camera = await db.getCameraById(cameraId);
@@ -560,6 +560,35 @@ async function adminRoutes(fastify, options) {
 
     if (camera.camera_type !== 'city') {
       return reply.status(400).send({ error: 'Not a city camera' });
+    }
+
+    // Handle HLS source URL update
+    if (hls_url !== undefined) {
+      try {
+        const url = new URL(hls_url);
+        if (!url.pathname.endsWith('.m3u8')) {
+          return reply.status(400).send({ error: 'URL must end with .m3u8' });
+        }
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          return reply.status(400).send({ error: 'URL must use HTTP or HTTPS' });
+        }
+      } catch (e) {
+        return reply.status(400).send({ error: 'Invalid URL format' });
+      }
+
+      const mediamtx = require('../services/mediamtx');
+
+      // Remove old MediaMTX path and re-add with new URL
+      if (camera.mediamtx_path) {
+        await mediamtx.removePath(camera.mediamtx_path);
+        const result = await mediamtx.addHlsPath(camera.mediamtx_path, hls_url);
+        if (!result.success) {
+          return reply.status(502).send({ error: 'Failed to update HLS source', details: result.error });
+        }
+      }
+
+      // Update source URL in database
+      await db.pool.execute('UPDATE cameras SET rtsp_source_url = ? WHERE id = ?', [hls_url, cameraId]);
     }
 
     // Build update query for cameras table
@@ -631,7 +660,7 @@ async function adminRoutes(fastify, options) {
     }
 
     // Check if any updates were made
-    if (updates.length === 0 && !hasAiSettings) {
+    if (updates.length === 0 && !hasAiSettings && hls_url === undefined) {
       return reply.status(400).send({ error: 'No updates provided' });
     }
 

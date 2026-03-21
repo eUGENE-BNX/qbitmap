@@ -78,6 +78,7 @@
         <button class="tab" data-tab="voice">Voice Call</button>
         <button class="tab" data-tab="messages">Messages</button>
         <button class="tab" data-tab="places">Places</button>
+        <button class="tab" data-tab="city-cameras">Şehir Kameraları</button>
       </div>
 
       <!-- Users Tab -->
@@ -357,6 +358,27 @@
         </div>
 
         <div class="pagination" id="places-pagination"></div>
+      </section>
+      <!-- City Cameras Tab -->
+      <section class="tab-content" id="tab-city-cameras">
+        <div class="toolbar">
+          <button class="btn btn-primary" id="add-city-camera-btn">+ Yeni Kamera</button>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="city-cameras-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Kamera Adı</th>
+                <th>HLS Source URL</th>
+                <th>Konum</th>
+                <th>İşlemler</th>
+              </tr>
+            </thead>
+            <tbody id="city-cameras-tbody"></tbody>
+          </table>
+        </div>
       </section>
     </main>
   </div>
@@ -656,9 +678,45 @@
     </div>
   </div>
 
+  <!-- City Camera Modal -->
+  <div class="modal-overlay" id="city-camera-modal">
+    <div class="modal-content" style="max-width: 560px;">
+      <button class="modal-close" id="city-camera-modal-close">&times;</button>
+      <div class="modal-header">
+        <h3 id="city-camera-modal-title">Yeni Şehir Kamerası</h3>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Kamera Adı *</label>
+          <input type="text" id="city-cam-name" class="form-input" placeholder="ör: Eyüpsultan Turistik">
+        </div>
+        <div class="form-group">
+          <label>HLS Source URL *</label>
+          <input type="text" id="city-cam-url" class="form-input" placeholder="https://livestream.ibb.gov.tr/cam_turistik/b_eyupsultan.stream/chunklist.m3u8">
+          <p class="hint">URL .m3u8 ile bitmelidir</p>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Enlem (lat)</label>
+            <input type="number" id="city-cam-lat" class="form-input" step="any" placeholder="41.0487">
+          </div>
+          <div class="form-group">
+            <label>Boylam (lng)</label>
+            <input type="number" id="city-cam-lng" class="form-input" step="any" placeholder="28.9343">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="city-cam-delete-btn" style="display:none;">Sil</button>
+        <button class="btn btn-ghost" id="city-camera-modal-cancel">İptal</button>
+        <button class="btn btn-primary" id="city-cam-save-btn">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="/js/config.js"></script>
   <script src="/js/utils.js"></script>
-  <script src="/js/admin/index.js?v=4"></script>
+  <script src="/js/admin/index.js?v=5"></script>
 </body>
 </html>

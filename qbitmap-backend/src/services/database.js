@@ -347,8 +347,8 @@ class DatabaseService {
     return camera && camera.user_id === userId;
   }
 
-  async updateCamera(cameraId, userId, { name, lng, lat, isPublic }) {
-    if (!(await this.isUserCameraOwner(userId, cameraId))) {
+  async updateCamera(cameraId, userId, { name, lng, lat, isPublic, skipOwnerCheck } = {}) {
+    if (!skipOwnerCheck && !(await this.isUserCameraOwner(userId, cameraId))) {
       return { success: false, error: 'You do not own this camera.' };
     }
 
@@ -2007,7 +2007,7 @@ class DatabaseService {
   }
 
   async adminUpdateCamera(cameraId, updates, params) {
-    await this.pool.execute(`UPDATE cameras SET ${updates.join(', ')} WHERE id = ?`, [...params, cameraId]);
+    await this.pool.execute(`UPDATE cameras SET ${updates.join(', ')} WHERE id = ?`, params);
   }
 
   async getActiveFaceDetectionCameras(userId) {

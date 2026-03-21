@@ -665,12 +665,14 @@ async function userRoutes(fastify, options) {
     const cameraId = parseInt(request.params.cameraId);
     const { name, lng, lat, is_public, whep_url } = request.body;
 
-    // Update basic camera info
+    // Admin users can update any camera (including city cameras)
+    const isAdmin = request.user.role === 'admin';
     const result = await db.updateCamera(cameraId, request.user.userId, {
       name,
       lng,
       lat,
-      isPublic: is_public
+      isPublic: is_public,
+      skipOwnerCheck: isAdmin
     });
 
     if (!result.success) {
