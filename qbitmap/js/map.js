@@ -475,8 +475,13 @@ map.on("load", async () => {
         }
     };
 
-    map.on('moveend', window.updateSatelliteVisibility);
-    map.on('zoomend', window.updateSatelliteVisibility);
+    let _satDebounce;
+    const debouncedSatUpdate = () => {
+        clearTimeout(_satDebounce);
+        _satDebounce = setTimeout(window.updateSatelliteVisibility, 120);
+    };
+    map.on('moveend', debouncedSatUpdate);
+    map.on('zoomend', debouncedSatUpdate);
 
     const sourceLayer = "buildings";
     const firstLabel = styleObj.layers.find(l => l.type === "symbol")?.id;
@@ -625,9 +630,14 @@ map.on("load", async () => {
         }
     };
 
-    // Listen to both zoom and move events
-    map.on('zoom', updateVideoVisibility);
-    map.on('move', updateVideoVisibility);
+    // Listen to both zoom and move events (debounced)
+    let _vidDebounce;
+    const debouncedVideoUpdate = () => {
+        clearTimeout(_vidDebounce);
+        _vidDebounce = setTimeout(updateVideoVisibility, 100);
+    };
+    map.on('zoom', debouncedVideoUpdate);
+    map.on('move', debouncedVideoUpdate);
 
     // Wait for ModelManager before using it
     await waitForModelManager();
@@ -687,6 +697,11 @@ map.on("load", async () => {
         });
     };
 
-    map.on('zoom', updateTrafficCamVisibility);
+    let _tcDebounce;
+    const debouncedTrafficUpdate = () => {
+        clearTimeout(_tcDebounce);
+        _tcDebounce = setTimeout(updateTrafficCamVisibility, 100);
+    };
+    map.on('zoom', debouncedTrafficUpdate);
     updateTrafficCamVisibility(); // Initial check
 });

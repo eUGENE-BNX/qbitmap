@@ -50,7 +50,7 @@ qbitmap.com {
 		X-Frame-Options "SAMEORIGIN"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "geolocation=(self), microphone=(self), camera=(self)"
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://unpkg.com https://cdn.jsdelivr.net https://cdn.plyr.io; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.plyr.io; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://stream.qbitmap.com wss://stream.qbitmap.com https://h3.qbitmap.com https://static.qbitmap.com https://hls.qbitmap.com https://matcher.qbitwise.com https://www.google-analytics.com; media-src 'self' blob: https://hls.qbitmap.com; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://cdn.jsdelivr.net https://cdn.plyr.io https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.plyr.io; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' data: https://stream.qbitmap.com wss://stream.qbitmap.com https://h3.qbitmap.com https://static.qbitmap.com https://hls.qbitmap.com https://matcher.qbitwise.com https://www.google-analytics.com https://protomaps.github.io https://cdn.plyr.io https://static.cloudflareinsights.com https://cloudflareinsights.com; media-src 'self' blob: https://hls.qbitmap.com https://stream.qbitmap.com; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'"
 	}
 
 	@pmtiles path *.pmtiles
@@ -79,13 +79,14 @@ qbitmap.com {
 	header @wasm Cache-Control "public, max-age=31536000, immutable"
 
 	@app path /js/*.js /js/**/*.js /css/*.css
-	header @app Cache-Control "public, max-age=3600, must-revalidate"
+	header @app Cache-Control "public, max-age=3600, s-maxage=86400, must-revalidate"
 
 	@media path *.png *.jpg *.jpeg *.gif *.svg *.ico *.webp *.woff *.woff2
 	header @media Cache-Control "public, max-age=604800, immutable"
 
 	@html path *.html /
 	header @html Cache-Control "no-cache, must-revalidate"
+	header @html Link "</vendor/maplibre-gl.css>; rel=preload; as=style, </vendor/maplibre-gl.js>; rel=preload; as=script"
 }
 
 # QBitmap Backend API Server

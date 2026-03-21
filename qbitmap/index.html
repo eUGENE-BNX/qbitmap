@@ -80,12 +80,12 @@
   <!-- ================== BIOMETRIC MODAL BİTİŞ ================== -->
 
   <!-- Scripts in optimal loading order -->
-  <script src=/vendor/hls.min.js></script>
+  <script defer src=/vendor/hls.min.js></script>
   <script src=/vendor/maplibre-gl.js></script>
   <script src=/vendor/basemaps.js></script>
   <!-- H3 Hexagonal Grid (h3-js must load before deck.gl) -->
-  <script src="https://unpkg.com/h3-js@4.1.0/dist/h3-js.umd.js" integrity="sha384-nKUDlg+fT0U/eEt4KWP9n034kLe/eVj6k7CVjbu6qfRhJdEyinlGajS9+9AU+UZ5" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/deck.gl@9.0.0/dist.min.js" integrity="sha384-swFovX3ZcjmbLcV6TDG5hfxTmX+r/s/2lxRXi2wD1At3LGvgDY/YkSVyzuvQmJys" crossorigin="anonymous"></script>
+  <script defer src=/vendor/h3-js.umd.js></script>
+  <script defer src=/vendor/deck.gl.min.js></script>
   <!-- Three.js r182 ES Module with Import Map -->
   <script type="importmap">
   {
@@ -144,7 +144,7 @@
       if (window.VideoMessage) window.VideoMessage.init();
     });
   </script>
-  <script src=/vendor/protobuf.min.js></script>
+  <script defer src=/vendor/protobuf.min.js></script>
   <script defer src=/js/tesla-dashcam.js?v=20260301></script>
   <script defer src=/js/vehicle-animation.js?v=20260206></script>
   <script defer src=/js/modal.js?v=20260206></script>
