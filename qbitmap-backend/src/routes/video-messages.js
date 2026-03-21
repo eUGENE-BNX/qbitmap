@@ -252,6 +252,18 @@ async function videoMessageRoutes(fastify, options) {
     }
   });
 
+  // GET /my-recent - Get user's recent messages (for profile)
+  fastify.get('/my-recent', { preHandler: authHook }, async (request, reply) => {
+    try {
+      const limit = Math.min(Math.max(parseInt(request.query.limit) || 5, 1), 20);
+      const messages = await db.getUserRecentMessages(request.user.userId, limit);
+      return { messages };
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to get recent messages');
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // GET /unread-count - Get unread private message count
   fastify.get('/unread-count', { preHandler: authHook }, async (request, reply) => {
     try {

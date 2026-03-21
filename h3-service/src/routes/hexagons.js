@@ -42,6 +42,15 @@ async function hexagonRoutes(fastify) {
     return ownershipService.getLeaderboard(limit);
   });
 
+  // User stats for profile
+  fastify.get('/user-stats/:userId', async (request) => {
+    const userId = parseInt(request.params.userId);
+    if (!Number.isFinite(userId)) {
+      return { totalPoints: 0, cellCount: 0, totalAreaM2: 0, rank: 0 };
+    }
+    return ownershipService.getUserStats(userId);
+  });
+
   // Hexagon details (cameras inside)
   fastify.get('/:h3Index', async (request) => {
     return h3Service.getHexagonDetails(request.params.h3Index);

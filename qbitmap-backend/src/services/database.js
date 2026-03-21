@@ -2578,6 +2578,35 @@ class DatabaseService {
     );
     return rows;
   }
+
+  async getUserRecentMessages(userId, limit = 5) {
+    const safeLimit = Math.min(Math.max(parseInt(limit) || 5, 1), 20);
+    const [rows] = await this.pool.execute(
+      `SELECT message_id, media_type, thumbnail_path, description, duration_ms, created_at
+       FROM video_messages
+       WHERE sender_id = ?
+       ORDER BY created_at DESC
+       LIMIT ${safeLimit}`,
+      [userId]
+    );
+    return rows;
+  }
+
+  async getSharedCameraCount(userId) {
+    const [rows] = await this.pool.execute(
+      'SELECT COUNT(*) as count FROM camera_shares WHERE shared_with_user_id = ?',
+      [userId]
+    );
+    return rows[0].count;
+  }
+
+  async getUserMessageCount(userId) {
+    const [rows] = await this.pool.execute(
+      'SELECT COUNT(*) as count FROM video_messages WHERE sender_id = ?',
+      [userId]
+    );
+    return rows[0].count;
+  }
 }
 
 module.exports = new DatabaseService();

@@ -93,4 +93,76 @@ async function getLeaderboard(limit = 10) {
   return result;
 }
 
-module.exports = { getViewportOwnership, getLeaderboard };
+async function getUserStats(userId) {
+  const cacheKey = `ustats:${userId}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  // Total points
+  const { rows: pointRows } = await pool.query(
+    'SELECT COALESCE(SUM(points), 0) AS total_points FROM content_items WHERE user_id = $1',
+    [userId]
+  );
+
+  // Owned cells at resolution 13
+  const { rows: cellRows } = await pool.query(
+    `SELECT COUNT(*) AS cell_count FROM (
+       SELECT DISTINCT ON (cell) cell, user_id
+       FROM (
+         SELECT
+           h3_cell_to_parent(h3_res14, 13) AS cell,
+           user_id,
+           SUM(points) AS pts,
+           MIN(created_at) AS earliest
+         FROM content_items
+         GROUP BY 1, 2
+       ) sub
+       ORDER BY cell, pts DESC, earliest ASC
+     ) owned
+     WHERE user_id = $1`,
+    [userId]
+  );
+
+  // Rank
+  const { rows: rankRows } = await pool.query(
+    `SELECT rank FROM (
+       SELECT user_id, ROW_NUMBER() OVER (ORDER BY cell_count DESC) AS rank
+       FROM (
+         SELECT owned.user_id, COUNT(*) AS cell_count
+         FROM (
+           SELECT DISTINCT ON (cell) cell, user_id
+           FROM (
+             SELECT
+               h3_cell_to_parent(h3_res14, 13) AS cell,
+               user_id,
+               SUM(points) AS pts,
+               MIN(created_at) AS earliest
+             FROM content_items
+             GROUP BY 1, 2
+           ) sub
+           ORDER BY cell, pts DESC, earliest ASC
+         ) owned
+         GROUP BY owned.user_id
+       ) counts
+     ) ranked
+     WHERE user_id = $1`,
+    [userId]
+  );
+
+  const cellCount = parseInt(cellRows[0]?.cell_count || 0);
+  // H3 resolution 13 average cell area
+  const H3_RES13_AREA_M2 = 43.87;
+
+  const result = {
+    userId,
+    totalPoints: parseInt(pointRows[0]?.total_points || 0),
+    cellCount,
+    totalAreaM2: Math.round(cellCount * H3_RES13_AREA_M2),
+    rank: parseInt(rankRows[0]?.rank || 0)
+  };
+
+  cache.set(cacheKey, result, 60000);
+  return result;
+}
+
+module.exports = { getViewportOwnership, getLeaderboard, getUserStats };

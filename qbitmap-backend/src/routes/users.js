@@ -38,6 +38,7 @@ async function userRoutes(fastify, options) {
       avatarUrl: user.avatar_url,
       createdAt: user.created_at,
       hasFaceRegistered: !!user.face_api_person_id,
+      totalMessages: await db.getUserMessageCount(request.user.userId),
       plan: {
         id: limits?.plan_id,
         name: limits?.plan_name,
@@ -47,6 +48,26 @@ async function userRoutes(fastify, options) {
       isActive: limits?.is_active ?? true,
       location: await db.getUserLocation(request.user.userId)
     };
+  });
+
+  // GET /me/camera-stats - Camera counts for profile
+  fastify.get('/me/camera-stats', async (request, reply) => {
+    try {
+      const userId = request.user.userId;
+      const owned = await db.getUserCameraTypeCounts(userId);
+      const sharedWithMe = await db.getSharedCameraCount(userId);
+      return {
+        owned: {
+          total: owned.total,
+          device: owned.device_count,
+          whep: owned.whep_count
+        },
+        sharedWithMe
+      };
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to get camera stats');
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
   });
 
   // ==================== USER LOCATION ====================
