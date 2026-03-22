@@ -1130,14 +1130,16 @@ class DatabaseService {
   }
 
   async setAdminUser() {
-    const adminEmail = 'alp@qbitwise.com';
-    try {
-      await this.pool.execute(
-        "UPDATE users SET role = 'admin' WHERE email = ? AND (role IS NULL OR role = 'user')",
-        [adminEmail]
-      );
-    } catch (e) {
-      // User might not exist yet
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
+    for (const email of adminEmails) {
+      try {
+        await this.pool.execute(
+          "UPDATE users SET role = 'admin' WHERE email = ? AND (role IS NULL OR role = 'user')",
+          [email]
+        );
+      } catch (e) {
+        // User might not exist yet
+      }
     }
   }
 
