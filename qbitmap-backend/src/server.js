@@ -30,6 +30,7 @@ async function buildServer() {
           }
         },
     bodyLimit: 20 * 1024 * 1024,
+    trustProxy: '127.0.0.1',
     disableRequestLogging: isProduction
   });
 
@@ -83,7 +84,7 @@ async function buildServer() {
   await fastify.register(rateLimit, {
     max: 100,
     timeWindow: '1 minute',
-    keyGenerator: (req) => req.headers['x-forwarded-for'] || req.ip
+    keyGenerator: (req) => req.ip
   });
 
   // Auth-specific rate limiting (brute force protection)

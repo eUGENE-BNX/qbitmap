@@ -125,7 +125,7 @@ async function aiRoutes(fastify, options) {
   fastify.post('/analyze', {
     preHandler: [validateBody(aiAnalyzeSchema), async (request, reply) => {
       // 1. IP-based rate limiting (DDoS prevention)
-      const ip = request.ip || request.headers['x-forwarded-for'] || 'unknown';
+      const ip = request.ip;
       const ipCheck = ipRateLimiter.check(ip);
 
       if (!ipCheck.allowed) {
