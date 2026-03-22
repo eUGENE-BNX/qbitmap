@@ -162,14 +162,14 @@ const AuthSystem = {
               </div>
             </div>
             <div class="dropdown-divider"></div>
-            <button class="dropdown-item" onclick="UserProfileSystem.open(); AuthSystem.toggleDropdown();" role="menuitem">
+            <button class="dropdown-item" onclick="loadScript('/js/user-profile.js?v=20260321').then(() => UserProfileSystem.open()); AuthSystem.toggleDropdown();" role="menuitem">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
               Profilim
             </button>
-            <button class="dropdown-item" onclick="MyCamerasSystem.open(); AuthSystem.toggleDropdown();" role="menuitem">
+            <button class="dropdown-item" onclick="loadScript('/js/my-cameras.js?v=20260206').then(() => MyCamerasSystem.open()); AuthSystem.toggleDropdown();" role="menuitem">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                 <circle cx="12" cy="13" r="4"></circle>
@@ -243,17 +243,15 @@ const AuthSystem = {
     if (window.VoiceControl && typeof VoiceControl.bindMicButton === 'function') {
       VoiceControl.bindMicButton();
     }
-    // Rebind broadcast button (floating)
-    if (window.LiveBroadcast && typeof LiveBroadcast.bindButton === 'function') {
-      LiveBroadcast.bindButton();
-    }
-    // Rebind video message button (now in dropdown)
-    if (window.VideoMessage && typeof VideoMessage.bindButton === 'function') {
-      VideoMessage.bindButton();
-    }
-    // Rebind photo message button (now in dropdown)
-    if (window.VideoMessage && typeof VideoMessage.bindPhotoButton === 'function') {
-      VideoMessage.bindPhotoButton();
+    // Lazy-load and bind broadcast + video message buttons
+    if (this.isLoggedIn()) {
+      loadScript('/js/live-broadcast.js?v=20260217c').then(() => {
+        if (window.LiveBroadcast) { LiveBroadcast.init(); LiveBroadcast.bindButton(); }
+      });
+      loadScript('/js/video-message.js?v=20260217e').then(() => {
+        if (window.VideoMessage) { VideoMessage.init(); VideoMessage.bindButton(); VideoMessage.bindPhotoButton(); }
+      });
+      loadScript('/js/comments.js?v=20260214');
     }
   },
 

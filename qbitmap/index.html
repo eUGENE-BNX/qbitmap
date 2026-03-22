@@ -110,12 +110,9 @@
 
   <script defer src=/js/voice-control.js?v=20260213></script>
   <script defer src=/js/auth.js?v=20260215d></script>
-  <script defer src=/js/live-broadcast.js?v=20260217c></script>
-  <script defer src=/js/comments.js?v=20260214></script>
-  <script defer src=/js/video-message.js?v=20260217e></script>
   <!-- FaceID scripts loaded on demand by biometric-auth.js -->
   <script defer src=/js/biometric-auth.js?v=20260206></script>
-  <script defer src=/js/user-profile.js?v=20260321></script>
+  <!-- live-broadcast, comments, video-message, user-profile, my-cameras: lazy-loaded on demand -->
   <!-- Camera System Modules -->
   <script defer src=/js/camera-system/index.js?v=20260206></script>
   <script defer src=/js/camera-system/websocket.js?v=20260206></script>
@@ -134,8 +131,7 @@
   <!-- H3 Grid Layer -->
   <script defer src=/js/h3-grid.js?v=20260222></script>
   <script defer src=/js/h3-tron-trails.js?v=20260223></script>
-  <!-- My Cameras after Camera System -->
-  <script defer src=/js/my-cameras.js?v=20260206></script>
+  <!-- my-cameras: lazy-loaded from auth dropdown -->
   <!-- Plyr Video Player - loaded async for performance -->
   <script async src=https://cdn.plyr.io/3.8.4/plyr.polyfilled.js integrity="sha384-ZDYtn77N2Oxc6W8oilE9z73hj1EZqidVlQeqTwsKW19gglwyUYHMn/LzX+ewyFJD" crossorigin="anonymous"></script>
   <script>
@@ -143,8 +139,6 @@
     window.CameraSystemModulesLoaded = true;
     document.addEventListener('DOMContentLoaded', () => {
       if (window.startCameraSystem) window.startCameraSystem();
-      if (window.LiveBroadcast) window.LiveBroadcast.init();
-      if (window.VideoMessage) window.VideoMessage.init();
     });
   </script>
   <!-- tesla-dashcam, protobuf, vehicle-animation: lazy-loaded on demand -->

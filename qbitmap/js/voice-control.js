@@ -301,9 +301,9 @@ window.VoiceControl = {
             }
 
             // Paneli de aç
-            if (window.MyCamerasSystem?.open) {
-              MyCamerasSystem.open();
-            }
+            loadScript('/js/my-cameras.js?v=20260206').then(() => {
+              if (window.MyCamerasSystem?.open) MyCamerasSystem.open();
+            });
           } catch (err) {
             Logger.error('[Voice] openMyCameras hatası:', err);
             self.showFeedback('Bir hata oluştu', 'error');
