@@ -250,7 +250,9 @@ const AuthSystem = {
         if (this.isLoggedIn()) { VideoMessage.bindButton(); VideoMessage.bindPhotoButton(); }
       }
     });
-    loadScript('/js/comments.js?v=20260214');
+    loadScript('/js/comments.js?v=20260214').then(() => {
+      if (window.CommentWidget) CommentWidget.init();
+    });
     // Broadcast only for logged-in users
     if (this.isLoggedIn()) {
       loadScript('/js/live-broadcast.js?v=20260217c').then(() => {
