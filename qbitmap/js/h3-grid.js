@@ -246,13 +246,9 @@ const H3Grid = {
         if (info.object) {
           const owner = this._ownershipMap && this._ownershipMap.get(info.object.h3Index);
           if (owner) {
-            this._showOwnerTooltip(info.x, info.y, info.object.h3Index, owner);
+            this._showOwnerTooltipTimed(info.x, info.y, info.object.h3Index, owner);
           } else {
-            const cellArea = h3.cellArea(info.object.h3Index, 'm2');
-            this._tooltip.textContent = `${info.object.h3Index} (${this._formatArea(cellArea)})`;
-            this._tooltip.style.display = 'block';
-            this._tooltip.style.left = (info.x + 12) + 'px';
-            this._tooltip.style.top = (info.y - 28) + 'px';
+            this._tooltip.style.display = 'none';
           }
         } else {
           this._tooltip.style.display = 'none';
@@ -296,7 +292,7 @@ const H3Grid = {
 
         onHover: (info) => {
           if (info.object) {
-            this._showOwnerTooltip(info.x, info.y, info.object.h3Index, info.object);
+            this._showOwnerTooltipTimed(info.x, info.y, info.object.h3Index, info.object);
           } else {
             this._tooltip.style.display = 'none';
           }
@@ -316,6 +312,18 @@ const H3Grid = {
     }
 
     this._overlay.setProps({ layers });
+  },
+
+  _showOwnerTooltipTimed(x, y, h3Index, owner) {
+    // Don't re-show if same cell tooltip is already visible
+    if (this._tooltipH3Index === h3Index && this._tooltip.style.display === 'block') return;
+    clearTimeout(this._tooltipTimer);
+    this._tooltipH3Index = h3Index;
+    this._showOwnerTooltip(x, y, h3Index, owner);
+    this._tooltipTimer = setTimeout(() => {
+      this._tooltip.style.display = 'none';
+      this._tooltipH3Index = null;
+    }, 5000);
   },
 
   _showOwnerTooltip(x, y, h3Index, owner) {

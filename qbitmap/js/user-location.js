@@ -210,15 +210,13 @@ const UserLocationSystem = {
         // Store lngLat for popup
         container._lngLat = lngLat;
 
-        // Hover effect on container, transform on inner element
+        // Hover effect on container (scale only, no popup)
         container.addEventListener('mouseenter', () => {
             el.style.transform = 'scale(1.3)';
-            this.showPublicUserPopupFromProps(props, container._lngLat);
         });
 
         container.addEventListener('mouseleave', () => {
             el.style.transform = 'scale(1)';
-            this.hidePopup();
         });
 
         return container;
