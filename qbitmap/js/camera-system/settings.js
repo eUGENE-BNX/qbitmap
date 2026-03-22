@@ -59,7 +59,7 @@ const SettingsMixin = {
     }
 
     try {
-      const response = await fetch(`${this.apiSettings}/${deviceId}`);
+      const response = await fetch(`${this.apiSettings}/${deviceId}`, { credentials: 'include' });
       Logger.log('[Settings] API response status:', response.status);
       if (!response.ok) throw new Error('Failed');
 
@@ -841,7 +841,7 @@ const SettingsMixin = {
 
     try {
       // Get current settings
-      const response = await fetch(`${this.apiSettings}/${deviceId}`);
+      const response = await fetch(`${this.apiSettings}/${deviceId}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to get settings');
 
       const data = await response.json();

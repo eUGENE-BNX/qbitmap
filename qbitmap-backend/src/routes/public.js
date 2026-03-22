@@ -326,8 +326,15 @@ async function publicRoutes(fastify, options) {
     }
   });
 
-  // Get camera settings (public - no auth required for now)
-  fastify.get('/settings/:deviceId', async (request, reply) => {
+  // Get camera settings (filtered by ownership)
+  const PUBLIC_SETTINGS_FIELDS = [
+    'capture_interval_ms',
+    'ai_capture_interval_ms',
+    'ai_detection_enabled',
+    'mjpeg_enabled'
+  ];
+
+  fastify.get('/settings/:deviceId', { preHandler: optionalAuthHook }, async (request, reply) => {
     const { deviceId } = request.params;
 
     try {
@@ -346,9 +353,17 @@ async function publicRoutes(fastify, options) {
         };
       }
 
+      const isOwner = request.user?.userId && camera.user_id === request.user.userId;
+      const allSettings = JSON.parse(settings.settings_json);
+      const exposedSettings = isOwner
+        ? allSettings
+        : Object.fromEntries(
+            Object.entries(allSettings).filter(([key]) => PUBLIC_SETTINGS_FIELDS.includes(key))
+          );
+
       return {
         config_version: settings.config_version,
-        settings: JSON.parse(settings.settings_json),
+        settings: exposedSettings,
         updated_at: settings.updated_at
       };
     } catch (error) {
