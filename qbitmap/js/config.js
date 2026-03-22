@@ -68,7 +68,7 @@ const QBitmapConfig = {
   map: {
     defaultCenter: [29.12304, 40.99112], // Ataşehir
     defaultZoom: 14.5,
-    turkeyCenter: [35.444, 39.126],      // Türkiye merkezi (zoom out için)
+    turkeyCenter: [35.157, 39.167],      // Türkiye merkezi (zoom out için)
     maxZoom: 22,
     minZoom: 5.75
   },

@@ -477,55 +477,76 @@ const ClickableZonesMixin = {
     container.appendChild(overlay);
 
     // Add click handlers
+    const isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0) && window.matchMedia('(max-width: 768px)').matches;
+
     overlay.querySelectorAll('.zone-polygon').forEach(polygon => {
-      polygon.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Check if this polygon is actually the topmost element at mouse position
-        const topElement = document.elementFromPoint(e.clientX, e.clientY);
-        if (topElement !== polygon && !polygon.contains(topElement)) {
-          return; // Another element is on top, don't trigger click
-        }
-        const zoneId = polygon.dataset.zoneId;
-        this.handleZoneClick(deviceId, zoneId);
-      });
+      if (isTouchDevice) {
+        // Mobile: tap shows info card, same tap dismisses
+        polygon.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const topElement = document.elementFromPoint(e.clientX, e.clientY);
+          if (topElement !== polygon && !polygon.contains(topElement)) return;
 
-      // Context menu for delete
-      polygon.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        // Check if this polygon is actually the topmost element at mouse position
-        const topElement = document.elementFromPoint(e.clientX, e.clientY);
-        if (topElement !== polygon && !polygon.contains(topElement)) {
-          return; // Another element is on top, don't show context menu
-        }
-        const zoneId = polygon.dataset.zoneId;
-        this.showZoneContextMenu(e, deviceId, zoneId);
-      });
+          const zoneId = polygon.dataset.zoneId;
 
-      // Hover for relay info card
-      let hoverTimeout = null;
-      polygon.addEventListener('mouseenter', (e) => {
-        // Check if this polygon is actually the topmost element at mouse position
-        // This prevents showing cards when another popup is on top
-        const topElement = document.elementFromPoint(e.clientX, e.clientY);
-        if (topElement !== polygon && !polygon.contains(topElement)) {
-          return; // Another element is on top, don't show card
-        }
+          if (this._activeInfoZoneId === zoneId) {
+            this.dismissRelayInfoCard();
+            return;
+          }
 
-        const zoneId = polygon.dataset.zoneId;
-        // Debounce 200ms to avoid flickering
-        hoverTimeout = setTimeout(() => {
+          this.dismissRelayInfoCard();
+          this._activeInfoZoneId = zoneId;
           this.showRelayInfoCard(deviceId, zoneId, polygon);
-        }, 200);
-      });
+        });
 
-      polygon.addEventListener('mouseleave', () => {
-        if (hoverTimeout) {
-          clearTimeout(hoverTimeout);
-          hoverTimeout = null;
-        }
-        this.dismissRelayInfoCard();
-      });
+        // Long press for context menu on mobile
+        let longPressTimer = null;
+        polygon.addEventListener('touchstart', (e) => {
+          longPressTimer = setTimeout(() => {
+            e.preventDefault();
+            const zoneId = polygon.dataset.zoneId;
+            const touch = e.touches[0];
+            this.showZoneContextMenu({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => {} }, deviceId, zoneId);
+          }, 600);
+        }, { passive: false });
+        polygon.addEventListener('touchend', () => { clearTimeout(longPressTimer); });
+        polygon.addEventListener('touchmove', () => { clearTimeout(longPressTimer); });
+      } else {
+        // Desktop: click toggles relay, hover shows info
+        polygon.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const topElement = document.elementFromPoint(e.clientX, e.clientY);
+          if (topElement !== polygon && !polygon.contains(topElement)) return;
+          const zoneId = polygon.dataset.zoneId;
+          this.handleZoneClick(deviceId, zoneId);
+        });
+
+        // Context menu for delete
+        polygon.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const topElement = document.elementFromPoint(e.clientX, e.clientY);
+          if (topElement !== polygon && !polygon.contains(topElement)) return;
+          const zoneId = polygon.dataset.zoneId;
+          this.showZoneContextMenu(e, deviceId, zoneId);
+        });
+
+        // Hover for relay info card
+        let hoverTimeout = null;
+        polygon.addEventListener('mouseenter', (e) => {
+          const topElement = document.elementFromPoint(e.clientX, e.clientY);
+          if (topElement !== polygon && !polygon.contains(topElement)) return;
+          const zoneId = polygon.dataset.zoneId;
+          hoverTimeout = setTimeout(() => {
+            this.showRelayInfoCard(deviceId, zoneId, polygon);
+          }, 200);
+        });
+
+        polygon.addEventListener('mouseleave', () => {
+          if (hoverTimeout) { clearTimeout(hoverTimeout); hoverTimeout = null; }
+          this.dismissRelayInfoCard();
+        });
+      }
     });
   },
 
@@ -844,6 +865,7 @@ const ClickableZonesMixin = {
     if (card) {
       card.remove();
     }
+    this._activeInfoZoneId = null;
   }
 };
 
