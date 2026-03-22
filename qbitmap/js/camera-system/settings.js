@@ -228,7 +228,7 @@ const SettingsMixin = {
             <div style="background: #1a1a2e; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
               <code id="rtmp-url-settings" style="color: #4fc3f7; font-size: 12px; word-break: break-all; display: block; user-select: all;">${escapeHtml(rtmpUrl)}</code>
             </div>
-            <button type="button" class="btn-secondary" onclick="navigator.clipboard.writeText('${escapeHtml(rtmpUrl)}').then(() => AuthSystem.showNotification('RTMP URL kopyalandi', 'success')).catch(() => AuthSystem.showNotification('Kopyalama basarisiz', 'error'))">
+            <button type="button" class="btn-secondary" data-copy-url="${escapeHtml(rtmpUrl)}" onclick="navigator.clipboard.writeText(this.dataset.copyUrl).then(() => AuthSystem.showNotification('RTMP URL kopyalandi', 'success')).catch(() => AuthSystem.showNotification('Kopyalama basarisiz', 'error'))">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -550,8 +550,8 @@ const SettingsMixin = {
             </div>
             <div class="mjpeg-info" style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px; font-size: 12px; color: #666;">
               <p style="margin: 0 0 4px 0;"><strong>Not:</strong> MJPEG stream acikken normal kare yakalama durur.</p>
-              <p style="margin: 0;">Stream URL: <code class="stream-url" style="background: #e0e0e0; padding: 2px 6px; border-radius: 3px; word-break: break-all; font-size: 11px;">${streamUrl}</code></p>
-              <button type="button" class="copy-stream-url" style="margin-top: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; border: 1px solid #ccc; border-radius: 3px; background: #fff;" onclick="navigator.clipboard.writeText('${streamUrl}'); this.textContent='Kopyalandi!'; setTimeout(() => this.textContent='URL Kopyala', 1500);">URL Kopyala</button>
+              <p style="margin: 0;">Stream URL: <code class="stream-url" style="background: #e0e0e0; padding: 2px 6px; border-radius: 3px; word-break: break-all; font-size: 11px;">${escapeHtml(streamUrl)}</code></p>
+              <button type="button" class="copy-stream-url" style="margin-top: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; border: 1px solid #ccc; border-radius: 3px; background: #fff;" data-copy-url="${escapeHtml(streamUrl)}" onclick="navigator.clipboard.writeText(this.dataset.copyUrl); this.textContent='Kopyalandi!'; setTimeout(() => this.textContent='URL Kopyala', 1500);">URL Kopyala</button>
             </div>
           </div>
         </div>
