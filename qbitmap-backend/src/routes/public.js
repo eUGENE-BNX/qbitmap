@@ -815,12 +815,19 @@ async function publicRoutes(fastify, options) {
         return reply.code(403).send({ error: 'Domain not allowed' });
       }
 
-      // Fetch the image
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'QBitmap-ImageProxy/1.0'
-        }
-      });
+      // Fetch the image with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      let response;
+      try {
+        response = await fetch(url, {
+          headers: { 'User-Agent': 'QBitmap-ImageProxy/1.0' },
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (!response.ok) {
         return reply.code(response.status).send({ error: 'Failed to fetch image' });
@@ -832,8 +839,17 @@ async function publicRoutes(fastify, options) {
         return reply.code(400).send({ error: 'URL does not point to an image' });
       }
 
+      // Reject oversized images (max 2MB for avatars)
+      const contentLength = parseInt(response.headers.get('content-length') || '0');
+      if (contentLength > 2 * 1024 * 1024) {
+        return reply.code(413).send({ error: 'Image too large' });
+      }
+
       // Get image data as buffer
       const buffer = Buffer.from(await response.arrayBuffer());
+      if (buffer.length > 2 * 1024 * 1024) {
+        return reply.code(413).send({ error: 'Image too large' });
+      }
 
       // Set cache headers (cache for 1 hour)
       reply.header('Cache-Control', 'public, max-age=3600');
