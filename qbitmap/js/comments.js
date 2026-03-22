@@ -17,6 +17,7 @@ const CommentWidget = {
 
   // Render comment section into a container
   async render(container, entityType, entityId) {
+    if (!this.apiBase) this.init();
     this.activeEntityType = entityType;
     this.activeEntityId = entityId;
     this.activeContainer = container;
