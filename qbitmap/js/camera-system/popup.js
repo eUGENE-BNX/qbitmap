@@ -7,6 +7,31 @@ const PopupMixin = {
   // Maximum concurrent popups
   maxPopups: 5,
 
+  // Adaptive polling intervals
+  POLL_INTERVAL_VISIBLE: 5000,
+  POLL_INTERVAL_HIDDEN: 15000,
+
+  /**
+   * Start adaptive stats polling - slower when tab is hidden
+   */
+  startAdaptivePolling(popupData, updateFn) {
+    if (popupData.clockInterval) clearInterval(popupData.clockInterval);
+    if (popupData._visHandler) document.removeEventListener('visibilitychange', popupData._visHandler);
+
+    const self = this;
+    const schedule = () => {
+      if (popupData.clockInterval) clearInterval(popupData.clockInterval);
+      const interval = document.hidden ? self.POLL_INTERVAL_HIDDEN : self.POLL_INTERVAL_VISIBLE;
+      popupData.clockInterval = setInterval(updateFn, interval);
+    };
+
+    popupData._visHandler = schedule;
+    document.addEventListener('visibilitychange', popupData._visHandler);
+
+    updateFn();
+    schedule();
+  },
+
   /**
    * Format bandwidth to human-readable string in kbit/s or Mbit/s
    */
@@ -398,8 +423,7 @@ const PopupMixin = {
               }
             };
 
-            updateStats();
-            popupData.clockInterval = setInterval(updateStats, 2000);
+            this.startAdaptivePolling(popupData, updateStats);
           }
         }
       };
@@ -576,8 +600,7 @@ const PopupMixin = {
             } catch (e) { /* silent */ }
           };
 
-          updateStats();
-          popupData.clockInterval = setInterval(updateStats, 2000);
+          this.startAdaptivePolling(popupData, updateStats);
         }
       },
       onError: (data) => {
@@ -2351,9 +2374,12 @@ const PopupMixin = {
       clearInterval(popupData.refreshInterval);
     }
 
-    // Clear clock interval (used during MJPEG mode or WHEP)
+    // Clear clock interval and visibility listener
     if (popupData.clockInterval) {
       clearInterval(popupData.clockInterval);
+    }
+    if (popupData._visHandler) {
+      document.removeEventListener('visibilitychange', popupData._visHandler);
     }
 
     // Cleanup HLS instance
