@@ -289,14 +289,23 @@ async function publicRoutes(fastify, options) {
   });
 
   // Get latest frame info for a camera (FAST - uses cache first)
-  // Note: Accessible to anyone who knows the device_id (for user's own cameras)
-  fastify.get('/cameras/:deviceId/latest', async (request, reply) => {
+  fastify.get('/cameras/:deviceId/latest', { preHandler: optionalAuthHook }, async (request, reply) => {
     const { deviceId } = request.params;
 
     try {
       const camera = await db.getCameraByDeviceId(deviceId);
       if (!camera) {
         return reply.code(404).send({ error: 'Camera not found' });
+      }
+
+      // Security: Check ownership for private cameras
+      if (!camera.is_public) {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Authentication required for private camera' });
+        }
+        if (camera.user_id !== request.user.userId) {
+          return reply.code(403).send({ error: 'Not authorized to access this camera' });
+        }
       }
 
       // Get frame from memory cache (frames are no longer stored in DB)

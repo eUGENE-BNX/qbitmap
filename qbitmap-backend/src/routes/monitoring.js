@@ -60,13 +60,22 @@ async function monitoringRoutes(fastify, options) {
    * GET /api/monitoring/cameras/:deviceId/monitoring
    * Get AI monitoring status for a camera
    */
-  fastify.get('/cameras/:deviceId/monitoring', async (request, reply) => {
+  fastify.get('/cameras/:deviceId/monitoring', { preHandler: optionalAuthHook }, async (request, reply) => {
     const { deviceId } = request.params;
 
     try {
       const camera = await db.getCameraByDeviceId(deviceId);
       if (!camera) {
         return reply.code(404).send({ error: 'Camera not found' });
+      }
+
+      if (!camera.is_public) {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Authentication required for private camera' });
+        }
+        if (camera.user_id !== request.user.userId) {
+          return reply.code(403).send({ error: 'Not authorized to access this camera' });
+        }
       }
 
       const state = await db.getAiMonitoringState(camera.id);
@@ -260,7 +269,7 @@ async function monitoringRoutes(fastify, options) {
    * GET /api/monitoring/cameras/:deviceId/alarms
    * Get alarm history for a camera (with optional pagination)
    */
-  fastify.get('/cameras/:deviceId/alarms', async (request, reply) => {
+  fastify.get('/cameras/:deviceId/alarms', { preHandler: optionalAuthHook }, async (request, reply) => {
     const { deviceId } = request.params;
     const page = Math.max(1, parseInt(request.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(request.query.limit) || 50));
@@ -269,6 +278,15 @@ async function monitoringRoutes(fastify, options) {
       const camera = await db.getCameraByDeviceId(deviceId);
       if (!camera) {
         return reply.code(404).send({ error: 'Camera not found' });
+      }
+
+      if (!camera.is_public) {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Authentication required for private camera' });
+        }
+        if (camera.user_id !== request.user.userId) {
+          return reply.code(403).send({ error: 'Not authorized to access this camera' });
+        }
       }
 
       // If no pagination params, return with limit only (backward compatible)
