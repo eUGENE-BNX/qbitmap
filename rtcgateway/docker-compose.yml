@@ -1,6 +1,6 @@
 services:
   mediamtx:
-    image: bluenviron/mediamtx:1.17.0
+    image: bluenviron/mediamtx:1.17.0-ffmpeg
     container_name: mediamtx
     restart: always
     network_mode: host
