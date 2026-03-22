@@ -1692,9 +1692,10 @@ class DatabaseService {
       SELECT u.id, u.email, u.display_name, u.avatar_url, u.role, u.plan_id, u.is_active,
              u.last_login, u.created_at, u.notes,
              p.name as plan_name, p.display_name as plan_display_name,
-             (SELECT COUNT(*) FROM cameras WHERE user_id = u.id) as camera_count
+             COALESCE(cc.camera_count, 0) as camera_count
       FROM users u
       LEFT JOIN user_plans p ON p.id = u.plan_id
+      LEFT JOIN (SELECT user_id, COUNT(*) as camera_count FROM cameras GROUP BY user_id) cc ON cc.user_id = u.id
       WHERE ${whereClause}
       ORDER BY u.created_at DESC
       LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
