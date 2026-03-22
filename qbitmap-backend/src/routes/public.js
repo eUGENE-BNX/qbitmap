@@ -168,18 +168,28 @@ async function publicRoutes(fastify, options) {
     }
   });
 
-  // Get all public cameras (with pagination)
-  // Default limit: 500, Max limit: 1000 to prevent memory/IO issues
+  // Get all public cameras (with pagination + optional bbox filter)
+  // Supports ?bbox=west,south,east,north for viewport-based queries
   fastify.get('/cameras', async (request, reply) => {
     try {
-      const DEFAULT_LIMIT = 500;
-      const MAX_LIMIT = 1000;
+      const DEFAULT_LIMIT = 50;
+      const MAX_LIMIT = 200;
 
       const page = Math.max(1, parseInt(request.query.page) || 1);
       const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(request.query.limit) || DEFAULT_LIMIT));
 
-      // Always use pagination to prevent unbounded queries
-      const result = await db.getPublicCamerasPaginated(page, limit);
+      // Parse optional bbox (west,south,east,north)
+      let bbox = null;
+      if (request.query.bbox) {
+        const parts = request.query.bbox.split(',').map(Number);
+        if (parts.length === 4 && parts.every(n => !isNaN(n))) {
+          bbox = { west: parts[0], south: parts[1], east: parts[2], north: parts[3] };
+        }
+      }
+
+      const result = bbox
+        ? await db.getPublicCamerasByBbox(bbox, page, limit)
+        : await db.getPublicCamerasPaginated(page, limit);
 
       // Add HLS URL for all cameras with mediamtx_path
       const cameras = result.items.map(cam => {

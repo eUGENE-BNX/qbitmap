@@ -864,6 +864,30 @@ class DatabaseService {
     return { page, limit, offset: (page - 1) * limit };
   }
 
+  async getPublicCamerasByBbox(bbox, page = 1, limit = 50) {
+    ({ page, limit } = this._safePagination(page, limit));
+    const offset = (page - 1) * limit;
+
+    const [items] = await this.pool.execute(`
+      SELECT id, device_id, name, lng, lat, stream_mode, last_seen, created_at, camera_type, whep_url, rtsp_source_url, mediamtx_path
+      FROM cameras
+      WHERE is_public = 1 AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ?
+      ORDER BY last_seen DESC
+      LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+    `, [bbox.west, bbox.east, bbox.south, bbox.north]);
+
+    const [countRows] = await this.pool.execute(
+      'SELECT COUNT(*) as count FROM cameras WHERE is_public = 1 AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ?',
+      [bbox.west, bbox.east, bbox.south, bbox.north]
+    );
+    const total = countRows[0].count;
+
+    return {
+      items,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit), hasMore: page * limit < total }
+    };
+  }
+
   async getPublicCamerasPaginated(page = 1, limit = 20) {
     ({ page, limit } = this._safePagination(page, limit));
     const offset = (page - 1) * limit;
