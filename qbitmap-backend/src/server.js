@@ -229,7 +229,10 @@ async function syncRtspCamerasWithMediamtx() {
       const batch = syncTasks.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map(async (task) => {
         const exists = await mediamtx.pathExists(task.path);
-        if (exists.exists) return { status: 'skipped', task };
+        if (exists.exists) {
+          // Remove stale path and re-add with correct source config
+          await mediamtx.removePath(task.path);
+        }
         const result = await task.sync();
         return { status: result.success ? 'synced' : 'failed', task, error: result.error };
       }));
