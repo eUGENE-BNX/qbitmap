@@ -243,15 +243,19 @@ const AuthSystem = {
     if (window.VoiceControl && typeof VoiceControl.bindMicButton === 'function') {
       VoiceControl.bindMicButton();
     }
-    // Lazy-load and bind broadcast + video message buttons
+    // Lazy-load map features (visible to everyone)
+    loadScript('/js/video-message.js?v=20260217e').then(() => {
+      if (window.VideoMessage) {
+        VideoMessage.init();
+        if (this.isLoggedIn()) { VideoMessage.bindButton(); VideoMessage.bindPhotoButton(); }
+      }
+    });
+    loadScript('/js/comments.js?v=20260214');
+    // Broadcast only for logged-in users
     if (this.isLoggedIn()) {
       loadScript('/js/live-broadcast.js?v=20260217c').then(() => {
         if (window.LiveBroadcast) { LiveBroadcast.init(); LiveBroadcast.bindButton(); }
       });
-      loadScript('/js/video-message.js?v=20260217e').then(() => {
-        if (window.VideoMessage) { VideoMessage.init(); VideoMessage.bindButton(); VideoMessage.bindPhotoButton(); }
-      });
-      loadScript('/js/comments.js?v=20260214');
     }
   },
 
