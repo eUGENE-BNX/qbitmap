@@ -86,7 +86,7 @@ qbitmap.com {
 
 	@html path *.html /
 	header @html Cache-Control "no-cache, must-revalidate"
-	header @html Link "</vendor/maplibre-gl.css>; rel=preload; as=style, </vendor/maplibre-gl.js>; rel=preload; as=script"
+	header @html Link "</vendor/maplibre-gl.css>; rel=preload; as=style, </vendor/maplibre-gl.js>; rel=preload; as=script, </vendor/basemaps.js>; rel=preload; as=script"
 }
 
 # QBitmap Backend API Server

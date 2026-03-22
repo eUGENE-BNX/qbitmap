@@ -20,6 +20,9 @@
   <!-- Preload critical resources -->
   <link rel=preload href=/vendor/maplibre-gl.css as=style>
   <link rel=preload href=/vendor/maplibre-gl.js as=script>
+  <link rel=preload href=/vendor/basemaps.js as=script>
+  <link rel=preload href=/css/style.css as=style>
+  <link rel=preload href=/js/config.js?v=20260206 as=script>
 
   <!-- Stylesheets -->
   <link rel=stylesheet href=/vendor/maplibre-gl.css>
@@ -81,8 +84,8 @@
 
   <!-- Scripts in optimal loading order -->
   <script defer src=/vendor/hls.min.js></script>
-  <script src=/vendor/maplibre-gl.js></script>
-  <script src=/vendor/basemaps.js></script>
+  <script defer src=/vendor/maplibre-gl.js></script>
+  <script defer src=/vendor/basemaps.js></script>
   <!-- H3 Hexagonal Grid (h3-js must load before deck.gl) -->
   <script defer src=/vendor/h3-js.umd.js></script>
   <script defer src=/vendor/deck.gl.min.js></script>
@@ -95,11 +98,11 @@
     }
   }
   </script>
-  <script src=/js/labels.js?v=20260206></script>
-  <script src=/js/voice-commands.js?v=20260206></script>
-  <script src=/js/config.js?v=20260206></script>
-  <script src=/js/utils.js?v=20260206></script>
-  <script src=/js/analytics.js?v=20260225></script>
+  <script defer src=/js/labels.js?v=20260206></script>
+  <script defer src=/js/voice-commands.js?v=20260206></script>
+  <script defer src=/js/config.js?v=20260206></script>
+  <script defer src=/js/utils.js?v=20260206></script>
+  <script defer src=/js/analytics.js?v=20260225></script>
   <script type="module" src="/js/3d-models.js?v=20260206"></script>
   <script type="module" src="/js/particle-cube.js?v=20260206"></script>
   <script defer src=/js/map.js?v=20260319></script>
@@ -144,9 +147,7 @@
       if (window.VideoMessage) window.VideoMessage.init();
     });
   </script>
-  <script defer src=/vendor/protobuf.min.js></script>
-  <script defer src=/js/tesla-dashcam.js?v=20260301></script>
-  <script defer src=/js/vehicle-animation.js?v=20260206></script>
+  <!-- tesla-dashcam, protobuf, vehicle-animation: lazy-loaded on demand -->
   <script defer src=/js/modal.js?v=20260206></script>
 </body>
 </html>

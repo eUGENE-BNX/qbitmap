@@ -6,6 +6,20 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 
+// Lazy script loader (caches loaded scripts)
+function loadScript(src) {
+    if (loadScript._cache[src]) return loadScript._cache[src];
+    loadScript._cache[src] = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+    });
+    return loadScript._cache[src];
+}
+loadScript._cache = {};
+
 const sourceId = "protomaps";
 const baseLayers = basemaps.layers(sourceId, basemaps.LIGHT || basemaps.namedTheme("light"));
 
@@ -220,7 +234,11 @@ class LayersDropdownControl {
                 toggle.classList.toggle('active', window.vehiclesVisible);
                 if (window.vehiclesVisible) {
                     if (this._map.getLayer('vehicles')) this._map.setLayoutProperty('vehicles', 'visibility', 'visible');
-                    if (window.VehicleAnimation) VehicleAnimation.start();
+                    if (window.VehicleAnimation) {
+                        VehicleAnimation.start();
+                    } else {
+                        loadScript('/js/vehicle-animation.js?v=20260206');
+                    }
                 } else {
                     if (this._map.getLayer('vehicles')) this._map.setLayoutProperty('vehicles', 'visibility', 'none');
                     if (window.VehicleAnimation) VehicleAnimation.stop();
@@ -396,6 +414,9 @@ map.on("load", async () => {
     // Initialize H3 Grid layer
     if (window.H3Grid) H3Grid.init(map);
     if (window.H3TronTrails) H3TronTrails.init(map);
+
+    // Lazy-load non-critical modules after map is ready
+    loadScript('/vendor/protobuf.min.js').then(() => loadScript('/js/tesla-dashcam.js?v=20260301'));
 
     const styleObj = map.getStyle();
     const vectorSourceId = Object.entries(styleObj.sources).find(([, src]) => src.type === "vector")?.[0];
