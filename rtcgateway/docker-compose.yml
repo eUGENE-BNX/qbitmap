@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mediamtx:
     image: bluenviron/mediamtx:1.17.0
