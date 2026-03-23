@@ -241,6 +241,13 @@ class LayersDropdownControl {
                             if (window.VehicleAnimation) VehicleAnimation.start();
                         });
                     }
+                    // Fly to Ataşehir where vehicles are (layer minzoom:14, maxzoom:17)
+                    const zoom = this._map.getZoom();
+                    const center = this._map.getCenter();
+                    const inVehicleArea = center.lat > 40.9 && center.lat < 41.1 && center.lng > 28.9 && center.lng < 29.2;
+                    if (!inVehicleArea || zoom < 14 || zoom > 17) {
+                        this._map.flyTo({ center: [29.114, 40.997], zoom: 15 });
+                    }
                 } else {
                     if (this._map.getLayer('vehicles')) this._map.setLayoutProperty('vehicles', 'visibility', 'none');
                     if (window.VehicleAnimation) VehicleAnimation.stop();
