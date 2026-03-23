@@ -1,3 +1,8 @@
+import { QBitmapConfig } from './config.js';
+import { Logger, escapeHtml, showNotification } from './utils.js';
+import { AuthSystem } from './auth.js';
+import { Analytics } from './analytics.js';
+
 /**
  * QBitmap Live Broadcast System
  * Handles live video broadcasting from user's device to the map via WHIP
@@ -2111,4 +2116,5 @@ const LiveBroadcast = {
   }
 };
 
+export { LiveBroadcast };
 window.LiveBroadcast = LiveBroadcast;

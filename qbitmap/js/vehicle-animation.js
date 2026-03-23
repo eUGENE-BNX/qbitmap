@@ -1,3 +1,7 @@
+import { QBitmapConfig } from './config.js';
+import { AuthSystem } from './auth.js';
+import { escapeHtml } from './utils.js';
+
 /**
  * Multi-Vehicle Animation System
  * Supports multiple vehicles with plates and camera integration
@@ -1020,7 +1024,7 @@ const VehicleAnimation = {
   }
 };
 
-// Expose globally so map.js can call start/stop
+export { VehicleAnimation };
 window.VehicleAnimation = VehicleAnimation;
 
 // Initialize

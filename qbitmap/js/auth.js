@@ -254,14 +254,14 @@ const AuthSystem = {
         if (this.isLoggedIn()) { m.VideoMessage.bindButton(); m.VideoMessage.bindPhotoButton(); }
       }
     }).catch(err => console.error('[Auth] video-message load failed:', err));
-    loadScript('/js/comments.js?v=20260323').then(() => {
+    import('/js/comments.js').then(() => {
       if (window.CommentWidget) CommentWidget.init();
-    });
+    }).catch(err => console.error('[Auth] comments load failed:', err));
     // Broadcast only for logged-in users
     if (this.isLoggedIn()) {
-      loadScript('/js/live-broadcast.js?v=20260217c').then(() => {
+      import('/js/live-broadcast.js').then(() => {
         if (window.LiveBroadcast) { LiveBroadcast.init(); LiveBroadcast.bindButton(); }
-      });
+      }).catch(err => console.error('[Auth] broadcast load failed:', err));
     }
   },
 

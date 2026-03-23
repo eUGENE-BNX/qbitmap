@@ -1,14 +1,12 @@
+import { Logger, escapeHtml, showNotification } from './utils.js';
+
 /**
  * Tesla Dashcam Module — Standalone & Modular
  * Parses Tesla front camera MP4 SEI metadata (GPS, speed, gear, steering, etc.)
  * and displays vehicle on map with synchronized video + driving dashboard.
  *
  * Dependencies: protobuf.min.js (vendor), MapLibre GL JS (global window.map)
- * No modifications to vehicle-animation.js required.
  */
-
-// Fallback if Logger is not available
-if (typeof Logger === 'undefined') { window.Logger = { log: function() { console.log.apply(console, arguments); } }; }
 
 const TeslaDashcam = {
 
@@ -1002,3 +1000,6 @@ const TeslaDashcam = {
     setTimeout(initTeslaDashcam, 300);
   }
 })();
+
+export { TeslaDashcam };
+window.TeslaDashcam = TeslaDashcam;

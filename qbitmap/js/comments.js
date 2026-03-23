@@ -1,3 +1,8 @@
+import { QBitmapConfig } from './config.js';
+import { Logger } from './utils.js';
+import { AuthSystem } from './auth.js';
+import { Analytics } from './analytics.js';
+
 /**
  * QBitmap Comment Widget
  * Reusable comment system for video messages, cameras, etc.
@@ -295,8 +300,8 @@ const CommentWidget = {
 };
 
 // Auto-init when DOM ready
-document.addEventListener('DOMContentLoaded', () => {
-  if (typeof QBitmapConfig !== 'undefined') {
-    CommentWidget.init();
-  }
-});
+// Init immediately (lazy-loaded after DOMContentLoaded)
+CommentWidget.init();
+
+export { CommentWidget };
+window.CommentWidget = CommentWidget;
