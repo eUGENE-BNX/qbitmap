@@ -2078,14 +2078,16 @@ class DatabaseService {
     return this.getVideoMessageById(messageId);
   }
 
-  async getVideoMessageById(messageId) {
+  async getVideoMessageById(messageId, userId = null) {
     const [rows] = await this.pool.execute(
       `SELECT vm.*, u.display_name AS sender_name, u.avatar_url AS sender_avatar,
               COALESCE(vc.view_count, 0) AS view_count,
+              COALESCE(lc.like_count, 0) AS like_count,
               gp.display_name AS place_name, gp.formatted_address AS place_address
        FROM video_messages vm
        JOIN users u ON u.id = vm.sender_id
        LEFT JOIN view_counts vc ON vc.entity_type = 'video_message' AND vc.entity_id = vm.message_id
+       LEFT JOIN like_counts lc ON lc.entity_type = 'video_message' AND lc.entity_id = vm.message_id
        LEFT JOIN google_places gp ON gp.id = vm.place_id
        WHERE vm.message_id = ?`,
       [messageId]
@@ -2093,6 +2095,15 @@ class DatabaseService {
     const msg = rows[0] || null;
     if (msg) {
       msg.tags = await this.getVideoMessageTags(msg.id);
+      if (userId) {
+        const [likeRows] = await this.pool.execute(
+          'SELECT 1 FROM likes WHERE entity_type = ? AND entity_id = ? AND user_id = ?',
+          ['video_message', messageId, userId]
+        );
+        msg.liked = likeRows.length > 0;
+      } else {
+        msg.liked = false;
+      }
     }
     return msg;
   }
@@ -2119,10 +2130,12 @@ class DatabaseService {
     const [rows] = await this.pool.execute(
       `SELECT vm.*, u.display_name AS sender_name, u.avatar_url AS sender_avatar,
               COALESCE(vc.view_count, 0) AS view_count,
+              COALESCE(lc.like_count, 0) AS like_count,
               gp.display_name AS place_name, gp.formatted_address AS place_address
        FROM video_messages vm
        JOIN users u ON u.id = vm.sender_id
        LEFT JOIN view_counts vc ON vc.entity_type = 'video_message' AND vc.entity_id = vm.message_id
+       LEFT JOIN like_counts lc ON lc.entity_type = 'video_message' AND lc.entity_id = vm.message_id
        LEFT JOIN google_places gp ON gp.id = vm.place_id
        WHERE ${where}
        ORDER BY vm.created_at DESC
@@ -2145,8 +2158,22 @@ class DatabaseService {
         if (!tagMap.has(tr.video_message_id)) tagMap.set(tr.video_message_id, []);
         tagMap.get(tr.video_message_id).push(tr.name);
       }
+
+      // [PERF] Batch fetch liked status for current user
+      let likedSet = new Set();
+      if (userId) {
+        const messageIds = rows.map(r => r.message_id);
+        const msgPlaceholders = messageIds.map(() => '?').join(',');
+        const [likeRows] = await this.pool.query(
+          `SELECT entity_id FROM likes WHERE entity_type = 'video_message' AND user_id = ? AND entity_id IN (${msgPlaceholders})`,
+          [userId, ...messageIds]
+        );
+        likedSet = new Set(likeRows.map(r => r.entity_id));
+      }
+
       for (const row of rows) {
         row.tags = tagMap.get(row.id) || [];
+        row.liked = likedSet.has(row.message_id);
       }
     }
     return rows;
@@ -2390,6 +2417,68 @@ class DatabaseService {
       [entityType, entityId]
     );
     return rows[0]?.view_count || 0;
+  }
+
+  // ==================== LIKES (generic) ====================
+
+  async toggleLike(userId, entityType, entityId) {
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [existing] = await conn.execute(
+        'SELECT id FROM likes WHERE entity_type = ? AND entity_id = ? AND user_id = ?',
+        [entityType, entityId, userId]
+      );
+      let liked;
+      if (existing.length > 0) {
+        await conn.execute('DELETE FROM likes WHERE id = ?', [existing[0].id]);
+        await conn.execute(
+          'UPDATE like_counts SET like_count = GREATEST(like_count - 1, 0) WHERE entity_type = ? AND entity_id = ?',
+          [entityType, entityId]
+        );
+        liked = false;
+      } else {
+        await conn.execute(
+          'INSERT INTO likes (entity_type, entity_id, user_id) VALUES (?, ?, ?)',
+          [entityType, entityId, userId]
+        );
+        await conn.execute(
+          `INSERT INTO like_counts (entity_type, entity_id, like_count)
+           VALUES (?, ?, 1)
+           ON DUPLICATE KEY UPDATE like_count = like_count + 1`,
+          [entityType, entityId]
+        );
+        liked = true;
+      }
+      const [countRows] = await conn.execute(
+        'SELECT like_count FROM like_counts WHERE entity_type = ? AND entity_id = ?',
+        [entityType, entityId]
+      );
+      await conn.commit();
+      return { liked, likeCount: countRows[0]?.like_count || 0 };
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async getLikeStatus(entityType, entityId, userId = null) {
+    const [countRows] = await this.pool.execute(
+      'SELECT like_count FROM like_counts WHERE entity_type = ? AND entity_id = ?',
+      [entityType, entityId]
+    );
+    const likeCount = countRows[0]?.like_count || 0;
+    let liked = false;
+    if (userId) {
+      const [likeRows] = await this.pool.execute(
+        'SELECT 1 FROM likes WHERE entity_type = ? AND entity_id = ? AND user_id = ?',
+        [entityType, entityId, userId]
+      );
+      liked = likeRows.length > 0;
+    }
+    return { likeCount, liked };
   }
 
   // ==================== COMMENTS (generic) ====================

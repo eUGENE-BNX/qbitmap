@@ -1853,6 +1853,8 @@ const VideoMessage = {
         isRead: m.is_read,
         createdAt: m.created_at,
         viewCount: m.view_count || 0,
+        likeCount: m.like_count || 0,
+        liked: m.liked ? 'true' : 'false',
         description: m.description || '',
         aiDescription: m.ai_description || '',
         tags: JSON.stringify(m.tags || []),
@@ -1943,6 +1945,8 @@ const VideoMessage = {
           isRead: msg.is_read,
           createdAt: msg.created_at,
           viewCount: msg.view_count || 0,
+          likeCount: msg.like_count || 0,
+          liked: msg.liked ? 'true' : 'false',
           description: msg.description || '',
           aiDescription: msg.ai_description || '',
           tags: JSON.stringify(msg.tags || []),
@@ -1994,6 +1998,9 @@ const VideoMessage = {
     const videoUrl = `${this.apiBase}/${encodeURIComponent(messageId)}/video`;
 
     const viewCount = parseInt(props.viewCount) || 0;
+    const likeCount = parseInt(props.likeCount) || 0;
+    const liked = props.liked === 'true' || props.liked === true;
+    const isLoggedIn = AuthSystem.isLoggedIn();
     const description = props.description || '';
     const aiDescription = props.aiDescription || '';
     const placeName = props.placeName || '';
@@ -2030,6 +2037,17 @@ const VideoMessage = {
               </span>
             </div>
           </div>
+          ${isLoggedIn ? `
+          <button class="video-msg-like-btn${liked ? ' liked' : ''}" data-action="toggle-like" title="Beğen">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="${liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <span data-like-count-num>${likeCount}</span>
+          </button>
+          ` : (likeCount > 0 ? `
+          <span class="video-msg-like-btn disabled" title="Beğeni">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <span data-like-count-num>${likeCount}</span>
+          </span>
+          ` : '')}
           ${!isPrivateMsg ? `
           <div class="video-msg-share-buttons">
             <button class="video-msg-share-btn facebook" data-action="share-facebook" title="Facebook'ta Paylas">
@@ -2128,6 +2146,10 @@ const VideoMessage = {
         this.viewedMessages.add(messageId);
         this.incrementViewCount(messageId, popupEl);
       }
+
+      // Like button
+      const likeBtn = popupEl.querySelector('[data-action="toggle-like"]');
+      if (likeBtn) likeBtn.onclick = () => this.toggleLike(messageId, likeBtn);
 
       // Share buttons
       const whatsappBtn = popupEl.querySelector('[data-action="share-whatsapp"]');
@@ -2352,6 +2374,55 @@ const VideoMessage = {
       }
     } catch (e) {
       // Silently ignore - view count is non-critical
+    }
+  },
+
+  async toggleLike(messageId, btnEl) {
+    if (!AuthSystem.isLoggedIn()) return;
+
+    // Optimistic UI update
+    const isLiked = btnEl.classList.contains('liked');
+    const countEl = btnEl.querySelector('[data-like-count-num]');
+    const svgEl = btnEl.querySelector('svg');
+    const currentCount = parseInt(countEl?.textContent || '0');
+
+    btnEl.classList.toggle('liked');
+    if (svgEl) svgEl.setAttribute('fill', isLiked ? 'none' : 'currentColor');
+    if (countEl) countEl.textContent = isLiked ? Math.max(currentCount - 1, 0) : currentCount + 1;
+
+    try {
+      const res = await fetch(`${QBitmapConfig.api.base}/api/likes/video_message/${encodeURIComponent(messageId)}`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Reconcile with server state
+        if (countEl) countEl.textContent = data.likeCount;
+        if (data.liked) {
+          btnEl.classList.add('liked');
+          if (svgEl) svgEl.setAttribute('fill', 'currentColor');
+        } else {
+          btnEl.classList.remove('liked');
+          if (svgEl) svgEl.setAttribute('fill', 'none');
+        }
+        // Update local cache
+        const cached = this.videoMessages.get(messageId);
+        if (cached) {
+          cached.like_count = data.likeCount;
+          cached.liked = data.liked;
+        }
+      }
+    } catch (e) {
+      // Revert on error
+      if (isLiked) {
+        btnEl.classList.add('liked');
+        if (svgEl) svgEl.setAttribute('fill', 'currentColor');
+      } else {
+        btnEl.classList.remove('liked');
+        if (svgEl) svgEl.setAttribute('fill', 'none');
+      }
+      if (countEl) countEl.textContent = currentCount;
     }
   },
 
@@ -2593,6 +2664,8 @@ const VideoMessage = {
                 isRead: msg.is_read,
                 createdAt: msg.created_at,
                 viewCount: msg.view_count || 0,
+                likeCount: msg.like_count || 0,
+                liked: msg.liked ? 'true' : 'false',
                 description: msg.description || '',
                 aiDescription: msg.ai_description || '',
                 tags: JSON.stringify(msg.tags || []),
@@ -2629,6 +2702,8 @@ const VideoMessage = {
       is_read: 0,
       created_at: payload.createdAt,
       view_count: 0,
+      like_count: 0,
+      liked: false,
       description: payload.description || '',
       ai_description: payload.aiDescription || '',
       tags: payload.tags || [],
@@ -2835,6 +2910,8 @@ const VideoMessage = {
                   isRead: msg.is_read,
                   createdAt: msg.created_at,
                   viewCount: msg.view_count || 0,
+                  likeCount: msg.like_count || 0,
+                  liked: msg.liked ? 'true' : 'false',
                   description: msg.description || '',
                   aiDescription: msg.ai_description || '',
                   tags: JSON.stringify(msg.tags || []),

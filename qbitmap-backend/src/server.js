@@ -160,6 +160,9 @@ async function buildServer() {
   // Register comment routes (generic, used by video messages, cameras, etc.)
   await fastify.register(require('./routes/comments'), { prefix: '/api/comments' });
 
+  // Register like routes (generic, used by video messages, etc.)
+  await fastify.register(require('./routes/likes'), { prefix: '/api/likes' });
+
   // Register live broadcast routes
   await fastify.register(require('./routes/broadcasts'), { prefix: '/api/broadcasts' });
 

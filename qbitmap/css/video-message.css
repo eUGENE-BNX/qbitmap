@@ -782,6 +782,47 @@
 }
 
 /* ============================================
+   Like Button (in header)
+   ============================================ */
+.video-msg-like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #999;
+  font-size: 11px;
+  padding: 0;
+  margin-left: auto;
+  margin-right: 4px;
+  flex-shrink: 0;
+  transition: color 0.2s, transform 0.15s;
+}
+
+.video-msg-like-btn:hover {
+  transform: scale(1.15);
+}
+
+.video-msg-like-btn.liked {
+  color: #e74c3c;
+}
+
+.video-msg-like-btn.liked:hover {
+  color: #c0392b;
+}
+
+.video-msg-like-btn.disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
+.video-msg-like-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ============================================
    Share Buttons (in header)
    ============================================ */
 .video-msg-share-buttons {

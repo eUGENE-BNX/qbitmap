@@ -493,4 +493,29 @@ CREATE TABLE IF NOT EXISTS places_cache_cell_places (
   CONSTRAINT fk_pccp_place FOREIGN KEY (place_id) REFERENCES google_places(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- =================================================================
+-- 28. likes (generic like/unlike per user per entity)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS likes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  entity_type VARCHAR(50) NOT NULL,
+  entity_id VARCHAR(64) NOT NULL,
+  user_id INT UNSIGNED NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_likes_user_entity (entity_type, entity_id, user_id),
+  INDEX idx_likes_entity (entity_type, entity_id),
+  INDEX idx_likes_user (user_id),
+  CONSTRAINT fk_likes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================
+-- 29. like_counts (denormalized counter for fast reads)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS like_counts (
+  entity_type VARCHAR(50) NOT NULL,
+  entity_id VARCHAR(64) NOT NULL,
+  like_count INT UNSIGNED DEFAULT 0,
+  PRIMARY KEY (entity_type, entity_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
