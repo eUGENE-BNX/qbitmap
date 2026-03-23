@@ -2504,7 +2504,9 @@ const MyCamerasSystem = {
   }
 };
 
-// Initialize on DOM ready
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize on DOM ready (handle lazy-load after DOMContentLoaded)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => MyCamerasSystem.init());
+} else {
   MyCamerasSystem.init();
-});
+}

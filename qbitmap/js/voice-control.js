@@ -301,7 +301,7 @@ window.VoiceControl = {
             }
 
             // Paneli de aç
-            loadScript('/js/my-cameras.js?v=20260206').then(() => {
+            loadScript('/js/my-cameras.js?v=20260323').then(() => {
               if (window.MyCamerasSystem?.open) MyCamerasSystem.open();
             });
           } catch (err) {
