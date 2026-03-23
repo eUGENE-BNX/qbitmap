@@ -518,4 +518,12 @@ CREATE TABLE IF NOT EXISTS like_counts (
   PRIMARY KEY (entity_type, entity_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- =================================================================
+-- Performance indexes (added during optimization)
+-- =================================================================
+CREATE INDEX IF NOT EXISTS idx_video_messages_place ON video_messages(place_id);
+CREATE INDEX IF NOT EXISTS idx_comments_entity_user ON comments(entity_type, entity_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_alarms_user ON alarms(user_id);
+CREATE INDEX IF NOT EXISTS idx_cameras_public_type ON cameras(is_public, camera_type);
+
 SET FOREIGN_KEY_CHECKS = 1;
