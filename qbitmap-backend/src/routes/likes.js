@@ -19,7 +19,7 @@ async function likeRoutes(fastify, options) {
     }
 
     try {
-      const result = await db.toggleLike(request.user.id, entityType, entityId);
+      const result = await db.toggleLike(request.user.userId, entityType, entityId);
       return result;
     } catch (error) {
       logger.error({ err: error, entityType, entityId }, 'Like toggle failed');
@@ -40,7 +40,7 @@ async function likeRoutes(fastify, options) {
     }
 
     try {
-      const userId = request.user?.id || null;
+      const userId = request.user?.userId || null;
       const result = await db.getLikeStatus(entityType, entityId, userId);
       return result;
     } catch (error) {
