@@ -40,6 +40,23 @@
   <link rel="stylesheet" href="/css/live-broadcast.css">
   <!-- Plyr Video Player -->
   <link rel="stylesheet" href="https://cdn.plyr.io/3.8.4/plyr.css" integrity="sha384-VqqE0KSv00qfHvKpRa8aov+g3xtUu2Rw0NsEmtjTOPGn/JDKVghgd56iw/VObHa7" crossorigin="anonymous">
+
+  <!-- Vendor libraries in head so they execute before Vite's module scripts -->
+  <script defer src="/vendor/hls.min.js"></script>
+  <script defer src="/vendor/maplibre-gl.js"></script>
+  <script defer src="/vendor/basemaps.js"></script>
+  <script defer src="/vendor/h3-js.umd.js"></script>
+  <script defer src="/vendor/deck.gl.min.js"></script>
+  <!-- Three.js ES Module Import Map -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script async src="https://cdn.plyr.io/3.8.4/plyr.polyfilled.js" integrity="sha384-ZDYtn77N2Oxc6W8oilE9z73hj1EZqidVlQeqTwsKW19gglwyUYHMn/LzX+ewyFJD" crossorigin="anonymous"></script>
 </head>
 <body>
   <div id="map"></div>
@@ -82,27 +99,10 @@
   </div>
   <!-- ================== BIOMETRIC MODAL BİTİŞ ================== -->
 
-  <!-- Vendor libraries (UMD/IIFE - must load before modules) -->
-  <script defer src="/vendor/hls.min.js"></script>
-  <script defer src="/vendor/maplibre-gl.js"></script>
-  <script defer src="/vendor/basemaps.js"></script>
-  <script defer src="/vendor/h3-js.umd.js"></script>
-  <script defer src="/vendor/deck.gl.min.js"></script>
-  <!-- Three.js ES Module Import Map -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"
-    }
-  }
-  </script>
-  <!-- 3D models (already ES modules) -->
+  <!-- 3D models (ES modules) -->
   <script type="module" src="/js/3d-models.js"></script>
   <script type="module" src="/js/particle-cube.js"></script>
-  <!-- Plyr Video Player -->
-  <script async src="https://cdn.plyr.io/3.8.4/plyr.polyfilled.js" integrity="sha384-ZDYtn77N2Oxc6W8oilE9z73hj1EZqidVlQeqTwsKW19gglwyUYHMn/LzX+ewyFJD" crossorigin="anonymous"></script>
-  <!-- Main app entry point (bundles all our JS modules) -->
+  <!-- Main app entry point -->
   <script type="module" src="/js/main.js"></script>
 </body>
 </html>
