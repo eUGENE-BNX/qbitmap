@@ -1,3 +1,6 @@
+const ACCESS_CACHE_TTL = 60000;
+const ACCESS_CACHE_MAX_SIZE = 5000;
+
 module.exports = function(DatabaseService) {
 
 DatabaseService.prototype.invalidateAccessCache = function(cameraId) {

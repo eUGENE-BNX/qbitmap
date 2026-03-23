@@ -1,4 +1,5 @@
 const { notifyH3CameraChange, notifyH3CameraRemove, notifyH3ContentItemRemove } = require('../../utils/h3-sync');
+const settingsCache = require('../settings-cache');
 
 module.exports = function(DatabaseService) {
 
