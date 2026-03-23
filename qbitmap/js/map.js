@@ -238,7 +238,7 @@ class LayersDropdownControl {
                     if (window.VehicleAnimation) {
                         VehicleAnimation.start();
                     } else {
-                        loadScript('/js/vehicle-animation.js?v=20260323').then(() => {
+                        loadScript('/js/vehicle-animation.js?v=20260323b').then(() => {
                             if (window.VehicleAnimation) VehicleAnimation.start();
                         });
                     }
@@ -443,7 +443,7 @@ map.on("load", async () => {
     }
 
     // Lazy-load non-critical modules after map is ready
-    loadScript('/vendor/protobuf.min.js').then(() => loadScript('/js/tesla-dashcam.js?v=20260301'));
+    loadScript('/vendor/protobuf.min.js').then(() => loadScript('/js/tesla-dashcam.js?v=20260323b'));
 
     const styleObj = map.getStyle();
     const vectorSourceId = Object.entries(styleObj.sources).find(([, src]) => src.type === "vector")?.[0];

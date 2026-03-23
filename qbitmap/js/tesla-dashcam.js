@@ -953,14 +953,19 @@ const TeslaDashcam = {
 
   _tryInjectButton: function() {
     // Already injected?
-    if (document.querySelector('.tesla-upload-btn')) return;
+    if (document.querySelector('.tesla-upload-btn')) {
+      Logger.log('[Tesla] Upload button already exists');
+      return;
+    }
 
     // Find the "Vehicles" label in layers dropdown
     var labels = document.querySelectorAll('.layers-dropdown-label');
+    Logger.log('[Tesla] _tryInjectButton: found', labels.length, 'labels');
     var self = this;
 
     labels.forEach(function(label) {
-      var text = label.textContent || '';
+      var text = (label.textContent || '').trim();
+      Logger.log('[Tesla] Label text:', JSON.stringify(text));
       if (text === 'Vehicles') {
         var btn = document.createElement('button');
         btn.className = 'tesla-upload-btn';
@@ -987,6 +992,7 @@ const TeslaDashcam = {
 
 // ── Auto-Initialize ──────────────────────────────────────
 (function initTeslaDashcam() {
+  Logger.log('[Tesla] initTeslaDashcam: map=' + !!window.map + ', loaded=' + (window.map && window.map.loaded && window.map.loaded()));
   if (window.map && typeof window.map.getSource === 'function') {
     if (window.map.loaded()) {
       TeslaDashcam.init(window.map);
@@ -998,6 +1004,7 @@ const TeslaDashcam = {
       });
     }
   } else {
+    Logger.log('[Tesla] Map not ready, retrying in 300ms...');
     setTimeout(initTeslaDashcam, 300);
   }
 })();

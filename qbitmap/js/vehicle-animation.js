@@ -842,8 +842,11 @@ const VehicleAnimation = {
     var totalIcons = this.carIcons.length + 1;
     var loadedCount = 0;
 
+    Logger.log('[Vehicles] Loading', totalIcons, 'icons...');
+
     var checkAllLoaded = function() {
       loadedCount++;
+      Logger.log('[Vehicles] Icon loaded', loadedCount + '/' + totalIcons);
       if (loadedCount === totalIcons) {
         self.addVehicleSource();
       }
@@ -858,7 +861,10 @@ const VehicleAnimation = {
         }
         checkAllLoaded();
       };
-      img.onerror = function() { checkAllLoaded(); };
+      img.onerror = function() {
+        Logger.warn('[Vehicles] Failed to load icon:', iconFile);
+        checkAllLoaded();
+      };
       img.src = '/' + iconFile;
     });
 
@@ -869,7 +875,10 @@ const VehicleAnimation = {
       }
       checkAllLoaded();
     };
-    truckImg.onerror = function() { checkAllLoaded(); };
+    truckImg.onerror = function() {
+      Logger.warn('[Vehicles] Failed to load truck icon');
+      checkAllLoaded();
+    };
     truckImg.src = '/' + this.truckIcon;
   },
 
@@ -886,20 +895,25 @@ const VehicleAnimation = {
           id: v.id,
           plate: v.plate,
           bearing: 0,
-          iconIndex: v.iconIndex || 0,
+          iconIndex: v.iconIndex,
           vehicleType: v.type || 'car'
         }
       };
     });
+
+    Logger.log('[Vehicles] addVehicleSource: features=' + features.length + ', vehiclesVisible=' + window.vehiclesVisible);
 
     if (!this.map.getSource('vehicles')) {
       this.map.addSource('vehicles', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: features }
       });
+      Logger.log('[Vehicles] Source added');
     }
 
     if (!this.map.getLayer('vehicles')) {
+      var vis = window.vehiclesVisible ? 'visible' : 'none';
+      Logger.log('[Vehicles] Adding layer with visibility:', vis);
       this.map.addLayer({
         id: 'vehicles',
         type: 'symbol',
@@ -907,11 +921,11 @@ const VehicleAnimation = {
         minzoom: 14,
         maxzoom: 17,
         layout: {
-          'visibility': window.vehiclesVisible ? 'visible' : 'none',
+          'visibility': vis,
           'icon-image': [
             'case',
             ['==', ['get', 'vehicleType'], 'truck'], 'truck-icon',
-            ['concat', 'vehicle-icon-', ['get', 'iconIndex']]
+            ['concat', 'vehicle-icon-', ['to-string', ['get', 'iconIndex']]]
           ],
           'icon-size': [
             'interpolate',
@@ -925,6 +939,13 @@ const VehicleAnimation = {
           'icon-rotation-alignment': 'map'
         }
       });
+      Logger.log('[Vehicles] Layer added');
+
+      // Verify images are registered
+      var registered = this.carIcons.map(function(_, i) {
+        return 'vehicle-icon-' + i + ':' + self.map.hasImage('vehicle-icon-' + i);
+      });
+      Logger.log('[Vehicles] Registered icons:', registered.join(', '), 'truck:' + this.map.hasImage('truck-icon'));
     }
 
     var truckCount = this.vehicles.filter(function(v) { return v.type === 'truck'; }).length;
