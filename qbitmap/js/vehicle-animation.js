@@ -1047,7 +1047,12 @@ console.log('[Vehicles] Script loaded, window.map=' + !!window.map);
 (function initVehicleAnimation() {
   console.log('[Vehicles] initVehicleAnimation called, map=' + !!window.map);
   if (window.map) {
-    VehicleAnimation.init(window.map);
+    try {
+      VehicleAnimation.init(window.map);
+      console.log('[Vehicles] init() completed OK');
+    } catch(e) {
+      console.error('[Vehicles] init() FAILED:', e);
+    }
   } else {
     setTimeout(initVehicleAnimation, 200);
   }
