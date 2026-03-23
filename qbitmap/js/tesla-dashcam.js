@@ -953,19 +953,14 @@ const TeslaDashcam = {
 
   _tryInjectButton: function() {
     // Already injected?
-    if (document.querySelector('.tesla-upload-btn')) {
-      console.log('[Tesla] Upload button already exists');
-      return;
-    }
+    if (document.querySelector('.tesla-upload-btn')) return;
 
     // Find the "Vehicles" label in layers dropdown
     var labels = document.querySelectorAll('.layers-dropdown-label');
-    console.log('[Tesla] _tryInjectButton: found', labels.length, 'labels');
     var self = this;
 
     labels.forEach(function(label) {
       var text = (label.textContent || '').trim();
-      console.log('[Tesla] Label text:', JSON.stringify(text));
       if (text === 'Vehicles') {
         var btn = document.createElement('button');
         btn.className = 'tesla-upload-btn';
@@ -997,12 +992,10 @@ const TeslaDashcam = {
     if (window.map.isStyleLoaded()) {
       TeslaDashcam.init(window.map);
       TeslaDashcam._injectUploadButton();
-      console.log('[Tesla] Initialized (style loaded)');
     } else {
       window.map.on('load', function() {
         TeslaDashcam.init(window.map);
         TeslaDashcam._injectUploadButton();
-        console.log('[Tesla] Initialized (on load)');
       });
     }
   } else {

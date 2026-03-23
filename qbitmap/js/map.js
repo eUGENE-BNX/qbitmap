@@ -233,17 +233,14 @@ class LayersDropdownControl {
             case 'vehicles':
                 window.vehiclesVisible = !window.vehiclesVisible;
                 toggle.classList.toggle('active', window.vehiclesVisible);
-                console.log('[Map] Vehicles toggle:', window.vehiclesVisible, 'VehicleAnimation:', !!window.VehicleAnimation, 'layer:', !!this._map.getLayer('vehicles'));
                 if (window.vehiclesVisible) {
                     if (this._map.getLayer('vehicles')) this._map.setLayoutProperty('vehicles', 'visibility', 'visible');
                     if (window.VehicleAnimation) {
                         VehicleAnimation.start();
                     } else {
-                        console.log('[Map] Loading vehicle-animation.js...');
                         loadScript('/js/vehicle-animation.js?v=20260323d').then(() => {
-                            console.log('[Map] vehicle-animation.js loaded, VehicleAnimation:', !!window.VehicleAnimation);
                             if (window.VehicleAnimation) VehicleAnimation.start();
-                        }).catch(err => console.error('[Map] vehicle-animation.js FAILED to load:', err));
+                        });
                     }
                     // Fly to Ataşehir where vehicles are (layer minzoom:14, maxzoom:17)
                     const zoom = this._map.getZoom();
