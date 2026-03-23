@@ -244,7 +244,7 @@ const AuthSystem = {
       VoiceControl.bindMicButton();
     }
     // Lazy-load map features (visible to everyone)
-    loadScript('/js/video-message.js?v=20260217e').then(() => {
+    loadScript('/js/video-message.js?v=20260323').then(() => {
       if (window.VideoMessage) {
         VideoMessage.init();
         if (this.isLoggedIn()) { VideoMessage.bindButton(); VideoMessage.bindPhotoButton(); }

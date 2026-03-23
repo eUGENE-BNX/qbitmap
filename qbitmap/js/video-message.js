@@ -72,12 +72,6 @@ const VideoMessage = {
   // ==================== INIT ====================
 
   init() {
-    // Check browser support
-    if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      Logger.warn('[VideoMessage] MediaRecorder not supported, feature disabled');
-      return;
-    }
-
     this.apiBase = QBitmapConfig.api.base + '/api/video-messages';
     this.initMapLayer();
     this.initSearch();
@@ -93,6 +87,12 @@ const VideoMessage = {
       this.updateBadgeCount(0);
       this.loadVideoMessages();
     });
+
+    // Check browser support for recording (viewing messages still works without this)
+    if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      Logger.warn('[VideoMessage] MediaRecorder not supported, recording disabled');
+      return;
+    }
 
     Logger.log('[VideoMessage] System initialized');
   },
