@@ -992,19 +992,20 @@ const TeslaDashcam = {
 
 // ── Auto-Initialize ──────────────────────────────────────
 (function initTeslaDashcam() {
-  console.log('[Tesla] initTeslaDashcam: map=' + !!window.map + ', loaded=' + (window.map && window.map.loaded && window.map.loaded()));
   if (window.map && typeof window.map.getSource === 'function') {
-    if (window.map.loaded()) {
+    // Style is what matters — map.loaded() can be false while tiles stream in
+    if (window.map.isStyleLoaded()) {
       TeslaDashcam.init(window.map);
       TeslaDashcam._injectUploadButton();
+      console.log('[Tesla] Initialized (style loaded)');
     } else {
       window.map.on('load', function() {
         TeslaDashcam.init(window.map);
         TeslaDashcam._injectUploadButton();
+        console.log('[Tesla] Initialized (on load)');
       });
     }
   } else {
-    console.log('[Tesla] Map not ready, retrying in 300ms...');
     setTimeout(initTeslaDashcam, 300);
   }
 })();

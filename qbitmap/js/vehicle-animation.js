@@ -266,12 +266,15 @@ const VehicleAnimation = {
 
     var self = this;
     var setup = function() {
+      console.log('[Vehicles] setup() running');
       self.addVehicleLayers();
       self.setupClickHandler();
       self.start();
     };
 
-    if (map.loaded()) {
+    // Use isStyleLoaded() — map.loaded() returns false while tiles load
+    // and the 'load' event won't re-fire, so setup() would never run
+    if (map.isStyleLoaded()) {
       setup();
     } else {
       map.on('load', setup);
