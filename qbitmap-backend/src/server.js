@@ -80,9 +80,9 @@ async function buildServer() {
     allowedHeaders: config.cors.allowedHeaders
   });
 
-  // Rate limiting - Global (100 req/min)
+  // Rate limiting - Global (150 req/min)
   await fastify.register(rateLimit, {
-    max: 100,
+    max: 150,
     timeWindow: '1 minute',
     keyGenerator: (req) => req.ip
   });

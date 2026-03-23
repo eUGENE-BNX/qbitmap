@@ -306,7 +306,7 @@ const VoiceControl = {
             }
 
             // Paneli de aç
-            loadScript('/js/my-cameras.js?v=20260323').then(() => {
+            import('/js/my-cameras/index.js').then(() => {
               if (window.MyCamerasSystem?.open) MyCamerasSystem.open();
             });
           } catch (err) {

@@ -173,7 +173,7 @@ const AuthSystem = {
               </svg>
               Profilim
             </button>
-            <button class="dropdown-item" onclick="loadScript('/js/my-cameras.js?v=20260323').then(() => MyCamerasSystem.open()); AuthSystem.toggleDropdown();" role="menuitem">
+            <button class="dropdown-item" onclick="import('/js/my-cameras/index.js').then(() => MyCamerasSystem.open()); AuthSystem.toggleDropdown();" role="menuitem">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                 <circle cx="12" cy="13" r="4"></circle>
@@ -248,12 +248,12 @@ const AuthSystem = {
       VoiceControl.bindMicButton();
     }
     // Lazy-load map features (visible to everyone)
-    loadScript('/js/video-message.js?v=20260323').then(() => {
-      if (window.VideoMessage) {
-        VideoMessage.init();
-        if (this.isLoggedIn()) { VideoMessage.bindButton(); VideoMessage.bindPhotoButton(); }
+    import('/js/video-message/index.js').then(m => {
+      if (m.VideoMessage) {
+        m.VideoMessage.init();
+        if (this.isLoggedIn()) { m.VideoMessage.bindButton(); m.VideoMessage.bindPhotoButton(); }
       }
-    });
+    }).catch(err => console.error('[Auth] video-message load failed:', err));
     loadScript('/js/comments.js?v=20260323').then(() => {
       if (window.CommentWidget) CommentWidget.init();
     });

@@ -4,7 +4,7 @@ import { AuthSystem } from '../auth.js';
 import { WebSocketMixin } from './websocket.js';
 import { CameraLayerMixin } from './camera-layer.js';
 import { HlsPlayerMixin } from './hls-player.js';
-import { PopupMixin } from './popup.js';
+import { PopupMixin } from './popup/index.js';
 import { SettingsMixin } from './settings.js';
 import { AIMonitoringMixin } from './ai-monitoring.js';
 import { FaceBlurMixin } from './face-blur.js';
@@ -456,8 +456,11 @@ function initCameraSystem() {
 window.startCameraSystem = function() {
   initCameraSystem();
 
-  // Listen for auth events to reload cameras
+  // Listen for auth events to reload cameras (debounce to avoid duplicate calls on page load)
+  let _initDone = false;
+  setTimeout(() => { _initDone = true; }, 3000);
   window.addEventListener('auth:login', () => {
+    if (!_initDone) return; // Skip if still initializing (init already loads cameras)
     Logger.log('[Cameras] User logged in, reloading cameras with private cameras');
     CameraSystem.reloadCamerasWithUserCameras();
   });
