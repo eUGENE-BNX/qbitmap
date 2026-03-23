@@ -1222,7 +1222,7 @@ const AdminPanel = {
       ).join('') || '<span class="msg-meta">-</span>';
 
       const aiSnippet = msg.ai_description
-        ? `<div class="msg-ai-desc" title="${escapeHtml(msg.ai_description)}">AI: ${escapeHtml(msg.ai_description)}</div>`
+        ? `<div class="msg-ai-desc" title="${escapeHtml(msg.ai_description)}">${escapeHtml(msg.ai_description)}</div>`
         : '';
 
       return `<tr>

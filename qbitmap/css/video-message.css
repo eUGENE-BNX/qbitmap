@@ -786,15 +786,15 @@
    ============================================ */
 .video-msg-share-buttons {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   margin-left: auto;
-  margin-right: 4px;
+  margin-right: 2px;
   flex-shrink: 0;
 }
 
 .video-msg-share-btn {
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   border: none;
   border-radius: 50%;
   cursor: pointer;
@@ -802,6 +802,11 @@
   align-items: center;
   justify-content: center;
   transition: opacity 0.15s, transform 0.15s;
+}
+
+.video-msg-share-btn svg {
+  width: 8px;
+  height: 8px;
 }
 
 .video-msg-share-btn:hover {
