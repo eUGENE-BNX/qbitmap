@@ -1,3 +1,5 @@
+import { Logger } from '../utils.js';
+
 /**
  * QBitmap Camera System - Terminal Module
  * Handles terminal panel, commands, and boot sequence
@@ -312,5 +314,4 @@ const TerminalMixin = {
   }
 };
 
-// Merge into CameraSystem
-Object.assign(CameraSystem, TerminalMixin);
+export { TerminalMixin };

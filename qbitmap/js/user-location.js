@@ -1,3 +1,7 @@
+import { QBitmapConfig } from './config.js';
+import { Logger } from './utils.js';
+import { AuthSystem } from './auth.js';
+
 /**
  * UserLocationSystem - Display user's location on map
  * Shows avatar marker with accuracy circle and info popup
@@ -679,5 +683,5 @@ document.addEventListener('DOMContentLoaded', () => {
     UserLocationSystem.init();
 });
 
-// Export
+export { UserLocationSystem };
 window.UserLocationSystem = UserLocationSystem;

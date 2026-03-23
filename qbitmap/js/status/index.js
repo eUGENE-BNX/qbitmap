@@ -1,3 +1,7 @@
+import { QBitmapConfig } from '../config.js';
+import { StatusGraph } from './graph.js';
+import { StatusAnimations } from './animations.js';
+
 /**
  * StatusSystem - Main status page controller
  * Handles API communication, state management, and DOM rendering
@@ -5,7 +9,7 @@
 
 const StatusSystem = {
   // Configuration
-  apiBase: typeof QBitmapConfig !== 'undefined' ? QBitmapConfig.api.status : 'https://stream.qbitmap.com/api/status',
+  apiBase: QBitmapConfig.api.status,
   refreshInterval: 30000, // 30 seconds
 
   // State
@@ -162,9 +166,7 @@ const StatusSystem = {
     this.renderLastUpdate();
 
     // Trigger animations
-    if (typeof StatusAnimations !== 'undefined') {
-      StatusAnimations.startPacketAnimations(this.services, this.connections);
-    }
+    StatusAnimations.startPacketAnimations(this.services, this.connections);
   },
 
   /**
@@ -218,9 +220,7 @@ const StatusSystem = {
    * Render network graph
    */
   renderGraph() {
-    if (typeof StatusGraph !== 'undefined') {
-      StatusGraph.render(this.services, this.connections, this.elements);
-    }
+    StatusGraph.render(this.services, this.connections, this.elements);
   },
 
   /**
@@ -393,13 +393,8 @@ const StatusSystem = {
    */
   destroy() {
     this.stopAutoRefresh();
-    if (typeof StatusAnimations !== 'undefined') {
-      StatusAnimations.stopAllAnimations();
-    }
+    StatusAnimations.stopAllAnimations();
   }
 };
 
-// Export for module systems
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = StatusSystem;
-}
+export { StatusSystem };

@@ -1,3 +1,7 @@
+import { QBitmapConfig } from '../config.js';
+import { Logger, escapeHtml, showNotification } from '../utils.js';
+import { AuthSystem } from '../auth.js';
+
 /**
  * QBitmap Camera System - Clickable Zones Module
  * Draw polygon zones on camera video to control relay devices
@@ -869,9 +873,6 @@ const ClickableZonesMixin = {
   }
 };
 
-// Merge into CameraSystem
-Object.assign(CameraSystem, ClickableZonesMixin);
-
 // Add CSS styles for zones
 const zonesStyles = document.createElement('style');
 zonesStyles.textContent = `
@@ -1348,3 +1349,5 @@ zonesStyles.textContent = `
   }
 `;
 document.head.appendChild(zonesStyles);
+
+export { ClickableZonesMixin };

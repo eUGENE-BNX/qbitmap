@@ -1,3 +1,7 @@
+import { QBitmapConfig } from './config.js';
+import { Logger } from './utils.js';
+import { Analytics } from './analytics.js';
+
 /**
  * QBitmap H3 Hexagonal Grid Layer
  * Renders a semi-transparent hexagonal grid overlay using deck.gl H3HexagonLayer on MapLibre
@@ -465,4 +469,5 @@ const H3Grid = {
   }
 };
 
+export { H3Grid };
 window.H3Grid = H3Grid;

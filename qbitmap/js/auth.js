@@ -1,3 +1,7 @@
+import { QBitmapConfig } from './config.js';
+import { Logger } from './utils.js';
+import { Analytics } from './analytics.js';
+
 /**
  * QBitmap Authentication System
  * Handles Google OAuth login and JWT token management
@@ -455,5 +459,6 @@ document.addEventListener('click', (e) => {
   AuthSystem.closeDropdown(e);
 });
 
-// Export to window for access from other scripts
+// ES module export + backward compat
+export { AuthSystem };
 window.AuthSystem = AuthSystem;

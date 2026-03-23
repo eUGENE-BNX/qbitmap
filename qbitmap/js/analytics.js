@@ -4,8 +4,10 @@
  * Only active in production (disabled on localhost)
  */
 
+import { QBitmapConfig } from './config.js';
+
 const Analytics = {
-  enabled: typeof QBitmapConfig !== 'undefined' && QBitmapConfig.env === 'production',
+  enabled: QBitmapConfig.env === 'production',
   GA_ID: 'G-5Y929W13D6',
 
   event(name, params = {}) {
@@ -52,3 +54,6 @@ Analytics._trackPageLoad();
 if (Analytics.enabled && typeof gtag !== 'undefined') {
   gtag('event', 'page_view');
 }
+
+export { Analytics };
+window.Analytics = Analytics;

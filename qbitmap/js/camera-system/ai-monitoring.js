@@ -1,3 +1,7 @@
+import { QBitmapConfig } from '../config.js';
+import { Logger, TimerManager, escapeHtml } from '../utils.js';
+import { Analytics } from '../analytics.js';
+
 /**
  * QBitmap Camera System - AI Monitoring Module
  * Handles AI fall detection, alarms, and ONVIF events
@@ -923,5 +927,4 @@ const AIMonitoringMixin = {
   }
 };
 
-// Merge into CameraSystem
-Object.assign(CameraSystem, AIMonitoringMixin);
+export { AIMonitoringMixin };

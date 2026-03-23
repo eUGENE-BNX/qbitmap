@@ -1,3 +1,5 @@
+import { Logger } from '../utils.js';
+
 /**
  * QBitmap Camera System - Camera Layer Module
  * Handles map layer, icons, and interactions
@@ -399,5 +401,4 @@ const CameraLayerMixin = {
   }
 };
 
-// Merge into CameraSystem
-Object.assign(CameraSystem, CameraLayerMixin);
+export { CameraLayerMixin };

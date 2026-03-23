@@ -1,3 +1,7 @@
+import { QBitmapConfig } from '../config.js';
+import { Logger, TimerManager, escapeHtml, showNotification } from '../utils.js';
+import { Analytics } from '../analytics.js';
+
 /**
  * QBitmap Camera System - Grid Module
  * Provides a 3x2 camera grid overlay for simultaneous viewing
@@ -714,17 +718,4 @@ const CameraGridMixin = {
   }
 };
 
-// Merge into CameraSystem when it's available
-if (typeof CameraSystem !== 'undefined') {
-  Object.assign(CameraSystem, CameraGridMixin);
-  Logger.log('[CameraGrid] Module loaded');
-} else {
-  // Wait for CameraSystem to be defined
-  const waitForCameraSystem = setInterval(() => {
-    if (typeof CameraSystem !== 'undefined') {
-      clearInterval(waitForCameraSystem);
-      Object.assign(CameraSystem, CameraGridMixin);
-      Logger.log('[CameraGrid] Module loaded (deferred)');
-    }
-  }, 100);
-}
+export { CameraGridMixin };

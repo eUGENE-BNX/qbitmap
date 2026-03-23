@@ -1,3 +1,7 @@
+import { QBitmapConfig } from '../config.js';
+import { Logger, escapeHtml, sanitize, fetchWithTimeout, TimerManager, showNotification } from '../utils.js';
+import { AuthSystem } from '../auth.js';
+
 /**
  * QBitmap Camera System - Settings Module
  * Handles settings drawer, camera settings form, and ONVIF integration
@@ -1861,5 +1865,4 @@ const SettingsMixin = {
   }
 };
 
-// Merge into CameraSystem
-Object.assign(CameraSystem, SettingsMixin);
+export { SettingsMixin };

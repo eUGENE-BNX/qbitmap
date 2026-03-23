@@ -1,9 +1,14 @@
+import { QBitmapConfig } from './config.js';
+import { Logger } from './utils.js';
+import { AuthSystem } from './auth.js';
+import { VoiceCommands } from './voice-commands.js';
+
 /**
  * QBitmap Voice Control System
  * Web Speech API ile sesli harita kontrolü
  */
 
-window.VoiceControl = {
+const VoiceControl = {
   recognition: null,
   isListening: false,
   lastCommand: null,
@@ -583,3 +588,6 @@ window.VoiceControl = {
 document.addEventListener('DOMContentLoaded', () => {
   VoiceControl.init();
 });
+
+export { VoiceControl };
+window.VoiceControl = VoiceControl;

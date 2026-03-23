@@ -1,3 +1,8 @@
+import { QBitmapConfig } from '../config.js';
+import { Logger, escapeHtml, sanitize, fetchWithTimeout, TimerManager, showNotification } from '../utils.js';
+import { AuthSystem } from '../auth.js';
+import { Analytics } from '../analytics.js';
+
 /**
  * QBitmap Camera System - Popup Module
  * Handles camera popup display, WHEP streams, and frame loading
@@ -2774,5 +2779,4 @@ const PopupMixin = {
   }
 };
 
-// Merge into CameraSystem
-Object.assign(CameraSystem, PopupMixin);
+export { PopupMixin };

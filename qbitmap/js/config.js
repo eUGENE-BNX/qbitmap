@@ -101,7 +101,6 @@ Object.freeze(QBitmapConfig.map);
 Object.freeze(QBitmapConfig.ai);
 Object.freeze(QBitmapConfig.voiceDefaults);
 
-// Export for module systems (if used)
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = QBitmapConfig;
-}
+// ES module export + backward compat for non-module pages
+export { QBitmapConfig };
+window.QBitmapConfig = QBitmapConfig;

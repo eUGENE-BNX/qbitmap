@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang=tr>
+<html lang="tr">
 <head>
-  <meta charset=utf-8>
-  <meta name=viewport content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name=description content=QBitmap - Vision Network>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="QBitmap - Vision Network">
   <title>QBitmap | Vision Network</title>
-  <link rel=icon href=data:,>
+  <link rel="icon" href="data:,">
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
 
   <!-- Google Analytics 4 -->
@@ -18,31 +18,29 @@
   </script>
 
   <!-- Preload critical resources -->
-  <link rel=preload href=/vendor/maplibre-gl.css as=style>
-  <link rel=preload href=/vendor/maplibre-gl.js as=script>
-  <link rel=preload href=/vendor/basemaps.js as=script>
-  <link rel=preload href=/css/style.css?v=20260206 as=style>
-  <link rel=preload href=/js/config.js?v=20260206 as=script>
+  <link rel="preload" href="/vendor/maplibre-gl.css" as="style">
+  <link rel="preload" href="/vendor/maplibre-gl.js" as="script">
+  <link rel="preload" href="/vendor/basemaps.js" as="script">
 
   <!-- Stylesheets -->
-  <link rel=stylesheet href=/vendor/maplibre-gl.css>
-  <link rel=stylesheet href=/css/style.css?v=20260206>
-  <link rel=stylesheet href=/css/modal.css?v=20260206>
-  <link rel=stylesheet href=/css/cameras-settings.css?v=20260217b>
-  <link rel=stylesheet href=/css/auth.css?v=20260215d>
-  <link rel=stylesheet href=/css/my-cameras.css?v=20260206>
-  <link rel=stylesheet href=/css/user-profile.css?v=20260321>
-  <link rel=stylesheet href=/css/camera-grid.css?v=20260206>
-  <link rel=stylesheet href=/css/vehicles.css?v=20260206>
-  <link rel=stylesheet href=/css/tesla-dashcam.css?v=20260323>
-  <link rel=stylesheet href=/css/video-message.css?v=20260217b>
-  <link rel=stylesheet href=/css/comments.css?v=20260215>
-  <link rel=stylesheet href=/css/live-broadcast.css?v=20260215>
+  <link rel="stylesheet" href="/vendor/maplibre-gl.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/modal.css">
+  <link rel="stylesheet" href="/css/cameras-settings.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <link rel="stylesheet" href="/css/my-cameras.css">
+  <link rel="stylesheet" href="/css/user-profile.css">
+  <link rel="stylesheet" href="/css/camera-grid.css">
+  <link rel="stylesheet" href="/css/vehicles.css">
+  <link rel="stylesheet" href="/css/tesla-dashcam.css">
+  <link rel="stylesheet" href="/css/video-message.css">
+  <link rel="stylesheet" href="/css/comments.css">
+  <link rel="stylesheet" href="/css/live-broadcast.css">
   <!-- Plyr Video Player -->
-  <link rel=stylesheet href=https://cdn.plyr.io/3.8.4/plyr.css integrity="sha384-VqqE0KSv00qfHvKpRa8aov+g3xtUu2Rw0NsEmtjTOPGn/JDKVghgd56iw/VObHa7" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.plyr.io/3.8.4/plyr.css" integrity="sha384-VqqE0KSv00qfHvKpRa8aov+g3xtUu2Rw0NsEmtjTOPGn/JDKVghgd56iw/VObHa7" crossorigin="anonymous">
 </head>
 <body>
-  <div id=map></div>
+  <div id="map"></div>
 
   <!-- Top Header Bar -->
   <div id="top-header">
@@ -82,14 +80,13 @@
   </div>
   <!-- ================== BIOMETRIC MODAL BİTİŞ ================== -->
 
-  <!-- Scripts in optimal loading order -->
-  <script defer src=/vendor/hls.min.js></script>
-  <script defer src=/vendor/maplibre-gl.js></script>
-  <script defer src=/vendor/basemaps.js></script>
-  <!-- H3 Hexagonal Grid (h3-js must load before deck.gl) -->
-  <script defer src=/vendor/h3-js.umd.js></script>
-  <script defer src=/vendor/deck.gl.min.js?v=9.2.11></script>
-  <!-- Three.js r182 ES Module with Import Map -->
+  <!-- Vendor libraries (UMD/IIFE - must load before modules) -->
+  <script defer src="/vendor/hls.min.js"></script>
+  <script defer src="/vendor/maplibre-gl.js"></script>
+  <script defer src="/vendor/basemaps.js"></script>
+  <script defer src="/vendor/h3-js.umd.js"></script>
+  <script defer src="/vendor/deck.gl.min.js"></script>
+  <!-- Three.js ES Module Import Map -->
   <script type="importmap">
   {
     "imports": {
@@ -98,50 +95,12 @@
     }
   }
   </script>
-  <script defer src=/js/labels.js?v=20260206></script>
-  <script defer src=/js/voice-commands.js?v=20260206></script>
-  <script defer src=/js/config.js?v=20260206></script>
-  <script defer src=/js/utils.js?v=20260206></script>
-  <script defer src=/js/analytics.js?v=20260225></script>
-  <script type="module" src="/js/3d-models.js?v=20260206"></script>
-  <script type="module" src="/js/particle-cube.js?v=20260206"></script>
-  <script defer src=/js/map.js?v=20260323g></script>
-  <script defer src=/js/user-location.js?v=20260215></script>
-
-  <script defer src=/js/voice-control.js?v=20260213></script>
-  <script defer src=/js/auth.js?v=20260215d></script>
-  <!-- FaceID scripts loaded on demand by biometric-auth.js -->
-  <script defer src=/js/biometric-auth.js?v=20260206></script>
-  <!-- live-broadcast, comments, video-message, user-profile, my-cameras: lazy-loaded on demand -->
-  <!-- Camera System Modules -->
-  <script defer src=/js/camera-system/index.js?v=20260206></script>
-  <script defer src=/js/camera-system/websocket.js?v=20260206></script>
-  <script defer src=/js/camera-system/camera-layer.js?v=20260206></script>
-  <script defer src=/js/camera-system/hls-player.js?v=20260220></script>
-  <script defer src=/js/camera-system/popup.js?v=20260221></script>
-  <script defer src=/js/camera-system/settings.js?v=20260206></script>
-  <script defer src=/js/camera-system/ai-monitoring.js?v=20260206></script>
-  <script defer src=/js/camera-system/face-blur.js?v=20260206></script>
-  <script defer src=/js/camera-system/terminal.js?v=20260206></script>
-  <script defer src=/js/camera-system/recording.js?v=20260206></script>
-  <script defer src=/js/camera-system/recordings-modal.js?v=20260206></script>
-  <script defer src=/js/camera-system/face-detection.js?v=20260206></script>
-  <script defer src=/js/camera-system/clickable-zones.js?v=20260206></script>
-  <script defer src=/js/camera-system/camera-grid.js?v=20260206></script>
-  <!-- H3 Grid Layer -->
-  <script defer src=/js/h3-grid.js?v=20260222></script>
-  <script defer src=/js/h3-tron-trails.js?v=20260223></script>
-  <!-- my-cameras: lazy-loaded from auth dropdown -->
-  <!-- Plyr Video Player - loaded async for performance -->
-  <script async src=https://cdn.plyr.io/3.8.4/plyr.polyfilled.js integrity="sha384-ZDYtn77N2Oxc6W8oilE9z73hj1EZqidVlQeqTwsKW19gglwyUYHMn/LzX+ewyFJD" crossorigin="anonymous"></script>
-  <script>
-    // Mark that modules are loaded and start camera system
-    window.CameraSystemModulesLoaded = true;
-    document.addEventListener('DOMContentLoaded', () => {
-      if (window.startCameraSystem) window.startCameraSystem();
-    });
-  </script>
-  <!-- tesla-dashcam, protobuf, vehicle-animation: lazy-loaded on demand -->
-  <script defer src=/js/modal.js?v=20260206></script>
+  <!-- 3D models (already ES modules) -->
+  <script type="module" src="/js/3d-models.js"></script>
+  <script type="module" src="/js/particle-cube.js"></script>
+  <!-- Plyr Video Player -->
+  <script async src="https://cdn.plyr.io/3.8.4/plyr.polyfilled.js" integrity="sha384-ZDYtn77N2Oxc6W8oilE9z73hj1EZqidVlQeqTwsKW19gglwyUYHMn/LzX+ewyFJD" crossorigin="anonymous"></script>
+  <!-- Main app entry point (bundles all our JS modules) -->
+  <script type="module" src="/js/main.js"></script>
 </body>
 </html>

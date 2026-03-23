@@ -1,3 +1,20 @@
+import { QBitmapConfig } from '../config.js';
+import { Logger } from '../utils.js';
+import { AuthSystem } from '../auth.js';
+import { WebSocketMixin } from './websocket.js';
+import { CameraLayerMixin } from './camera-layer.js';
+import { HlsPlayerMixin } from './hls-player.js';
+import { PopupMixin } from './popup.js';
+import { SettingsMixin } from './settings.js';
+import { AIMonitoringMixin } from './ai-monitoring.js';
+import { FaceBlurMixin } from './face-blur.js';
+import { TerminalMixin } from './terminal.js';
+import { RecordingMixin } from './recording.js';
+import { RecordingsModalMixin } from './recordings-modal.js';
+import { FaceDetectionMixin } from './face-detection.js';
+import { ClickableZonesMixin } from './clickable-zones.js';
+import { CameraGridMixin } from './camera-grid.js';
+
 /**
  * QBitmap Camera System - Main Entry Point
  * Modular architecture using mixins
@@ -451,12 +468,14 @@ window.startCameraSystem = function() {
   });
 };
 
-// Auto-start if this is the only file (backward compat)
-if (typeof window.CameraSystemModulesLoaded === 'undefined') {
-  // Wait a bit to see if modules will be loaded
-  setTimeout(() => {
-    if (typeof window.CameraSystemModulesLoaded === 'undefined') {
-      window.startCameraSystem();
-    }
-  }, 100);
-}
+// Merge all mixins into CameraSystem
+Object.assign(CameraSystem,
+  WebSocketMixin, CameraLayerMixin, HlsPlayerMixin, PopupMixin,
+  SettingsMixin, AIMonitoringMixin, FaceBlurMixin, TerminalMixin,
+  RecordingMixin, RecordingsModalMixin, FaceDetectionMixin,
+  ClickableZonesMixin, CameraGridMixin
+);
+
+export { CameraSystem, AI_VISION_PROMPT, CAPTURE_SERVICE_URL, buildPromptFromRules };
+window.CameraSystem = CameraSystem;
+window.startCameraSystem = window.startCameraSystem;

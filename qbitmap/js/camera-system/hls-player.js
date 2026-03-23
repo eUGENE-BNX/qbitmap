@@ -1,3 +1,6 @@
+import { Logger } from '../utils.js';
+import { Analytics } from '../analytics.js';
+
 /**
  * QBitmap Camera System - HLS Player Mixin
  * Provides HLS playback via hls.js with Safari native fallback
@@ -117,16 +120,4 @@ const HlsPlayerMixin = {
   }
 };
 
-// Merge into CameraSystem when available
-if (typeof CameraSystem !== 'undefined') {
-  Object.assign(CameraSystem, HlsPlayerMixin);
-  Logger.log('[HlsPlayer] Module loaded');
-} else {
-  const waitForCS = setInterval(() => {
-    if (typeof CameraSystem !== 'undefined') {
-      clearInterval(waitForCS);
-      Object.assign(CameraSystem, HlsPlayerMixin);
-      Logger.log('[HlsPlayer] Module loaded (deferred)');
-    }
-  }, 100);
-}
+export { HlsPlayerMixin };

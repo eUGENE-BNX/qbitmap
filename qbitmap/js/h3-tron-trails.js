@@ -1,3 +1,7 @@
+import { QBitmapConfig } from './config.js';
+import { Logger } from './utils.js';
+import { Analytics } from './analytics.js';
+
 /**
  * QBitmap H3 TRON Light Trail Effect
  * Renders light beams that flow between owned hexagonal cells,
@@ -587,4 +591,5 @@ const H3TronTrails = {
   }
 };
 
+export { H3TronTrails };
 window.H3TronTrails = H3TronTrails;

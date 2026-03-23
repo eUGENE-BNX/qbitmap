@@ -1,3 +1,6 @@
+import { Logger } from './utils.js';
+import { AuthSystem } from './auth.js';
+
 /**
  * Biometric Face Recognition Authentication
  * Using FacePlugin SDK for face detection and liveness
@@ -383,3 +386,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // On slow connections, scripts will load only when FaceID button is clicked
   }
 });
+
+export { BiometricAuth };
+window.BiometricAuth = BiometricAuth;

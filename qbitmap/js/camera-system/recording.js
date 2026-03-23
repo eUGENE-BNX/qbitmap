@@ -1,3 +1,6 @@
+import { QBitmapConfig } from '../config.js';
+import { Logger } from '../utils.js';
+
 /**
  * QBitmap Camera System - Recording Module
  * Handles video recording - server-side for WHEP, client-side for device cameras
@@ -551,5 +554,4 @@ const RecordingMixin = {
   }
 };
 
-// Merge into CameraSystem
-Object.assign(CameraSystem, RecordingMixin);
+export { RecordingMixin };

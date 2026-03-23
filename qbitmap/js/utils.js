@@ -1,3 +1,5 @@
+import { QBitmapConfig } from './config.js';
+
 /**
  * QBitmap Utility Functions
  */
@@ -6,7 +8,7 @@
  * [FE-001] Debug logging - reads from config environment
  * Production: false, Development: true
  */
-const DEBUG = (typeof QBitmapConfig !== 'undefined' && QBitmapConfig.env === 'development');
+const DEBUG = QBitmapConfig.env === 'development';
 
 const Logger = {
   log(...args) {
@@ -184,3 +186,13 @@ const TimerManager = {
     return Array.from(this._timers.keys());
   }
 };
+
+// ES module exports + backward compat for non-module pages
+export { Logger, escapeHtml, sanitize, fetchWithTimeout, loadUserCameras, showNotification, TimerManager };
+window.Logger = Logger;
+window.escapeHtml = escapeHtml;
+window.sanitize = sanitize;
+window.fetchWithTimeout = fetchWithTimeout;
+window.loadUserCameras = loadUserCameras;
+window.showNotification = showNotification;
+window.TimerManager = TimerManager;

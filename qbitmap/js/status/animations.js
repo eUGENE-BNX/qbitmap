@@ -1,3 +1,5 @@
+import { StatusGraph } from './graph.js';
+
 /**
  * StatusAnimations - Data flow animations for status graph
  * Creates animated particles flowing along connection lines
@@ -450,7 +452,4 @@ const StatusAnimations = {
   }
 };
 
-// Export for module systems
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = StatusAnimations;
-}
+export { StatusAnimations };

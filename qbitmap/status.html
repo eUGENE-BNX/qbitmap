@@ -129,14 +129,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="/js/config.js"></script>
-  <script src="/js/status/index.js"></script>
-  <script src="/js/status/graph.js"></script>
-  <script src="/js/status/animations.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      StatusSystem.init();
-    });
+  <script type="module">
+    import { StatusSystem } from '/js/status/index.js';
+    StatusSystem.init();
   </script>
 </body>
 </html>

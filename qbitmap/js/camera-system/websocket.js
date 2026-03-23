@@ -1,3 +1,6 @@
+import { QBitmapConfig } from '../config.js';
+import { Logger } from '../utils.js';
+
 /**
  * QBitmap Camera System - WebSocket Module
  * Handles real-time communication with backend
@@ -318,5 +321,4 @@ const WebSocketMixin = {
   }
 };
 
-// Merge into CameraSystem
-Object.assign(CameraSystem, WebSocketMixin);
+export { WebSocketMixin };

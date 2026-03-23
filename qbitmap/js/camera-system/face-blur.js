@@ -1,3 +1,5 @@
+import { Logger } from '../utils.js';
+
 /**
  * QBitmap Camera System - Face Blur Module
  * Client-side face detection and mosaic blur using face-api.js
@@ -396,6 +398,4 @@ const FaceBlurMixin = {
 };
 
 // Merge into CameraSystem
-if (typeof CameraSystem !== 'undefined') {
-  Object.assign(CameraSystem, FaceBlurMixin);
-}
+export { FaceBlurMixin };

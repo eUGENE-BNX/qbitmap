@@ -1,3 +1,6 @@
+import { QBitmapConfig } from '../config.js';
+import { Logger, escapeHtml, TimerManager } from '../utils.js';
+
 /**
  * QBitmap Camera System - Recordings Modal Module
  * Handles recordings list display and video playback
@@ -363,5 +366,4 @@ const RecordingsModalMixin = {
   }
 };
 
-// Merge into CameraSystem
-Object.assign(CameraSystem, RecordingsModalMixin);
+export { RecordingsModalMixin };

@@ -1,3 +1,6 @@
+import { QBitmapConfig } from '../config.js';
+import { Logger, escapeHtml } from '../utils.js';
+
 /**
  * QBitmap Camera System - Face Detection Module
  * Handles background face detection and recognition alerts
@@ -352,9 +355,6 @@ const FaceDetectionMixin = {
   }
 };
 
-// Merge into CameraSystem
-Object.assign(CameraSystem, FaceDetectionMixin);
-
 // Add CSS for alert popup
 const faceDetectionStyles = document.createElement('style');
 faceDetectionStyles.textContent = `
@@ -492,3 +492,5 @@ faceDetectionStyles.textContent = `
 }
 `;
 document.head.appendChild(faceDetectionStyles);
+
+export { FaceDetectionMixin };

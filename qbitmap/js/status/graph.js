@@ -286,7 +286,4 @@ const StatusGraph = {
   }
 };
 
-// Export for module systems
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = StatusGraph;
-}
+export { StatusGraph };

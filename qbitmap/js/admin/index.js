@@ -1,3 +1,6 @@
+import { QBitmapConfig } from '../config.js';
+import { escapeHtml } from '../utils.js';
+
 /**
  * QBitmap Admin Panel
  * User and Plan Management

@@ -1,3 +1,5 @@
+import { Logger } from './utils.js';
+
 // Label layers for Turkish map
 function addLabels(map, sourceId) {
     const textColor = "#2d3748";
@@ -110,3 +112,6 @@ function addLabels(map, sourceId) {
 
     Logger.log("Label layers added successfully");
 }
+
+export { addLabels };
+window.addLabels = addLabels;

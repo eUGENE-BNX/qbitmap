@@ -77,3 +77,6 @@ const VoiceCommands = {
       .trim();
   }
 };
+
+export { VoiceCommands };
+window.VoiceCommands = VoiceCommands;

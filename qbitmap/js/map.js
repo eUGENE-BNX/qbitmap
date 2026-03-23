@@ -1,3 +1,10 @@
+import { QBitmapConfig } from './config.js';
+import { Logger } from './utils.js';
+import { Analytics } from './analytics.js';
+import { addLabels } from './labels.js';
+import { H3Grid } from './h3-grid.js';
+import { H3TronTrails } from './h3-tron-trails.js';
+
 // Global unhandled promise rejection handler for video play errors
 window.addEventListener('unhandledrejection', (event) => {
     if (event.reason && event.reason.name === 'AbortError') {
@@ -753,3 +760,6 @@ map.on("load", async () => {
     map.on('zoom', debouncedTrafficUpdate);
     updateTrafficCamVisibility(); // Initial check
 });
+
+export { loadScript };
+window.loadScript = loadScript;
