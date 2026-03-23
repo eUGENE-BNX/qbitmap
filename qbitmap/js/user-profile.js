@@ -1,3 +1,8 @@
+import { QBitmapConfig } from './config.js';
+import { Logger } from './utils.js';
+import { AuthSystem } from './auth.js';
+import { Analytics } from './analytics.js';
+
 /**
  * QBitmap User Profile Panel
  * Manage user profile, stats, recent media, and face recognition
