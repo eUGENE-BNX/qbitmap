@@ -144,4 +144,8 @@
   .popup-content {
     width: 300px;
   }
+
+  .camera-popup-content[data-camera-type="city"] .popup-content {
+    width: 90vw;
+  }
 }

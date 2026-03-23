@@ -553,7 +553,10 @@ const PopupMixin = {
       protocolBtn.title = 'Gerçek Zamanlı Mod';
     }
 
+    const isCityCamera = popupData.camera?.camera_type === 'city' || popupData.camera?.is_city_camera;
+
     const result = this.startHlsStream(videoEl, hlsUrl, {
+      isVod: isCityCamera,
       onReady: () => {
         frameContainer.classList.remove('loading', 'error');
         frameContainer.classList.add('loaded');
@@ -781,8 +784,18 @@ const PopupMixin = {
       aiAnalyzeBtn.onclick = () => this.toggleAiAnalyze(deviceId);
     }
 
-    // Initialize zoom level
-    popupData.zoomLevel = 0;
+    // Initialize zoom level — city cameras start at zoom-1 (640x360)
+    const isCityPopup = popupData.camera?.camera_type === 'city' || popupData.camera?.is_city_camera;
+    popupData.zoomLevel = isCityPopup ? 1 : 0;
+
+    // City cameras: force res-720 class and set initial zoom
+    if (isCityPopup) {
+      const fc = popupEl.querySelector('.camera-frame-container');
+      if (fc) {
+        fc.classList.add('res-720', 'zoom-1');
+        fc.style.cursor = 'zoom-in';
+      }
+    }
 
     // Initialize search mode
     popupData.searchMode = false;

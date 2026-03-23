@@ -218,16 +218,22 @@ async function addHlsPath(pathName, hlsUrl, options = {}) {
     // [SB-1] Validate HLS URL to prevent command injection
     const safeUrl = validateHlsUrl(hlsUrl);
 
-    // Use FFmpeg remux to fix H.264 High profile issues
-    // - dump_extra: ensures SPS/PPS are properly sent
-    // - video copy: no transcoding, very low CPU
-    // - no audio: city cameras don't need audio
+    // Transcode mode: re-encode to reduce bandwidth (~10Mbit → ~2Mbit)
+    // Set CITY_CAM_TRANSCODE=false to revert to codec copy mode
+    const transcode = process.env.CITY_CAM_TRANSCODE !== 'false';
+
+    const videoParams = transcode
+      ? `-map 0:v:0 -c:v libx264 -preset ultrafast -tune zerolatency ` +
+        `-b:v 2M -maxrate 2.5M -bufsize 5M ` +
+        `-vf "scale=-2:720" -g 30 -keyint_min 30`
+      : `-map 0:v:0 -c:v copy -bsf:v dump_extra`;
+
     const ffmpegCmd = `ffmpeg -hide_banner -loglevel warning ` +
       `-reconnect 1 -reconnect_streamed 1 -reconnect_at_eof 1 -reconnect_delay_max 2 ` +
       `-rw_timeout 15000000 ` +
       `-re ` +
       `-i "${safeUrl}" ` +
-      `-map 0:v:0 -c:v copy -bsf:v dump_extra ` +
+      `${videoParams} ` +
       `-an -vsync passthrough ` +
       `-f rtsp -rtsp_transport tcp ` +
       `rtsp://127.0.0.1:8554/${pathName}`;

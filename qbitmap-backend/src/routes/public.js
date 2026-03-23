@@ -218,6 +218,10 @@ async function publicRoutes(fastify, options) {
   fastify.get('/city-cameras', async (request, reply) => {
     try {
       const cameras = await db.getCityCameras();
+      // Internal request from clip scheduler (MediaMTX server) — include source URLs
+      const isInternal = request.query.internal === '1' &&
+        ['91.98.90.57', '127.0.0.1', '::1'].includes(request.ip);
+
       return {
         cameras: cameras.map(c => {
           const cam = {
@@ -230,9 +234,13 @@ async function publicRoutes(fastify, options) {
             whep_url: c.whep_url,
             is_city_camera: true
           };
-          // MediaMTX HLS URL (via hls.qbitmap.com)
           if (c.mediamtx_path) {
-            cam.hls_url = getHlsUrl(c.mediamtx_path);
+            cam.mediamtx_path = c.mediamtx_path;
+            cam.hls_url = `https://hls.qbitmap.com/clips/${c.mediamtx_path}/playlist.m3u8`;
+          }
+          // Include source URL only for internal requests (clip scheduler)
+          if (isInternal && c.rtsp_source_url) {
+            cam.source_url = c.rtsp_source_url;
           }
           return cam;
         })

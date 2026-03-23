@@ -12,8 +12,26 @@ const HlsPlayerMixin = {
    * @returns {{ hls: Hls|null, destroy: Function }}
    */
   startHlsStream(videoElement, hlsUrl, options = {}) {
-    const { onReady, onError } = options;
+    const { onReady, onError, isVod } = options;
     const _hlsStartTime = performance.now();
+
+    // VOD clips: enable loop playback
+    if (isVod) {
+      videoElement.loop = true;
+      videoElement._vodReloadHandler = () => {
+        // hls.js may ignore loop attribute; force reload from start
+        videoElement.currentTime = 0;
+        videoElement.play().catch(() => {});
+      };
+      videoElement.addEventListener('ended', videoElement._vodReloadHandler);
+      // Also handle pause at end (some browsers pause instead of firing ended)
+      videoElement.addEventListener('pause', () => {
+        if (isVod && videoElement.currentTime >= videoElement.duration - 0.5) {
+          videoElement.currentTime = 0;
+          videoElement.play().catch(() => {});
+        }
+      });
+    }
 
     // Safari native HLS support
     if (videoElement.canPlayType('application/vnd.apple.mpegurl') &&
@@ -33,7 +51,12 @@ const HlsPlayerMixin = {
 
     // hls.js
     if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-      const hls = new Hls({
+      const hlsConfig = isVod ? {
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 30,
+        maxBufferLength: 30,
+      } : {
         enableWorker: true,
         lowLatencyMode: false,
         backBufferLength: 30,
@@ -41,7 +64,9 @@ const HlsPlayerMixin = {
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 10,
         liveDurationInfinity: true,
-      });
+      };
+
+      const hls = new Hls(hlsConfig);
 
       hls.loadSource(hlsUrl);
       hls.attachMedia(videoElement);
@@ -81,6 +106,9 @@ const HlsPlayerMixin = {
     return {
       hls: null,
       destroy() {
+        if (videoElement._vodEndedHandler) {
+          videoElement.removeEventListener('ended', videoElement._vodEndedHandler);
+        }
         videoElement.pause();
         videoElement.removeAttribute('src');
         videoElement.load();

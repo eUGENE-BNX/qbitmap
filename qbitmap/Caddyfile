@@ -129,7 +129,16 @@ h3.qbitmap.com {
 
 # QBitmap HLS Streaming (CDN origin)
 hls.qbitmap.com {
-	reverse_proxy 91.98.90.57:8888
+	# City camera pre-recorded clips (static files from clip scheduler)
+	handle /clips/* {
+		uri strip_prefix /clips
+		reverse_proxy 91.98.90.57:8080
+	}
+
+	# Live streams via MediaMTX
+	handle {
+		reverse_proxy 91.98.90.57:8888
+	}
 
 	@playlist path_regexp \.m3u8$
 	header @playlist Cache-Control "public, max-age=1"

@@ -216,12 +216,7 @@ async function syncRtspCamerasWithMediamtx() {
       syncTasks.push({ path: mediamtx_path, type: 'RTMP', sync: () => mediamtx.addRtmpPath(mediamtx_path) });
     }
 
-    const cityCameras = await db.getCityCamerasForSync();
-    for (const camera of cityCameras) {
-      const { mediamtx_path, hls_url } = camera;
-      if (!mediamtx_path || !hls_url) { totalSkipped++; continue; }
-      syncTasks.push({ path: mediamtx_path, type: 'HLS', sync: () => mediamtx.addHlsPath(mediamtx_path, hls_url) });
-    }
+    // City cameras no longer use MediaMTX — served as pre-recorded clips via clip-scheduler
 
     // [SF-8] Sync in parallel batches of 10 for faster startup
     const BATCH_SIZE = 10;
