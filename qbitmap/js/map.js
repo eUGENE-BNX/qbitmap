@@ -237,7 +237,9 @@ class LayersDropdownControl {
                     if (window.VehicleAnimation) {
                         VehicleAnimation.start();
                     } else {
-                        loadScript('/js/vehicle-animation.js?v=20260206');
+                        loadScript('/js/vehicle-animation.js?v=20260206').then(() => {
+                            if (window.VehicleAnimation) VehicleAnimation.start();
+                        });
                     }
                 } else {
                     if (this._map.getLayer('vehicles')) this._map.setLayoutProperty('vehicles', 'visibility', 'none');
@@ -306,6 +308,14 @@ class LayersDropdownControl {
         this._button.style.color = anyActive ? '#fff' : '';
     }
 
+    syncToggleState(layerId, state) {
+        const toggle = this._toggles[layerId];
+        if (toggle) {
+            toggle.classList.toggle('active', state);
+            this._updateButtonState();
+        }
+    }
+
     onRemove() {
         document.removeEventListener('click', this._outsideClickHandler);
         this._container.parentNode.removeChild(this._container);
@@ -313,7 +323,8 @@ class LayersDropdownControl {
     }
 }
 
-map.addControl(new LayersDropdownControl(), 'top-right');
+window.layersControl = new LayersDropdownControl();
+map.addControl(window.layersControl, 'top-right');
 
 window.videoLayerVisible = false;
 window.object3DLayerVisible = false;
@@ -333,6 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logo.addEventListener('click', () => {
             window.h3GridVisible = !window.h3GridVisible;
             if (window.H3Grid) H3Grid.setEnabled(window.h3GridVisible);
+            if (window.layersControl) window.layersControl.syncToggleState('h3-grid', window.h3GridVisible);
             Analytics.event('map_layer_change', { layer_name: 'h3-grid' });
         });
     }
