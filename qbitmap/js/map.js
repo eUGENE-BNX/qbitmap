@@ -221,6 +221,7 @@ class LayersDropdownControl {
                 break;
             case 'h3-grid':
                 window.h3GridVisible = !window.h3GridVisible;
+                localStorage.setItem('qbitmap_h3grid', window.h3GridVisible);
                 toggle.classList.toggle('active', window.h3GridVisible);
                 if (window.H3Grid) H3Grid.setEnabled(window.h3GridVisible);
                 break;
@@ -336,7 +337,7 @@ map.addControl(window.layersControl, 'top-right');
 window.videoLayerVisible = false;
 window.object3DLayerVisible = false;
 window.buildings3DVisible = false;
-window.h3GridVisible = false;
+window.h3GridVisible = localStorage.getItem('qbitmap_h3grid') === 'true';
 window.vehiclesVisible = false;
 window.videoMessagesVisible = true;
 window.photoMessagesVisible = true;
@@ -350,6 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logo.style.cursor = 'pointer';
         logo.addEventListener('click', () => {
             window.h3GridVisible = !window.h3GridVisible;
+            localStorage.setItem('qbitmap_h3grid', window.h3GridVisible);
             if (window.H3Grid) H3Grid.setEnabled(window.h3GridVisible);
             if (window.layersControl) window.layersControl.syncToggleState('h3-grid', window.h3GridVisible);
             Analytics.event('map_layer_change', { layer_name: 'h3-grid' });
@@ -433,6 +435,12 @@ map.on("load", async () => {
     // Initialize H3 Grid layer
     if (window.H3Grid) H3Grid.init(map);
     if (window.H3TronTrails) H3TronTrails.init(map);
+
+    // Restore persisted layer states
+    if (window.h3GridVisible) {
+        if (window.H3Grid) H3Grid.setEnabled(true);
+        if (window.layersControl) window.layersControl.syncToggleState('h3-grid', true);
+    }
 
     // Lazy-load non-critical modules after map is ready
     loadScript('/vendor/protobuf.min.js').then(() => loadScript('/js/tesla-dashcam.js?v=20260301'));
