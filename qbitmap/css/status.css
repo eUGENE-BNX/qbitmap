@@ -717,11 +717,6 @@ body {
   color: var(--accent-green);
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 /* Modal */
 .modal-overlay {
   position: fixed;

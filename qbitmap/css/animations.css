@@ -1,0 +1,64 @@
+/**
+ * QBitmap Shared Animations
+ * Consolidated from 7+ CSS files to avoid duplication
+ */
+
+/* Spin - loading spinners (was in 7 files) */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Pulse - general opacity pulse */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Pulse variants */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes pulse-mic {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes pulse-broadcast {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(231, 76, 60, 0); }
+}
+
+@keyframes pulse-expand {
+  0% { width: 20px; height: 20px; opacity: 1; }
+  100% { width: 40px; height: 40px; opacity: 0; }
+}
+
+/* Fade */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Slide */
+@keyframes slideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideOut {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(20px); opacity: 0; }
+}

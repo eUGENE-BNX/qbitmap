@@ -98,44 +98,61 @@ const MyCamerasSystem = {
   },
 
   createDashboard() {
-    // Dashboard DOM creation handled by mixin methods
+    const dashboard = document.createElement('div');
+    dashboard.id = 'my-cameras-dashboard';
+    dashboard.className = 'my-cameras-dashboard';
+    dashboard.innerHTML = `
+      <div class="dashboard-overlay" onclick="MyCamerasSystem.close()"></div>
+      <div class="dashboard-panel">
+        <div class="dashboard-header">
+          <h2>Kameralarım</h2>
+          <button class="close-btn" onclick="MyCamerasSystem.close()">&times;</button>
+        </div>
+        <div class="dashboard-content">
+          <div class="dashboard-loading">
+            <div class="loading-spinner"></div>
+            <p>Yükleniyor...</p>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(dashboard);
   },
 
   async open() {
-    if (this.isOpen) return;
-    this.isOpen = true;
-    await this.loadCameras();
-    const panel = document.getElementById('my-cameras-panel');
-    if (panel) {
-      panel.classList.add('open');
-      panel.setAttribute('aria-hidden', 'false');
+    if (!AuthSystem.isLoggedIn()) {
+      AuthSystem.showNotification('Önce giriş yapmalısınız', 'error');
+      return;
     }
+
+    const dashboard = document.getElementById('my-cameras-dashboard');
+    dashboard.classList.add('active');
+    this.isOpen = true;
+
+    await this.loadCameras();
   },
 
   close() {
+    const dashboard = document.getElementById('my-cameras-dashboard');
+    dashboard.classList.remove('active');
     this.isOpen = false;
-    const panel = document.getElementById('my-cameras-panel');
-    if (panel) {
-      panel.classList.remove('open');
-      panel.setAttribute('aria-hidden', 'true');
-    }
+    if (this.cancelLocationPick) this.cancelLocationPick();
   },
 
   getCameraType(camera) {
+    if (camera.camera_type === 'whep') return 'rtsp';
     if (camera.camera_type === 'city') return 'city';
-    if (camera.camera_type === 'rtmp') return 'rtmp';
+    if (camera.device_id?.startsWith('RTMP_')) return 'rtmp';
     if (camera.is_whep) return 'rtsp';
     return 'device';
   },
 
   isCameraOnline(camera) {
-    if (camera.camera_type === 'city') return true;
-    if (camera.is_whep) {
-      if (!camera.last_seen) return false;
-      const diff = Date.now() - new Date(camera.last_seen).getTime();
-      return diff < 120000;
-    }
-    return camera.is_online || false;
+    const isWhep = camera.camera_type === 'whep';
+    const isCity = camera.camera_type === 'city';
+    if (isWhep || isCity) return true;
+    const lastActivity = camera.lastFrameAt || camera.last_seen;
+    return lastActivity && (Date.now() - new Date(lastActivity).getTime() < 60000);
   },
 
   getFilteredCameras() {
@@ -188,22 +205,28 @@ const MyCamerasSystem = {
   },
 
   async loadCameras() {
+    const content = document.querySelector('.dashboard-content');
     try {
-      const [ownedRes, sharedRes] = await Promise.allSettled([
+      const [camerasResult, sharedResult] = await Promise.allSettled([
         fetch(`${this.apiBase}/me/cameras`, { credentials: 'include' }),
         fetch(`${this.apiBase}/me/shared-cameras`, { credentials: 'include' })
       ]);
-      if (ownedRes.status === 'fulfilled' && ownedRes.value.ok) {
-        const data = await ownedRes.value.json();
+      if (camerasResult.status === 'fulfilled' && camerasResult.value.ok) {
+        const data = await camerasResult.value.json();
         this.cameras = data.cameras || [];
+      } else {
+        throw new Error('Failed to load cameras');
       }
-      if (sharedRes.status === 'fulfilled' && sharedRes.value.ok) {
-        const data = await sharedRes.value.json();
-        this.sharedCameras = data.cameras || [];
+      if (sharedResult.status === 'fulfilled' && sharedResult.value.ok) {
+        const sharedData = await sharedResult.value.json();
+        this.sharedCameras = sharedData.cameras || [];
+      } else {
+        this.sharedCameras = [];
       }
-      if (this.isOpen) this.renderCameras();
-    } catch (err) {
-      Logger.error('[MyCameras] loadCameras error:', err);
+      this.renderCameras();
+    } catch (error) {
+      Logger.error('[MyCameras] Load error:', error);
+      if (content) content.innerHTML = '<div class="dashboard-error">Kameralar yüklenemedi</div>';
     }
   },
 };
@@ -212,6 +235,9 @@ const MyCamerasSystem = {
 Object.assign(MyCamerasSystem,
   DashboardMixin, ClaimMixin, FaceRecognitionMixin, CameraActionsMixin, SharingMixin
 );
+
+// Init immediately (this module is lazy-loaded after DOMContentLoaded)
+MyCamerasSystem.init();
 
 export { MyCamerasSystem };
 window.MyCamerasSystem = MyCamerasSystem;

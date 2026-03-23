@@ -566,6 +566,7 @@ const UserProfileSystem = {
   }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-  UserProfileSystem.init();
-});
+// Init immediately (this file is lazy-loaded after DOMContentLoaded)
+UserProfileSystem.init();
+
+window.UserProfileSystem = UserProfileSystem;

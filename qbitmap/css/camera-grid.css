@@ -174,11 +174,6 @@
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 /* Error State */
 .camera-grid-cell.error {
   display: flex;
@@ -457,11 +452,6 @@
   background: #4caf50;
   border-radius: 50%;
   animation: pulse-dot 2s ease-in-out infinite;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
 }
 
 .camera-zoom-popup .zoom-hint {

@@ -177,12 +177,6 @@
   }
 }
 
-/* Pulse animation for other elements */
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
 .cam-btn.close-btn:hover {
   background: #ffe5e5;
   color: #d44;
@@ -339,10 +333,6 @@
   border-top-color: #333;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 /* Frame Image */
