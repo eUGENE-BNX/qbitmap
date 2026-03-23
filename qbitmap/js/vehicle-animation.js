@@ -842,11 +842,11 @@ const VehicleAnimation = {
     var totalIcons = this.carIcons.length + 1;
     var loadedCount = 0;
 
-    Logger.log('[Vehicles] Loading', totalIcons, 'icons...');
+    console.log('[Vehicles] Loading', totalIcons, 'icons...');
 
     var checkAllLoaded = function() {
       loadedCount++;
-      Logger.log('[Vehicles] Icon loaded', loadedCount + '/' + totalIcons);
+      console.log('[Vehicles] Icon loaded', loadedCount + '/' + totalIcons);
       if (loadedCount === totalIcons) {
         self.addVehicleSource();
       }
@@ -862,7 +862,7 @@ const VehicleAnimation = {
         checkAllLoaded();
       };
       img.onerror = function() {
-        Logger.warn('[Vehicles] Failed to load icon:', iconFile);
+        console.warn('[Vehicles] Failed to load icon:', iconFile);
         checkAllLoaded();
       };
       img.src = '/' + iconFile;
@@ -876,7 +876,7 @@ const VehicleAnimation = {
       checkAllLoaded();
     };
     truckImg.onerror = function() {
-      Logger.warn('[Vehicles] Failed to load truck icon');
+      console.warn('[Vehicles] Failed to load truck icon');
       checkAllLoaded();
     };
     truckImg.src = '/' + this.truckIcon;
@@ -901,19 +901,19 @@ const VehicleAnimation = {
       };
     });
 
-    Logger.log('[Vehicles] addVehicleSource: features=' + features.length + ', vehiclesVisible=' + window.vehiclesVisible);
+    console.log('[Vehicles] addVehicleSource: features=' + features.length + ', vehiclesVisible=' + window.vehiclesVisible);
 
     if (!this.map.getSource('vehicles')) {
       this.map.addSource('vehicles', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: features }
       });
-      Logger.log('[Vehicles] Source added');
+      console.log('[Vehicles] Source added');
     }
 
     if (!this.map.getLayer('vehicles')) {
       var vis = window.vehiclesVisible ? 'visible' : 'none';
-      Logger.log('[Vehicles] Adding layer with visibility:', vis);
+      console.log('[Vehicles] Adding layer with visibility:', vis);
       this.map.addLayer({
         id: 'vehicles',
         type: 'symbol',
@@ -939,17 +939,17 @@ const VehicleAnimation = {
           'icon-rotation-alignment': 'map'
         }
       });
-      Logger.log('[Vehicles] Layer added');
+      console.log('[Vehicles] Layer added');
 
       // Verify images are registered
       var registered = this.carIcons.map(function(_, i) {
         return 'vehicle-icon-' + i + ':' + self.map.hasImage('vehicle-icon-' + i);
       });
-      Logger.log('[Vehicles] Registered icons:', registered.join(', '), 'truck:' + this.map.hasImage('truck-icon'));
+      console.log('[Vehicles] Registered icons:', registered.join(', '), 'truck:' + this.map.hasImage('truck-icon'));
     }
 
     var truckCount = this.vehicles.filter(function(v) { return v.type === 'truck'; }).length;
-    Logger.log('[Vehicles] Added', this.vehicles.length, 'vehicles (' + truckCount + ' trucks)');
+    console.log('[Vehicles] Added', this.vehicles.length, 'vehicles (' + truckCount + ' trucks)');
   },
 
   updateVehicleSpeed: function(v, deltaMultiplier) {
@@ -1026,7 +1026,7 @@ const VehicleAnimation = {
     this.isRunning = true;
     this.lastFrameTime = 0; // Reset for clean start
     this.animate();
-    Logger.log('[Vehicles] Animation started');
+    console.log('[Vehicles] Animation started');
   },
 
   stop: function() {
@@ -1041,8 +1041,11 @@ const VehicleAnimation = {
 // Expose globally so map.js can call start/stop
 window.VehicleAnimation = VehicleAnimation;
 
+console.log('[Vehicles] Script loaded, window.map=' + !!window.map);
+
 // Initialize
 (function initVehicleAnimation() {
+  console.log('[Vehicles] initVehicleAnimation called, map=' + !!window.map);
   if (window.map) {
     VehicleAnimation.init(window.map);
   } else {
