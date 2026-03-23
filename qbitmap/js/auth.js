@@ -166,14 +166,14 @@ const AuthSystem = {
               </div>
             </div>
             <div class="dropdown-divider"></div>
-            <button class="dropdown-item" onclick="import('/js/user-profile.js').then(() => UserProfileSystem.open()); AuthSystem.toggleDropdown();" role="menuitem">
+            <button class="dropdown-item" onclick="AuthSystem._openProfile()" role="menuitem">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
               Profilim
             </button>
-            <button class="dropdown-item" onclick="import('/js/my-cameras/index.js').then(() => MyCamerasSystem.open()); AuthSystem.toggleDropdown();" role="menuitem">
+            <button class="dropdown-item" onclick="AuthSystem._openMyCameras()" role="menuitem">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                 <circle cx="12" cy="13" r="4"></circle>
@@ -458,6 +458,17 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('click', (e) => {
   AuthSystem.closeDropdown(e);
 });
+
+// Lazy-load helpers for onclick handlers (Vite can analyze these import() calls)
+AuthSystem._openProfile = function() {
+  import('./user-profile.js').then(() => UserProfileSystem.open());
+  AuthSystem.toggleDropdown();
+};
+
+AuthSystem._openMyCameras = function() {
+  import('./my-cameras/index.js').then(() => MyCamerasSystem.open());
+  AuthSystem.toggleDropdown();
+};
 
 // ES module export + backward compat
 export { AuthSystem };
