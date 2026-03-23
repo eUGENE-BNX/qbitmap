@@ -1605,7 +1605,7 @@ const VideoMessage = {
   // ==================== MAP LAYER ====================
 
   initMapLayer() {
-    if (window.map && window.map.loaded()) {
+    if (window.map && window.map.isStyleLoaded()) {
       this.addVideoMessageLayer(window.map);
     } else if (window.map) {
       window.map.on('load', () => this.addVideoMessageLayer(window.map));
@@ -1952,14 +1952,14 @@ const VideoMessage = {
       }, 1500);
     };
 
-    if (window.map && window.map.loaded()) {
+    if (window.map && window.map.isStyleLoaded()) {
       openMsg();
     } else if (window.map) {
       window.map.on('load', openMsg);
     } else {
       // Map not yet created, wait for it
       const waitForMap = setInterval(() => {
-        if (window.map && window.map.loaded()) {
+        if (window.map && window.map.isStyleLoaded()) {
           clearInterval(waitForMap);
           openMsg();
         }

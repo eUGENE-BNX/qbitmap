@@ -784,18 +784,8 @@ const PopupMixin = {
       aiAnalyzeBtn.onclick = () => this.toggleAiAnalyze(deviceId);
     }
 
-    // Initialize zoom level — city cameras start at zoom-1 (640x360)
-    const isCityPopup = popupData.camera?.camera_type === 'city' || popupData.camera?.is_city_camera;
-    popupData.zoomLevel = isCityPopup ? 1 : 0;
-
-    // City cameras: force res-720 class and set initial zoom
-    if (isCityPopup) {
-      const fc = popupEl.querySelector('.camera-frame-container');
-      if (fc) {
-        fc.classList.add('res-720', 'zoom-1');
-        fc.style.cursor = 'zoom-in';
-      }
-    }
+    // Initialize zoom level
+    popupData.zoomLevel = 0;
 
     // Initialize search mode
     popupData.searchMode = false;
@@ -2754,11 +2744,10 @@ const PopupMixin = {
     // Remove any existing resolution classes
     frameContainer.classList.remove('res-720', 'res-1080', 'res-1440', 'res-2160');
 
-    // City cameras always use 1080p resolution (480x270 → 960x540 → 1920x1080)
+    // City cameras use city-cam class (640x360 → 1280x720), skip resolution class
     if (popupData.isCity) {
-      frameContainer.classList.add('res-1080');
-      popupData.resolution = 1080;
-      Logger.log(`[Popup] Applied res-1080 for city camera ${deviceId}`);
+      popupData.resolution = 720;
+      Logger.log(`[Popup] City camera ${deviceId} — using city-cam class`);
       return;
     }
 

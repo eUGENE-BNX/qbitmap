@@ -99,7 +99,7 @@ const LiveBroadcast = {
    * Initialize map layer (retry until map is ready)
    */
   initMapLayer() {
-    if (window.map && window.map.loaded()) {
+    if (window.map && window.map.isStyleLoaded()) {
       this.addBroadcastLayer(window.map);
     } else if (window.map) {
       window.map.on('load', () => this.addBroadcastLayer(window.map));
