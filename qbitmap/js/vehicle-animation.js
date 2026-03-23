@@ -280,7 +280,8 @@ const VehicleAnimation = {
 
   loadVehicles: function() {
     var saved = localStorage.getItem('qbitmap_vehicles');
-    var customVehicles = saved ? JSON.parse(saved) : [];
+    var customVehicles = [];
+    if (saved) { try { customVehicles = JSON.parse(saved); } catch(e) { localStorage.removeItem('qbitmap_vehicles'); } }
     var self = this;
 
     this.vehicles = this.defaultVehicles.map(function(def) {
@@ -857,6 +858,7 @@ const VehicleAnimation = {
         }
         checkAllLoaded();
       };
+      img.onerror = function() { checkAllLoaded(); };
       img.src = '/' + iconFile;
     });
 
@@ -867,6 +869,7 @@ const VehicleAnimation = {
       }
       checkAllLoaded();
     };
+    truckImg.onerror = function() { checkAllLoaded(); };
     truckImg.src = '/' + this.truckIcon;
   },
 
@@ -1013,6 +1016,9 @@ const VehicleAnimation = {
     }
   }
 };
+
+// Expose globally so map.js can call start/stop
+window.VehicleAnimation = VehicleAnimation;
 
 // Initialize
 (function initVehicleAnimation() {
