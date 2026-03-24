@@ -38,15 +38,17 @@ const PopupMixin = {
     const mediaType = props.mediaType || (messageId.startsWith('pmsg_') ? 'photo' : 'video');
     const isPhoto = mediaType === 'photo';
 
+    const shimmerHtml = `<div class="vmsg-media-shimmer"><div class="vmsg-shimmer-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div>`;
+
     const mediaBodyHtml = isPhoto
-      ? `<img class="vmsg-popup-photo" alt="Foto mesaj" data-photo-src="${videoUrl}">
+      ? `${shimmerHtml}<img class="vmsg-popup-photo" alt="Foto mesaj" data-photo-src="${videoUrl}">
          <button class="vmsg-photo-expand-btn" data-action="expand-photo" title="Büyük görüntüle">
            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
              <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
              <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
            </svg>
          </button>`
-      : `<video controls playsinline preload="metadata" crossorigin="use-credentials">
+      : `${shimmerHtml}<video controls playsinline preload="metadata" crossorigin="use-credentials">
             <source src="${videoUrl}" type="${esc(props.mimeType || 'video/mp4')}">
           </video>`;
 
@@ -234,8 +236,10 @@ const PopupMixin = {
       if (!response.ok) return;
       const blob = await response.blob();
       videoEl.src = URL.createObjectURL(blob);
+      videoEl.parentElement?.querySelector('.vmsg-media-shimmer')?.remove();
     } catch (e) {
       Logger.warn('[VideoMessage] Video load failed:', e);
+      videoEl.parentElement?.querySelector('.vmsg-media-shimmer')?.remove();
     }
   },
 
@@ -245,8 +249,10 @@ const PopupMixin = {
       if (!response.ok) return;
       const blob = await response.blob();
       imgEl.src = URL.createObjectURL(blob);
+      imgEl.parentElement?.querySelector('.vmsg-media-shimmer')?.remove();
     } catch (e) {
       Logger.warn('[VideoMessage] Photo load failed:', e);
+      imgEl.parentElement?.querySelector('.vmsg-media-shimmer')?.remove();
     }
   },
 

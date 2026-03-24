@@ -28,7 +28,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
+  padding: 5px 9px;
   background: #fafafa;
   border-bottom: 1px solid #eee;
 }
@@ -36,11 +36,12 @@
 .camera-popup-title {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
+  line-height: 1.2;
 }
 
 .camera-popup-title .camera-id {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #1a1a1a;
 }
@@ -74,8 +75,8 @@
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 10px;
-  margin-top: 1px;
+  font-size: 9px;
+  margin-top: 0;
 }
 
 .camera-title-line2 .live-badge {
@@ -89,12 +90,12 @@
 /* Header Buttons */
 .camera-popup-buttons {
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 
 .cam-btn {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border: none;
   border-radius: 5px;
   background: #f0f0f0;
