@@ -112,6 +112,11 @@ const PopupMixin = {
       </div>
     `;
 
+    // Pan map so popup (which opens above the marker) is fully visible
+    // Offset pushes the marker to the lower third of the screen
+    const offsetY = Math.round(map.getContainer().clientHeight * 0.3);
+    map.easeTo({ center: coordinates, offset: [0, offsetY], duration: 300 });
+
     const popup = new maplibregl.Popup({
       closeButton: false,
       closeOnClick: false,

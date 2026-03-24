@@ -1796,11 +1796,24 @@
   -webkit-user-select: none;
 }
 
-/* Touch device: enlarge small tap targets */
+/* Touch device: icon-only share buttons with proper tap targets */
 @media (pointer: coarse) {
   .video-msg-share-btn {
     width: 36px;
     height: 36px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .video-msg-share-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  .video-msg-share-btn span {
+    display: none;
+  }
+  .video-msg-popup-footer {
+    flex-wrap: wrap;
   }
   .video-msg-inbox-close {
     width: 40px;
