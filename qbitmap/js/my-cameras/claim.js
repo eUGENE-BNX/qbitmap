@@ -11,13 +11,13 @@ const ClaimMixin = {
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', 'claim-modal-title');
     modal.innerHTML = `
-      <div class="modal-overlay" onclick="MyCamerasSystem.closeClaimModal()" aria-hidden="true"></div>
+      <div class="modal-overlay" aria-hidden="true"></div>
       <div class="modal-content" style="max-width: 500px;" role="document">
         <h3 id="claim-modal-title">Yeni Kamera Ekle</h3>
 
         <div class="form-group">
           <label for="claim-camera-type">Kamera Tipi</label>
-          <select id="claim-camera-type" onchange="MyCamerasSystem.toggleCameraTypeInputs()" aria-describedby="camera-type-desc">
+          <select id="claim-camera-type" aria-describedby="camera-type-desc">
             <option value="rtsp">IP Kamera (RTSP)</option>
             <option value="rtmp">RTMP Kamera (GoPro, OBS)</option>
             <option value="device">ESP32-CAM (Device ID)</option>
@@ -55,7 +55,7 @@ const ClaimMixin = {
 
           <div class="form-group" style="margin-top: 12px;">
             <label style="display: flex; align-items: center; cursor: pointer;">
-              <input type="checkbox" id="rtsp-enable-onvif" checked style="margin-right: 8px; width: 18px; height: 18px;" onchange="MyCamerasSystem.toggleOnvifOptions()">
+              <input type="checkbox" id="rtsp-enable-onvif" checked style="margin-right: 8px; width: 18px; height: 18px;">
               <span>ONVIF entegrasyonunu etkinleştir</span>
             </label>
             <small style="color: #666; margin-left: 26px;">Hareket ve insan algılama bildirimleri alın</small>
@@ -65,7 +65,7 @@ const ClaimMixin = {
             <span id="onvif-options-label" class="sr-only">ONVIF Seçenekleri</span>
             <div class="form-group" style="margin-bottom: 12px;">
               <label for="rtsp-onvif-profile">Kamera Profili</label>
-              <select id="rtsp-onvif-profile" style="width: 100%;" onchange="MyCamerasSystem.onProfileChange()" aria-describedby="profile-hint">
+              <select id="rtsp-onvif-profile" style="width: 100%;" aria-describedby="profile-hint">
                 <option value="1">Generic ONVIF</option>
               </select>
               <small id="profile-hint" style="color: #666;">Kameranızın modeline göre profil seçin. Bu, hangi olayların algılanacağını belirler.</small>
@@ -148,8 +148,8 @@ const ClaimMixin = {
         </div>
 
         <div class="modal-actions">
-          <button type="button" class="btn-secondary" onclick="MyCamerasSystem.closeClaimModal()" aria-label="İptal et ve kapat">İptal</button>
-          <button type="submit" class="btn-primary" id="claim-submit-btn" onclick="MyCamerasSystem.claimCamera()" aria-describedby="claim-error">
+          <button type="button" class="btn-secondary claim-cancel-btn" aria-label="İptal et ve kapat">İptal</button>
+          <button type="submit" class="btn-primary" id="claim-submit-btn" aria-describedby="claim-error">
             <span class="btn-text">Ekle</span>
             <span class="btn-loading" style="display: none;" aria-hidden="true">
               <svg class="spinner-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -178,6 +178,14 @@ const ClaimMixin = {
       </style>
     `;
     document.body.appendChild(modal);
+
+    // Bind event handlers
+    modal.querySelector('.modal-overlay').addEventListener('click', () => MyCamerasSystem.closeClaimModal());
+    modal.querySelector('.claim-cancel-btn').addEventListener('click', () => MyCamerasSystem.closeClaimModal());
+    document.getElementById('claim-submit-btn').addEventListener('click', () => MyCamerasSystem.claimCamera());
+    document.getElementById('claim-camera-type').addEventListener('change', () => MyCamerasSystem.toggleCameraTypeInputs());
+    document.getElementById('rtsp-enable-onvif').addEventListener('change', () => MyCamerasSystem.toggleOnvifOptions());
+    document.getElementById('rtsp-onvif-profile').addEventListener('change', () => MyCamerasSystem.onProfileChange());
 
     // Add RTSP URL parser listener
     document.getElementById('rtsp-url').addEventListener('input', (e) => {
@@ -371,7 +379,7 @@ const ClaimMixin = {
     modal.id = 'rtmp-url-modal';
     modal.className = 'claim-modal active';
     modal.innerHTML = `
-      <div class="modal-overlay" onclick="MyCamerasSystem.closeRtmpUrlModal()"></div>
+      <div class="modal-overlay"></div>
       <div class="modal-content" style="max-width: 550px;">
         <h3>RTMP Kamera Oluşturuldu</h3>
         <p class="modal-desc"><strong>${escapeHtml(cameraName)}</strong> için RTMP URL'si:</p>
@@ -380,7 +388,7 @@ const ClaimMixin = {
           <code id="rtmp-url-display" style="color: #4fc3f7; font-size: 13px; word-break: break-all; display: block; user-select: all;">${escapeHtml(rtmpUrl)}</code>
         </div>
 
-        <button class="btn-primary" onclick="MyCamerasSystem.copyRtmpUrl()" style="width: 100%;">
+        <button class="btn-primary rtmp-copy-btn" style="width: 100%;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -409,10 +417,13 @@ const ClaimMixin = {
         </div>
 
         <div class="modal-actions" style="margin-top: 16px;">
-          <button class="btn-secondary" onclick="MyCamerasSystem.closeRtmpUrlModal()">Kapat</button>
+          <button class="btn-secondary rtmp-close-btn">Kapat</button>
         </div>
       </div>
     `;
+    modal.querySelector('.modal-overlay').addEventListener('click', () => MyCamerasSystem.closeRtmpUrlModal());
+    modal.querySelector('.rtmp-copy-btn').addEventListener('click', () => MyCamerasSystem.copyRtmpUrl());
+    modal.querySelector('.rtmp-close-btn').addEventListener('click', () => MyCamerasSystem.closeRtmpUrlModal());
     document.body.appendChild(modal);
   },
 

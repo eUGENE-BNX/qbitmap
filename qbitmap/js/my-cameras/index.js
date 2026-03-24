@@ -113,11 +113,11 @@ const MyCamerasSystem = {
     dashboard.id = 'my-cameras-dashboard';
     dashboard.className = 'my-cameras-dashboard';
     dashboard.innerHTML = `
-      <div class="dashboard-overlay" onclick="MyCamerasSystem.close()"></div>
+      <div class="dashboard-overlay"></div>
       <div class="dashboard-panel">
         <div class="dashboard-header">
           <h2>Kameralarım</h2>
-          <button class="close-btn" onclick="MyCamerasSystem.close()">&times;</button>
+          <button class="close-btn">&times;</button>
         </div>
         <div class="dashboard-content">
           <div class="dashboard-loading">
@@ -127,6 +127,8 @@ const MyCamerasSystem = {
         </div>
       </div>
     `;
+    dashboard.querySelector('.dashboard-overlay').addEventListener('click', () => MyCamerasSystem.close());
+    dashboard.querySelector('.close-btn').addEventListener('click', () => MyCamerasSystem.close());
     document.body.appendChild(dashboard);
   },
 

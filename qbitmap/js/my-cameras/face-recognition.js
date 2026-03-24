@@ -21,19 +21,19 @@ const FaceRecognitionMixin = {
     modal.className = 'claim-modal active';
     modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:3000;display:flex;align-items:center;justify-content:center;';
     modal.innerHTML = `
-      <div class="modal-overlay" onclick="MyCamerasSystem.closeFaceRecognitionModal()" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);"></div>
+      <div class="modal-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);"></div>
       <div class="modal-content face-modal-content" style="position:relative;width:480px;max-width:calc(100% - 32px);max-height:90vh;overflow-y:auto;background:white;padding:24px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.2);z-index:1;">
         <div class="face-modal-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
           <h3 style="margin:0;font-size:18px;color:#202124;">Yüz Tanıma - ${escapeHtml(camera.name || camera.device_id)}</h3>
-          <button class="close-btn" onclick="MyCamerasSystem.closeFaceRecognitionModal()" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:none;font-size:24px;color:#5f6368;cursor:pointer;border-radius:50%;">&times;</button>
+          <button class="close-btn" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:none;font-size:24px;color:#5f6368;cursor:pointer;border-radius:50%;">&times;</button>
         </div>
 
         <div class="face-toggle-row" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f8f9fa;border-radius:8px;margin-bottom:20px;">
           <label class="toggle-label" style="display:flex;align-items:center;gap:12px;cursor:pointer;">
             <span style="font-size:14px;font-weight:500;color:#3c4043;">Yüz Algılama</span>
-            <input type="checkbox" id="face-detection-toggle" onchange="MyCamerasSystem.toggleFaceDetection()">
+            <input type="checkbox" id="face-detection-toggle">
           </label>
-          <select id="face-detection-interval" onchange="MyCamerasSystem.updateFaceInterval()" style="padding:6px 12px;border:1px solid #dadce0;border-radius:6px;font-size:13px;background:white;">
+          <select id="face-detection-interval" style="padding:6px 12px;border:1px solid #dadce0;border-radius:6px;font-size:13px;background:white;">
             <option value="5">5 saniye</option>
             <option value="10" selected>10 saniye</option>
             <option value="30">30 saniye</option>
@@ -53,7 +53,7 @@ const FaceRecognitionMixin = {
           <h4 style="margin:0 0 12px;font-size:14px;font-weight:600;color:#3c4043;">Yeni Yüz Ekle</h4>
           <div class="add-face-form" style="display:flex;gap:6px;align-items:center;">
             <input type="text" id="face-name-input" placeholder="İsim" maxlength="50" style="flex:1;padding:6px 10px;border:1px solid #dadce0;border-radius:4px;font-size:12px;">
-            <div class="face-upload-area" id="face-upload-area" onclick="document.getElementById('face-file-input').click()" style="display:flex;align-items:center;gap:4px;padding:6px 10px;border:1px dashed #dadce0;border-radius:4px;cursor:pointer;">
+            <div class="face-upload-area" id="face-upload-area" style="display:flex;align-items:center;gap:4px;padding:6px 10px;border:1px dashed #dadce0;border-radius:4px;cursor:pointer;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 8 12 3 7 8"></polyline>
@@ -61,12 +61,12 @@ const FaceRecognitionMixin = {
               </svg>
               <span style="font-size:11px;color:#5f6368;">Fotoğraf Seç</span>
             </div>
-            <input type="file" id="face-file-input" accept="image/jpeg,image/png" style="display:none" onchange="MyCamerasSystem.handleFaceFileSelect(event)">
-            <button class="btn-primary btn-sm" id="add-face-btn" onclick="MyCamerasSystem.addFace()" disabled style="padding:6px 12px;background:#333;color:white;border:none;border-radius:4px;font-size:13px;cursor:pointer;">Ekle</button>
+            <input type="file" id="face-file-input" accept="image/jpeg,image/png" style="display:none">
+            <button class="btn-primary btn-sm" id="add-face-btn" disabled style="padding:6px 12px;background:#333;color:white;border:none;border-radius:4px;font-size:13px;cursor:pointer;">Ekle</button>
           </div>
           <div id="face-preview-container" class="face-preview-container" style="display:none;margin-top:6px;">
             <img id="face-preview-img" alt="Preview" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">
-            <button class="face-preview-remove" onclick="MyCamerasSystem.clearFacePreview()" style="width:20px;height:20px;background:#f1f3f4;border:none;border-radius:50%;cursor:pointer;">&times;</button>
+            <button class="face-preview-remove" style="width:20px;height:20px;background:#f1f3f4;border:none;border-radius:50%;cursor:pointer;">&times;</button>
           </div>
         </div>
 
@@ -81,6 +81,16 @@ const FaceRecognitionMixin = {
       </div>
     `;
     document.body.appendChild(modal);
+
+    // Bind static event handlers
+    modal.querySelector('.modal-overlay').addEventListener('click', () => MyCamerasSystem.closeFaceRecognitionModal());
+    modal.querySelector('.close-btn').addEventListener('click', () => MyCamerasSystem.closeFaceRecognitionModal());
+    document.getElementById('face-detection-toggle').addEventListener('change', () => MyCamerasSystem.toggleFaceDetection());
+    document.getElementById('face-detection-interval').addEventListener('change', () => MyCamerasSystem.updateFaceInterval());
+    document.getElementById('face-upload-area').addEventListener('click', () => document.getElementById('face-file-input').click());
+    document.getElementById('face-file-input').addEventListener('change', (e) => MyCamerasSystem.handleFaceFileSelect(e));
+    document.getElementById('add-face-btn').addEventListener('click', () => MyCamerasSystem.addFace());
+    modal.querySelector('.face-preview-remove').addEventListener('click', () => MyCamerasSystem.clearFacePreview());
 
     // Load settings and faces
     await this.loadFaceRecognitionData(deviceId);
@@ -151,12 +161,20 @@ const FaceRecognitionMixin = {
         <div class="face-placeholder" style="display:none;">👤</div>
         <span class="face-name">${escapeHtml(face.name)}</span>
         <label class="face-alarm-toggle" title="Alarm Ver">
-          <input type="checkbox" ${face.trigger_alarm ? 'checked' : ''} onchange="MyCamerasSystem.toggleFaceAlarm(${face.id}, this.checked)">
+          <input type="checkbox" ${face.trigger_alarm ? 'checked' : ''} data-face-id="${face.id}">
           <span class="alarm-icon">🔔</span>
         </label>
-        <button class="face-remove-btn" onclick="MyCamerasSystem.removeFace(${face.id})" title="Sil">&times;</button>
+        <button class="face-remove-btn" data-face-id="${face.id}" title="Sil">&times;</button>
       </div>
     `).join('');
+
+    // Bind dynamic handlers
+    grid.querySelectorAll('.face-alarm-toggle input').forEach(cb => {
+      cb.addEventListener('change', () => MyCamerasSystem.toggleFaceAlarm(Number(cb.dataset.faceId), cb.checked));
+    });
+    grid.querySelectorAll('.face-remove-btn').forEach(btn => {
+      btn.addEventListener('click', () => MyCamerasSystem.removeFace(Number(btn.dataset.faceId)));
+    });
   },
 
   /**

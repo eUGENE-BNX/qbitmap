@@ -197,8 +197,9 @@ const CameraActionsMixin = {
     instruction.className = 'pick-location-instruction';
     instruction.innerHTML = `
       <span>Haritada konumu seçmek için tıklayın</span>
-      <button onclick="MyCamerasSystem.cancelLocationPick()">İptal</button>
+      <button class="cancel-pick-btn">İptal</button>
     `;
+    instruction.querySelector('.cancel-pick-btn').addEventListener('click', () => MyCamerasSystem.cancelLocationPick());
     document.body.appendChild(instruction);
 
     // Add map click handler with high priority
@@ -291,7 +292,7 @@ const CameraActionsMixin = {
     modal.id = 'delete-modal';
     modal.className = 'claim-modal active';
     modal.innerHTML = `
-      <div class="modal-overlay" onclick="MyCamerasSystem.closeDeleteModal()"></div>
+      <div class="modal-overlay"></div>
       <div class="modal-content">
         <h3>Kamerayı Sil</h3>
         <p class="modal-desc"><strong>${escapeHtml(cameraName)}</strong> kamerasını silmek istediğinize emin misiniz?</p>
@@ -312,12 +313,15 @@ const CameraActionsMixin = {
         <p class="delete-warning">Bu işlem geri alınamaz!</p>
 
         <div class="modal-actions">
-          <button class="btn-secondary" onclick="MyCamerasSystem.closeDeleteModal()">İptal</button>
-          <button class="btn-danger" onclick="MyCamerasSystem.deleteCamera(${cameraId}, ${isWhep})">Sil</button>
+          <button class="btn-secondary delete-cancel-btn">İptal</button>
+          <button class="btn-danger delete-confirm-btn">Sil</button>
         </div>
         <div id="delete-error" class="claim-error"></div>
       </div>
     `;
+    modal.querySelector('.modal-overlay').addEventListener('click', () => MyCamerasSystem.closeDeleteModal());
+    modal.querySelector('.delete-cancel-btn').addEventListener('click', () => MyCamerasSystem.closeDeleteModal());
+    modal.querySelector('.delete-confirm-btn').addEventListener('click', () => MyCamerasSystem.deleteCamera(cameraId, isWhep));
     document.body.appendChild(modal);
   },
 

@@ -13,14 +13,14 @@ const SharingMixin = {
     modal.id = 'share-modal';
     modal.className = 'claim-modal active';
     modal.innerHTML = `
-      <div class="modal-overlay" onclick="MyCamerasSystem.closeShareModal()"></div>
+      <div class="modal-overlay"></div>
       <div class="modal-content">
         <h3>Kamera Paylaş</h3>
         <p class="modal-desc"><strong>${escapeHtml(camera.name)}</strong> kamerasını paylaş</p>
 
         <div class="share-form">
           <input type="email" id="share-email" placeholder="Email adresi girin" autocomplete="off">
-          <button class="btn-primary" onclick="MyCamerasSystem.shareCamera()">Paylaş</button>
+          <button class="btn-primary share-submit-btn">Paylaş</button>
         </div>
         <div id="share-error" class="claim-error"></div>
 
@@ -41,10 +41,13 @@ const SharingMixin = {
         </div>
 
         <div class="modal-actions">
-          <button class="btn-secondary" onclick="MyCamerasSystem.closeShareModal()">Kapat</button>
+          <button class="btn-secondary share-close-btn">Kapat</button>
         </div>
       </div>
     `;
+    modal.querySelector('.modal-overlay').addEventListener('click', () => MyCamerasSystem.closeShareModal());
+    modal.querySelector('.share-submit-btn').addEventListener('click', () => MyCamerasSystem.shareCamera());
+    modal.querySelector('.share-close-btn').addEventListener('click', () => MyCamerasSystem.closeShareModal());
     document.body.appendChild(modal);
 
     // Focus email input
@@ -96,9 +99,13 @@ const SharingMixin = {
               ${share.shared_with_name ? `<span class="share-email">${escapeHtml(share.shared_with_email)}</span>` : ''}
             </div>
           </div>
-          <button class="btn-danger btn-sm" onclick="MyCamerasSystem.removeShare(${share.id})">Kaldır</button>
+          <button class="btn-danger btn-sm remove-share-btn" data-share-id="${share.id}">Kaldır</button>
         </div>
       `).join('');
+
+      sharesList.querySelectorAll('.remove-share-btn').forEach(btn => {
+        btn.addEventListener('click', () => MyCamerasSystem.removeShare(Number(btn.dataset.shareId)));
+      });
 
     } catch (error) {
       Logger.error('[Share] Load shares error:', error);

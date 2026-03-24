@@ -221,7 +221,7 @@ const DashboardMixin = {
 
     let html = `
       <div class="cameras-actions">
-        <button class="btn-primary" onclick="MyCamerasSystem.showClaimModal()">
+        <button class="btn-primary add-camera-btn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -340,6 +340,8 @@ const DashboardMixin = {
     }
 
     content.innerHTML = html;
+
+    content.querySelector('.add-camera-btn')?.addEventListener('click', () => MyCamerasSystem.showClaimModal());
 
     // Load voice call states after rendering
     setTimeout(() => this.loadVoiceCallStates(), 100);
