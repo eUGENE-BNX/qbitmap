@@ -56,4 +56,3 @@ if (Analytics.enabled && typeof gtag !== 'undefined') {
 }
 
 export { Analytics };
-window.Analytics = Analytics;

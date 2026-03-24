@@ -1,6 +1,8 @@
 import { QBitmapConfig } from "../config.js";
 import { Logger, escapeHtml, showNotification } from "../utils.js";
 import { AuthSystem } from "../auth.js";
+import { CameraSystem } from '../camera-system/index.js';
+import * as AppState from '../state.js';
 
 const SharingMixin = {
   async openShareModal(cameraId) {
@@ -209,8 +211,8 @@ const SharingMixin = {
     this.close();
 
     // Fly to camera location
-    if (window.map) {
-      window.map.flyTo({
+    if (AppState.map) {
+      AppState.map.flyTo({
         center: [lng, lat],
         zoom: 17,
         essential: true
@@ -231,8 +233,8 @@ const SharingMixin = {
     this.close();
 
     // Fly to camera location and open popup
-    if (window.map) {
-      window.map.flyTo({
+    if (AppState.map) {
+      AppState.map.flyTo({
         center: [lng, lat],
         zoom: 17,
         essential: true
@@ -240,7 +242,7 @@ const SharingMixin = {
 
       // Wait for map to settle, then open popup
       setTimeout(() => {
-        if (window.CameraSystem) {
+        if (CameraSystem) {
           const camera = CameraSystem.cameras.find(c => c.device_id === deviceId);
           if (camera) {
             CameraSystem.openCameraPopup(camera, [lng, lat]);

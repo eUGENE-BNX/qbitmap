@@ -1,6 +1,7 @@
 import { QBitmapConfig } from '../config.js';
 import { Logger, escapeHtml, sanitize, fetchWithTimeout, TimerManager, showNotification } from '../utils.js';
 import { AuthSystem } from '../auth.js';
+import * as AppState from '../state.js';
 
 /**
  * QBitmap Camera System - Settings Module
@@ -1508,7 +1509,7 @@ const SettingsMixin = {
     }
 
     // Check if map is available
-    if (!window.map) {
+    if (!AppState.map) {
       alert('Harita bulunamadi');
       return;
     }
@@ -1530,7 +1531,7 @@ const SettingsMixin = {
     this.showLocationPickToast();
 
     // Set crosshair cursor
-    window.map.getCanvas().style.cursor = 'crosshair';
+    AppState.map.getCanvas().style.cursor = 'crosshair';
 
     // Flag to prevent double handling
     this._isPickingLocation = true;
@@ -1577,11 +1578,11 @@ const SettingsMixin = {
     this._locationPickHandler = handleMapClick;
 
     // Add click listener - try both methods
-    window.map.once('click', handleMapClick);
+    AppState.map.once('click', handleMapClick);
     console.log('[Settings] Click listener added via map.once');
 
     // Also add via canvas directly as fallback
-    const canvas = window.map.getCanvas();
+    const canvas = AppState.map.getCanvas();
     this._canvasClickHandler = (e) => {
       console.log('[Settings] Canvas clicked directly!');
       // Get coordinates from map
@@ -1590,7 +1591,7 @@ const SettingsMixin = {
         x: e.clientX - rect.left,
         y: e.clientY - rect.top
       };
-      const lngLat = window.map.unproject(point);
+      const lngLat = AppState.map.unproject(point);
       console.log('[Settings] Canvas lngLat:', lngLat);
 
       // Create fake event for handler
@@ -1655,15 +1656,15 @@ const SettingsMixin = {
    */
   cleanupLocationPick() {
     // Reset cursor
-    if (window.map) {
-      window.map.getCanvas().style.cursor = '';
+    if (AppState.map) {
+      AppState.map.getCanvas().style.cursor = '';
       if (this._locationPickHandler) {
-        window.map.off('click', this._locationPickHandler);
+        AppState.map.off('click', this._locationPickHandler);
         this._locationPickHandler = null;
       }
       // Also remove canvas click handler
       if (this._canvasClickHandler) {
-        window.map.getCanvas().removeEventListener('click', this._canvasClickHandler);
+        AppState.map.getCanvas().removeEventListener('click', this._canvasClickHandler);
         this._canvasClickHandler = null;
       }
     }

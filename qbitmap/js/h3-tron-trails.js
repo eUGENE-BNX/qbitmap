@@ -1,6 +1,8 @@
 import { QBitmapConfig } from './config.js';
 import { Logger } from './utils.js';
 import { Analytics } from './analytics.js';
+import { H3Grid } from './h3-grid.js';
+import { VideoMessage } from './video-message/index.js';
 
 /**
  * QBitmap H3 TRON Light Trail Effect
@@ -62,7 +64,7 @@ const H3TronTrails = {
     this._enabled = enabled;
     if (enabled) {
       this._canvas.style.display = 'block';
-      if (window.H3Grid && H3Grid._hexagonData.length > 0) {
+      if (H3Grid._hexagonData.length > 0) {
         this.onHexDataChanged(H3Grid._hexagonData, H3Grid._currentResolution);
       }
       // Start ad timer (8-14s random delay)
@@ -547,12 +549,12 @@ const H3TronTrails = {
         setTimeout(async () => {
           try {
             const msgId = 'vmsg_1_mlyzyvxx';
-            const base = window.VideoMessage ? VideoMessage.apiBase : (QBitmapConfig.api.base + '/api/video-messages');
+            const base = VideoMessage.apiBase || (QBitmapConfig.api.base + '/api/video-messages');
             const resp = await fetch(`${base}/${msgId}`, { credentials: 'include' });
             if (!resp.ok) return;
             const data = await resp.json();
             const msg = data.message;
-            if (msg && window.VideoMessage) {
+            if (msg) {
               VideoMessage.openMessagePopup({
                 messageId: msg.message_id,
                 senderId: msg.sender_id,
@@ -592,4 +594,3 @@ const H3TronTrails = {
 };
 
 export { H3TronTrails };
-window.H3TronTrails = H3TronTrails;

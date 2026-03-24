@@ -3,6 +3,7 @@ import { Logger, escapeHtml, sanitize } from "../utils.js";
 import { AuthSystem } from "../auth.js";
 import { Analytics } from "../analytics.js";
 import { _haptic } from "./photo-capture.js";
+import * as AppState from '../state.js';
 
 const FormUploadMixin = {
   showPreview() {
@@ -289,7 +290,7 @@ const FormUploadMixin = {
     }
 
     this.isSelectingLocation = true;
-    const map = window.map;
+    const map = AppState.map;
     if (!map) return;
 
     map.getCanvas().style.cursor = 'crosshair';
@@ -336,7 +337,7 @@ const FormUploadMixin = {
   exitLocationSelection() {
     this.isSelectingLocation = false;
 
-    const map = window.map;
+    const map = AppState.map;
     if (map) {
       map.getCanvas().style.cursor = '';
       if (this._locationClickHandler) {
@@ -577,10 +578,10 @@ const FormUploadMixin = {
       AuthSystem.showNotification(this.isPhotoMode ? 'Foto mesaj gönderildi' : 'Video mesaj gönderildi', 'success');
 
       // Fly to location
-      if (window.map && this.selectedLocation) {
-        window.map.flyTo({
+      if (AppState.map && this.selectedLocation) {
+        AppState.map.flyTo({
           center: [this.selectedLocation.lng, this.selectedLocation.lat],
-          zoom: Math.max(window.map.getZoom(), 14)
+          zoom: Math.max(AppState.map.getZoom(), 14)
         });
       }
 

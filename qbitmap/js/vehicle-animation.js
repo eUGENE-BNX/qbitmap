@@ -1,6 +1,8 @@
 import { QBitmapConfig } from './config.js';
 import { AuthSystem } from './auth.js';
 import { escapeHtml } from './utils.js';
+import * as AppState from './state.js';
+const { layers } = AppState;
 
 /**
  * Multi-Vehicle Animation System
@@ -923,7 +925,7 @@ const VehicleAnimation = {
     }
 
     if (!this.map.getLayer('vehicles')) {
-      var vis = window.vehiclesVisible ? 'visible' : 'none';
+      var vis = layers.vehiclesVisible ? 'visible' : 'none';
       this.map.addLayer({
         id: 'vehicles',
         type: 'symbol',
@@ -1042,8 +1044,8 @@ window.VehicleAnimation = VehicleAnimation;
 
 // Initialize
 (function initVehicleAnimation() {
-  if (window.map) {
-    VehicleAnimation.init(window.map);
+  if (AppState.map) {
+    VehicleAnimation.init(AppState.map);
   } else {
     setTimeout(initVehicleAnimation, 200);
   }

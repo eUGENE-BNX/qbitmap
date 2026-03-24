@@ -2,6 +2,9 @@ import { QBitmapConfig } from './config.js';
 import { Logger, escapeHtml } from './utils.js';
 import { AuthSystem } from './auth.js';
 import { Analytics } from './analytics.js';
+import { UserLocationSystem } from './user-location.js';
+import { VideoMessage } from './video-message/index.js';
+import * as AppState from './state.js';
 
 /**
  * QBitmap User Profile Panel
@@ -265,11 +268,11 @@ const UserProfileSystem = {
       const msg = data.message || data;
       this.close();
 
-      if (window.map && msg.lat && msg.lng) {
-        map.flyTo({ center: [msg.lng, msg.lat], zoom: 17, duration: 1000 });
+      if (AppState.map && msg.lat && msg.lng) {
+        AppState.map.flyTo({ center: [msg.lng, msg.lat], zoom: 17, duration: 1000 });
       }
 
-      if (window.VideoMessage && msg.message_id) {
+      if (msg.message_id) {
         const coord = msg.lat && msg.lng ? [msg.lng, msg.lat] : null;
         VideoMessage.openMessagePopup({
           messageId: msg.message_id,
@@ -373,7 +376,7 @@ const UserProfileSystem = {
             e.target.checked ? 'Konumunuz haritada görünür' : 'Konumunuz haritadan gizlendi',
             'success'
           );
-          if (window.UserLocationSystem) {
+          if (UserLocationSystem) {
             UserLocationSystem.refreshPublicLocations();
           }
         }
@@ -389,27 +392,27 @@ const UserProfileSystem = {
   async findLocation() {
     this.close();
     if (!navigator.geolocation) {
-      if (window.AuthSystem) AuthSystem.showNotification('Konum servisi desteklenmiyor', 'error');
+      AuthSystem.showNotification('Konum servisi desteklenmiyor', 'error');
       return;
     }
-    if (window.AuthSystem) AuthSystem.showNotification('Konum aranıyor...', 'info');
+    AuthSystem.showNotification('Konum aranıyor...', 'info');
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude, accuracy } = position.coords;
-        if (window.UserLocationSystem) {
+        if (UserLocationSystem) {
           await UserLocationSystem.showLocation(longitude, latitude, accuracy);
         }
-        if (window.map) {
-          map.flyTo({ center: [longitude, latitude], zoom: 17, duration: 1000 });
+        if (AppState.map) {
+          AppState.map.flyTo({ center: [longitude, latitude], zoom: 17, duration: 1000 });
         }
-        if (window.AuthSystem) {
+        if (AuthSystem) {
           AuthSystem.showNotification(`Konum belirlendi (±${Math.round(accuracy)}m)`, 'success');
         }
       },
       (error) => {
         Logger.error('[Profile] Geolocation error:', error);
-        if (window.AuthSystem) AuthSystem.showNotification('Konum alınamadı', 'error');
+        AuthSystem.showNotification('Konum alınamadı', 'error');
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
@@ -589,4 +592,5 @@ const UserProfileSystem = {
 // Init immediately (this file is lazy-loaded after DOMContentLoaded)
 UserProfileSystem.init();
 
-window.UserProfileSystem = UserProfileSystem;
+export { UserProfileSystem };
+

@@ -2,6 +2,7 @@ import { QBitmapConfig } from './config.js';
 import { Logger, escapeHtml, showNotification } from './utils.js';
 import { AuthSystem } from './auth.js';
 import { Analytics } from './analytics.js';
+import * as AppState from './state.js';
 
 /**
  * QBitmap Live Broadcast System
@@ -104,10 +105,10 @@ const LiveBroadcast = {
    * Initialize map layer (retry until map is ready)
    */
   initMapLayer() {
-    if (window.map && window.map.isStyleLoaded()) {
-      this.addBroadcastLayer(window.map);
-    } else if (window.map) {
-      window.map.on('load', () => this.addBroadcastLayer(window.map));
+    if (AppState.map && AppState.map.isStyleLoaded()) {
+      this.addBroadcastLayer(AppState.map);
+    } else if (AppState.map) {
+      AppState.map.on('load', () => this.addBroadcastLayer(AppState.map));
     } else {
       setTimeout(() => this.initMapLayer(), 500);
     }
@@ -236,8 +237,8 @@ const LiveBroadcast = {
       this.updateMapLayer();
 
       // 7. Fly map to broadcast location
-      if (window.map) {
-        window.map.flyTo({ center: [bc.lng, bc.lat], zoom: Math.max(window.map.getZoom(), 14) });
+      if (AppState.map) {
+        AppState.map.flyTo({ center: [bc.lng, bc.lat], zoom: Math.max(AppState.map.getZoom(), 14) });
       }
 
       _hapticBroadcast('success');
@@ -473,7 +474,7 @@ const LiveBroadcast = {
    * Update the broadcasts map layer
    */
   updateMapLayer() {
-    const map = window.map;
+    const map = AppState.map;
     if (!map) return;
 
     const geojson = {
@@ -587,7 +588,7 @@ const LiveBroadcast = {
    * Open popup to view a live broadcast
    */
   openBroadcastPopup(props, coordinates) {
-    const map = window.map;
+    const map = AppState.map;
     if (!map) return;
 
     Analytics.event('broadcast_view');
@@ -2066,7 +2067,7 @@ const LiveBroadcast = {
    */
   _pickLocationFromMap() {
     return new Promise((resolve, reject) => {
-      const map = window.map;
+      const map = AppState.map;
       if (!map) return reject(new Error('Map not available'));
 
       map.getCanvas().style.cursor = 'crosshair';
@@ -2117,4 +2118,3 @@ const LiveBroadcast = {
 };
 
 export { LiveBroadcast };
-window.LiveBroadcast = LiveBroadcast;

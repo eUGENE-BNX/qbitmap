@@ -1,6 +1,7 @@
 import { QBitmapConfig } from "../config.js";
 import { Logger, escapeHtml } from "../utils.js";
 import { AuthSystem } from "../auth.js";
+import { CameraSystem } from '../camera-system/index.js';
 
 const FaceRecognitionMixin = {
   async openFaceRecognition(deviceId) {
@@ -228,7 +229,7 @@ const FaceRecognitionMixin = {
       });
 
       // Start/stop face detection loop in browser
-      if (window.CameraSystem) {
+      if (CameraSystem) {
         if (enabled) {
           // Ensure camera is in CameraSystem.cameras before starting face detection
           const myCamera = this.cameras.find(c => c.device_id === this.faceRecognitionCameraId);
@@ -270,7 +271,7 @@ const FaceRecognitionMixin = {
       });
 
       // Restart face detection with new interval if running
-      if (window.CameraSystem && enabled) {
+      if (CameraSystem && enabled) {
         // [FIX] Ensure camera is in CameraSystem.cameras
         const myCamera = this.cameras.find(c => c.device_id === this.faceRecognitionCameraId);
         if (!Array.isArray(CameraSystem.cameras)) {

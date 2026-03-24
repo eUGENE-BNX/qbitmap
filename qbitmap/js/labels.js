@@ -114,4 +114,3 @@ function addLabels(map, sourceId) {
 }
 
 export { addLabels };
-window.addLabels = addLabels;

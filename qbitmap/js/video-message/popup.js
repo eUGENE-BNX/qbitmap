@@ -2,10 +2,11 @@ import { QBitmapConfig } from "../config.js";
 import { Logger, escapeHtml, sanitize } from "../utils.js";
 import { AuthSystem } from "../auth.js";
 import { Analytics } from "../analytics.js";
+import * as AppState from '../state.js';
 
 const PopupMixin = {
   openMessagePopup(props, coordinates) {
-    const map = window.map;
+    const map = AppState.map;
     if (!map) return;
 
     Analytics.event('video_message_view', { media_type: props.mediaType || 'video' });

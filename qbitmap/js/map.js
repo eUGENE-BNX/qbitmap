@@ -4,6 +4,8 @@ import { Analytics } from './analytics.js';
 import { addLabels } from './labels.js';
 import { H3Grid } from './h3-grid.js';
 import { H3TronTrails } from './h3-tron-trails.js';
+import { CameraSystem } from './camera-system/index.js';
+import { setMap, layers, satelliteMode, setSatelliteMode } from './state.js';
 
 // Global unhandled promise rejection handler for video play errors
 window.addEventListener('unhandledrejection', (event) => {
@@ -68,8 +70,10 @@ const map = new maplibregl.Map({
     }
 });
 
-window.map = map;
-window.satelliteMode = false;
+setMap(map);
+let _satelliteMode = false;
+let updateSatelliteVisibility;
+let videoBounds;
 Logger.log("[Map] Map instance created");
 
 // Minimum zoom'da Türkiye'yi ortala
@@ -199,56 +203,56 @@ class LayersDropdownControl {
         const toggle = this._toggles[layerId];
         switch (layerId) {
             case 'satellite':
-                window.satelliteMode = !window.satelliteMode;
-                toggle.classList.toggle('active', window.satelliteMode);
-                if (window.updateSatelliteVisibility) window.updateSatelliteVisibility();
-                if (window.satelliteMode && !this._isInSatelliteArea()) {
+                _satelliteMode = !_satelliteMode;
+                toggle.classList.toggle('active', _satelliteMode);
+                if (updateSatelliteVisibility) updateSatelliteVisibility();
+                if (_satelliteMode && !this._isInSatelliteArea()) {
                     this._showToast('Uydu g\u00F6r\u00FCnt\u00FCleri \u015Fu an yaln\u0131zca Ata\u015Fehir ve Sincan b\u00F6lgelerinde kullan\u0131labilir');
                 }
                 break;
             case 'video':
-                window.videoLayerVisible = !window.videoLayerVisible;
-                toggle.classList.toggle('active', window.videoLayerVisible);
+                _videoLayerVisible = !_videoLayerVisible;
+                toggle.classList.toggle('active', _videoLayerVisible);
                 if (this._map.getLayer('video-layer')) {
-                    this._map.setLayoutProperty('video-layer', 'visibility', window.videoLayerVisible ? 'visible' : 'none');
+                    this._map.setLayoutProperty('video-layer', 'visibility', _videoLayerVisible ? 'visible' : 'none');
                 }
                 const currentZoom = this._map.getZoom();
-                if (window.videoLayerVisible && currentZoom >= 18.4 && window.videoBounds) {
-                    this._map.setMaxBounds(window.videoBounds);
+                if (_videoLayerVisible && currentZoom >= 18.4 && videoBounds) {
+                    this._map.setMaxBounds(videoBounds);
                 } else {
                     this._map.setMaxBounds(null);
                 }
-                if (window.videoLayerVisible && !this._isInVideoArea()) {
+                if (_videoLayerVisible && !this._isInVideoArea()) {
                     this._showToast('Canl\u0131 video \u015Fu an yaln\u0131zca Ata\u015Fehir b\u00F6lgesinde kullan\u0131labilir');
                 }
                 break;
             case '3d-objects':
-                window.object3DLayerVisible = !window.object3DLayerVisible;
-                toggle.classList.toggle('active', window.object3DLayerVisible);
+                layers.object3DLayerVisible = !layers.object3DLayerVisible;
+                toggle.classList.toggle('active', layers.object3DLayerVisible);
                 this._map.triggerRepaint();
                 break;
             case '3d-buildings':
-                window.buildings3DVisible = !window.buildings3DVisible;
-                toggle.classList.toggle('active', window.buildings3DVisible);
+                _buildings3DVisible = !_buildings3DVisible;
+                toggle.classList.toggle('active', _buildings3DVisible);
                 if (this._map.getLayer('3d-buildings')) {
-                    this._map.setLayoutProperty('3d-buildings', 'visibility', window.buildings3DVisible ? 'visible' : 'none');
+                    this._map.setLayoutProperty('3d-buildings', 'visibility', _buildings3DVisible ? 'visible' : 'none');
                 }
                 break;
             case 'h3-grid':
-                window.h3GridVisible = !window.h3GridVisible;
-                localStorage.setItem('qbitmap_h3grid', window.h3GridVisible);
-                toggle.classList.toggle('active', window.h3GridVisible);
-                if (window.H3Grid) H3Grid.setEnabled(window.h3GridVisible);
+                layers.h3GridVisible = !layers.h3GridVisible;
+                localStorage.setItem('qbitmap_h3grid', layers.h3GridVisible);
+                toggle.classList.toggle('active', layers.h3GridVisible);
+                H3Grid.setEnabled(layers.h3GridVisible);
                 break;
             case 'h3-trails':
-                window.h3TrailsVisible = !window.h3TrailsVisible;
-                toggle.classList.toggle('active', window.h3TrailsVisible);
-                if (window.H3TronTrails) H3TronTrails.setEnabled(window.h3TrailsVisible);
+                layers.h3TrailsVisible = !layers.h3TrailsVisible;
+                toggle.classList.toggle('active', layers.h3TrailsVisible);
+                H3TronTrails.setEnabled(layers.h3TrailsVisible);
                 break;
             case 'vehicles':
-                window.vehiclesVisible = !window.vehiclesVisible;
-                toggle.classList.toggle('active', window.vehiclesVisible);
-                if (window.vehiclesVisible) {
+                layers.vehiclesVisible = !layers.vehiclesVisible;
+                toggle.classList.toggle('active', layers.vehiclesVisible);
+                if (layers.vehiclesVisible) {
                     if (this._map.getLayer('vehicles')) this._map.setLayoutProperty('vehicles', 'visibility', 'visible');
                     if (window.VehicleAnimation) {
                         VehicleAnimation.start();
@@ -270,27 +274,27 @@ class LayersDropdownControl {
                 }
                 break;
             case 'city-cameras':
-                window.cityCamerasVisible = !window.cityCamerasVisible;
-                toggle.classList.toggle('active', window.cityCamerasVisible);
-                if (window.CameraSystem) CameraSystem.updateCameraFilter();
+                layers.cityCamerasVisible = !layers.cityCamerasVisible;
+                toggle.classList.toggle('active', layers.cityCamerasVisible);
+                if (CameraSystem) CameraSystem.updateCameraFilter();
                 break;
             case 'user-cameras':
-                window.userCamerasVisible = !window.userCamerasVisible;
-                toggle.classList.toggle('active', window.userCamerasVisible);
-                if (window.CameraSystem) CameraSystem.updateCameraFilter();
+                layers.userCamerasVisible = !layers.userCamerasVisible;
+                toggle.classList.toggle('active', layers.userCamerasVisible);
+                if (CameraSystem) CameraSystem.updateCameraFilter();
                 break;
             case 'video-messages':
-                window.videoMessagesVisible = !window.videoMessagesVisible;
-                toggle.classList.toggle('active', window.videoMessagesVisible);
+                _videoMessagesVisible = !_videoMessagesVisible;
+                toggle.classList.toggle('active', _videoMessagesVisible);
                 ['video-messages', 'video-message-clusters', 'video-message-cluster-count'].forEach(id => {
-                    if (this._map.getLayer(id)) this._map.setLayoutProperty(id, 'visibility', window.videoMessagesVisible ? 'visible' : 'none');
+                    if (this._map.getLayer(id)) this._map.setLayoutProperty(id, 'visibility', _videoMessagesVisible ? 'visible' : 'none');
                 });
                 break;
             case 'photo-messages':
-                window.photoMessagesVisible = !window.photoMessagesVisible;
-                toggle.classList.toggle('active', window.photoMessagesVisible);
+                _photoMessagesVisible = !_photoMessagesVisible;
+                toggle.classList.toggle('active', _photoMessagesVisible);
                 ['photo-messages', 'photo-message-clusters', 'photo-message-cluster-count'].forEach(id => {
-                    if (this._map.getLayer(id)) this._map.setLayoutProperty(id, 'visibility', window.photoMessagesVisible ? 'visible' : 'none');
+                    if (this._map.getLayer(id)) this._map.setLayoutProperty(id, 'visibility', _photoMessagesVisible ? 'visible' : 'none');
                 });
                 break;
         }
@@ -326,7 +330,7 @@ class LayersDropdownControl {
     }
 
     _updateButtonState() {
-        const anyActive = window.satelliteMode || window.videoLayerVisible || window.object3DLayerVisible || window.buildings3DVisible || window.h3GridVisible || window.vehiclesVisible || window.videoMessagesVisible || window.photoMessagesVisible;
+        const anyActive = _satelliteMode || _videoLayerVisible || layers.object3DLayerVisible || _buildings3DVisible || layers.h3GridVisible || layers.vehiclesVisible || _videoMessagesVisible || _photoMessagesVisible;
         this._button.style.backgroundColor = anyActive ? '#a0a0a0' : '';
         this._button.style.color = anyActive ? '#fff' : '';
     }
@@ -346,18 +350,13 @@ class LayersDropdownControl {
     }
 }
 
-window.layersControl = new LayersDropdownControl();
-map.addControl(window.layersControl, 'top-right');
+const layersControl = new LayersDropdownControl();
+map.addControl(layersControl, 'top-right');
 
-window.videoLayerVisible = false;
-window.object3DLayerVisible = false;
-window.buildings3DVisible = false;
-window.h3GridVisible = localStorage.getItem('qbitmap_h3grid') === 'true';
-window.vehiclesVisible = false;
-window.videoMessagesVisible = true;
-window.photoMessagesVisible = true;
-window.cityCamerasVisible = true;
-window.userCamerasVisible = true;
+let _videoLayerVisible = false;
+let _buildings3DVisible = false;
+let _videoMessagesVisible = true;
+let _photoMessagesVisible = true;
 
 // Logo click → toggle H3 Grid (Qbitmap layer)
 document.addEventListener('DOMContentLoaded', () => {
@@ -365,10 +364,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logo) {
         logo.style.cursor = 'pointer';
         logo.addEventListener('click', () => {
-            window.h3GridVisible = !window.h3GridVisible;
-            localStorage.setItem('qbitmap_h3grid', window.h3GridVisible);
-            if (window.H3Grid) H3Grid.setEnabled(window.h3GridVisible);
-            if (window.layersControl) window.layersControl.syncToggleState('h3-grid', window.h3GridVisible);
+            layers.h3GridVisible = !layers.h3GridVisible;
+            localStorage.setItem('qbitmap_h3grid', layers.h3GridVisible);
+            H3Grid.setEnabled(layers.h3GridVisible);
+            if (layersControl) layersControl.syncToggleState('h3-grid', layers.h3GridVisible);
             Analytics.event('map_layer_change', { layer_name: 'h3-grid' });
         });
     }
@@ -391,8 +390,8 @@ class GridCameraControl {
         this._container.appendChild(this._button);
 
         // Store reference for CameraSystem
-        if (window.CameraSystem) {
-            window.CameraSystem.gridControlButton = this._button;
+        if (CameraSystem) {
+            CameraSystem.gridControlButton = this._button;
         }
 
         return this._container;
@@ -408,7 +407,7 @@ class GridCameraControl {
     }
 
     _toggleGrid() {
-        if (window.CameraSystem && CameraSystem.toggleGrid) {
+        if (CameraSystem && CameraSystem.toggleGrid) {
             // Ensure button reference is stored
             CameraSystem.gridControlButton = this._button;
             CameraSystem.toggleGrid();
@@ -448,13 +447,13 @@ map.on("load", async () => {
     Logger.log("[Map] loaded");
 
     // Initialize H3 Grid layer
-    if (window.H3Grid) H3Grid.init(map);
-    if (window.H3TronTrails) H3TronTrails.init(map);
+    H3Grid.init(map);
+    H3TronTrails.init(map);
 
     // Restore persisted layer states
-    if (window.h3GridVisible) {
-        if (window.H3Grid) H3Grid.setEnabled(true);
-        if (window.layersControl) window.layersControl.syncToggleState('h3-grid', true);
+    if (layers.h3GridVisible) {
+        H3Grid.setEnabled(true);
+        if (layersControl) layersControl.syncToggleState('h3-grid', true);
     }
 
     // Lazy-load non-critical modules after map is ready
@@ -506,7 +505,7 @@ map.on("load", async () => {
         )
         .map(l => l.id);
 
-    window.updateSatelliteVisibility = () => {
+    updateSatelliteVisibility = () => {
         const zoom = map.getZoom();
         const center = map.getCenter();
         
@@ -515,8 +514,8 @@ map.on("load", async () => {
         const inSincan = center.lng >= sincanBounds.minLng && center.lng <= sincanBounds.maxLng &&
                         center.lat >= sincanBounds.minLat && center.lat <= sincanBounds.maxLat;
         
-        const atasehirVisible = window.satelliteMode && zoom >= 17 && zoom < 19 && inAtasehir;
-        const sincanVisible = window.satelliteMode && zoom >= 17 && zoom < 19 && inSincan;
+        const atasehirVisible = _satelliteMode && zoom >= 17 && zoom < 19 && inAtasehir;
+        const sincanVisible = _satelliteMode && zoom >= 17 && zoom < 19 && inSincan;
         const satelliteVisible = atasehirVisible || sincanVisible;
 
         if (map.getLayer('atasehir-satellite-layer')) {
@@ -533,7 +532,7 @@ map.on("load", async () => {
             }
         });
         if (map.getLayer('3d-buildings')) {
-            const showBuildings = !satelliteVisible && window.buildings3DVisible;
+            const showBuildings = !satelliteVisible && _buildings3DVisible;
             map.setLayoutProperty('3d-buildings', 'visibility', showBuildings ? 'visible' : 'none');
         }
     };
@@ -541,7 +540,7 @@ map.on("load", async () => {
     let _satDebounce;
     const debouncedSatUpdate = () => {
         clearTimeout(_satDebounce);
-        _satDebounce = setTimeout(window.updateSatelliteVisibility, 120);
+        _satDebounce = setTimeout(updateSatelliteVisibility, 120);
     };
     map.on('moveend', debouncedSatUpdate);
     map.on('zoomend', debouncedSatUpdate);
@@ -595,11 +594,11 @@ map.on("load", async () => {
 
     // Video bounds for pan restriction (SW, NE corners)
     // Stored on window for access from VideoLayerToggleControl
-    window.videoBounds = [
+    videoBounds = [
         [videoCenter[0] - videoOffset.lng, videoCenter[1] - videoOffset.lat],  // SW
         [videoCenter[0] + videoOffset.lng, videoCenter[1] + videoOffset.lat]   // NE
     ];
-    const videoBounds = window.videoBounds;
+    // videoBounds already set above as module-scoped let
 
     map.addSource('video-source', {
         type: 'video',
@@ -636,7 +635,7 @@ map.on("load", async () => {
         const currentZoom = map.getZoom();
         const center = map.getCenter();
         const nearVideo = isNearVideoBounds(center);
-        const shouldShow = currentZoom >= 18.4 && nearVideo && window.videoLayerVisible;
+        const shouldShow = currentZoom >= 18.4 && nearVideo && _videoLayerVisible;
 
         // Pan restriction: only when zoomed in AND near video area
         if (shouldShow) {

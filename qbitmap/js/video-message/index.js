@@ -113,7 +113,7 @@ const VideoMessage = {
     if (btn && !btn._vmsgBound) {
       btn._vmsgBound = true;
       btn.addEventListener('click', () => {
-        if (window.AuthSystem) AuthSystem.toggleDropdown();
+        AuthSystem.toggleDropdown();
         this.startFlow();
       });
     }
@@ -124,7 +124,7 @@ const VideoMessage = {
     if (btn && !btn._pmsgBound) {
       btn._pmsgBound = true;
       btn.addEventListener('click', () => {
-        if (window.AuthSystem) AuthSystem.toggleDropdown();
+        AuthSystem.toggleDropdown();
         this.startPhotoFlow();
       });
     }
@@ -173,4 +173,3 @@ Object.assign(VideoMessage,
 );
 
 export { VideoMessage };
-window.VideoMessage = VideoMessage;

@@ -304,4 +304,3 @@ const CommentWidget = {
 CommentWidget.init();
 
 export { CommentWidget };
-window.CommentWidget = CommentWidget;

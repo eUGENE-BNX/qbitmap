@@ -1,5 +1,8 @@
 import { QBitmapConfig } from '../config.js';
 import { Logger } from '../utils.js';
+import { LiveBroadcast } from '../live-broadcast.js';
+import { VideoMessage } from '../video-message/index.js';
+import { CommentWidget } from '../comments.js';
 
 /**
  * QBitmap Camera System - WebSocket Module
@@ -97,39 +100,39 @@ const WebSocketMixin = {
         break;
 
       case 'broadcast_started':
-        if (window.LiveBroadcast) LiveBroadcast.handleBroadcastStarted(payload);
+        LiveBroadcast.handleBroadcastStarted(payload);
         break;
 
       case 'broadcast_ended':
-        if (window.LiveBroadcast) LiveBroadcast.handleBroadcastEnded(payload);
+        LiveBroadcast.handleBroadcastEnded(payload);
         break;
 
       case 'video_message_new':
-        if (window.VideoMessage) VideoMessage.handleNewMessage(payload);
+        VideoMessage.handleNewMessage(payload);
         break;
 
       case 'video_message_deleted':
-        if (window.VideoMessage) VideoMessage.handleDeletedMessage(payload);
+        VideoMessage.handleDeletedMessage(payload);
         break;
 
       case 'video_message_unread_count':
-        if (window.VideoMessage) VideoMessage.updateBadgeCount(payload.count);
+        VideoMessage.updateBadgeCount(payload.count);
         break;
 
       case 'video_message_tags_updated':
-        if (window.VideoMessage) VideoMessage.handleTagsUpdated(payload);
+        VideoMessage.handleTagsUpdated(payload);
         break;
 
       case 'ai_description_ready':
-        if (window.VideoMessage) VideoMessage.handleAiDescriptionReady(payload);
+        VideoMessage.handleAiDescriptionReady(payload);
         break;
 
       case 'comment_new':
-        if (window.CommentWidget) CommentWidget.handleCommentNew(payload);
+        CommentWidget.handleCommentNew(payload);
         break;
 
       case 'comment_deleted':
-        if (window.CommentWidget) CommentWidget.handleCommentDeleted(payload);
+        CommentWidget.handleCommentDeleted(payload);
         break;
 
       case 'pong':
@@ -174,7 +177,7 @@ const WebSocketMixin = {
     }
 
     // Restore active broadcasts
-    if (payload.broadcasts && window.LiveBroadcast) {
+    if (payload.broadcasts && LiveBroadcast) {
       LiveBroadcast.activeBroadcasts.clear();
       for (const b of payload.broadcasts) {
         LiveBroadcast.activeBroadcasts.set(b.broadcast_id, b);
@@ -183,7 +186,7 @@ const WebSocketMixin = {
     }
 
     // Restore unread video message count
-    if (payload.unreadVideoMessages !== undefined && window.VideoMessage) {
+    if (payload.unreadVideoMessages !== undefined && VideoMessage) {
       VideoMessage.updateBadgeCount(payload.unreadVideoMessages);
     }
 

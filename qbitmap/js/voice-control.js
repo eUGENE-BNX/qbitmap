@@ -1,7 +1,10 @@
 import { QBitmapConfig } from './config.js';
 import { Logger } from './utils.js';
 import { AuthSystem } from './auth.js';
+import { CameraSystem } from './camera-system/index.js';
+import { MyCamerasSystem } from './my-cameras/index.js';
 import { VoiceCommands } from './voice-commands.js';
+import * as AppState from './state.js';
 
 /**
  * QBitmap Voice Control System
@@ -72,7 +75,7 @@ const VoiceControl = {
    */
   checkUserPermission() {
     // If AuthSystem is available and user is logged in
-    if (window.AuthSystem && AuthSystem.user) {
+    if (AuthSystem.user) {
       const hasPermission = AuthSystem.user.features?.voiceControl;
       if (!hasPermission) {
         Logger.warn('[Voice] Ses kontrolü bu hesap için aktif değil');
@@ -192,7 +195,7 @@ const VoiceControl = {
    * Aksiyonu gerçekleştir
    */
   runAction(action, params = {}) {
-    const map = window.map;
+    const map = AppState.map;
     if (!map && action !== 'stopListening' && action !== 'showHelp') {
       Logger.warn('[Voice] Harita bulunamadı');
       return;
@@ -247,14 +250,14 @@ const VoiceControl = {
 
       case 'showCameras':
         // CameraSystem varsa kameraları göster
-        if (window.CameraSystem && typeof CameraSystem.showAllCameras === 'function') {
+        if (CameraSystem && typeof CameraSystem.showAllCameras === 'function') {
           CameraSystem.showAllCameras();
         }
         break;
 
       case 'hideCameras':
         // CameraSystem varsa kameraları gizle
-        if (window.CameraSystem && typeof CameraSystem.hideAllCameras === 'function') {
+        if (CameraSystem && typeof CameraSystem.hideAllCameras === 'function') {
           CameraSystem.hideAllCameras();
         }
         break;
@@ -267,7 +270,7 @@ const VoiceControl = {
             Logger.log('[Voice] openMyCameras başlıyor...');
 
             // Auth kontrolü - email varsa login
-            const userEmail = window.AuthSystem?.user?.email;
+            const userEmail = AuthSystem.user?.email;
             Logger.log('[Voice] userEmail:', userEmail);
 
             if (!userEmail) {
@@ -307,7 +310,7 @@ const VoiceControl = {
 
             // Paneli de aç
             import('/js/my-cameras/index.js').then(() => {
-              if (window.MyCamerasSystem?.open) MyCamerasSystem.open();
+              if (MyCamerasSystem?.open) MyCamerasSystem.open();
             });
           } catch (err) {
             Logger.error('[Voice] openMyCameras hatası:', err);
@@ -322,7 +325,7 @@ const VoiceControl = {
         (async () => {
           try {
             // CameraSystem'den city kamerasını bul
-            if (!window.CameraSystem || !CameraSystem.cameras) {
+            if (!CameraSystem || !CameraSystem.cameras) {
               self.showFeedback('Kamera sistemi yüklenmedi', 'error');
               return;
             }
@@ -590,4 +593,3 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 export { VoiceControl };
-window.VoiceControl = VoiceControl;

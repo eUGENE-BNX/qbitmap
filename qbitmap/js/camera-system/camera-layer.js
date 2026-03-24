@@ -1,4 +1,5 @@
 import { Logger } from '../utils.js';
+import { layers } from '../state.js';
 
 /**
  * QBitmap Camera System - Camera Layer Module
@@ -289,8 +290,8 @@ const CameraLayerMixin = {
       type: 'FeatureCollection',
       features: this.cameraGeojson.features.filter(f => {
         const type = f.properties.camera_type;
-        if (type === 'city') return window.cityCamerasVisible !== false;
-        return window.userCamerasVisible !== false;
+        if (type === 'city') return layers.cityCamerasVisible !== false;
+        return layers.userCamerasVisible !== false;
       })
     };
   },

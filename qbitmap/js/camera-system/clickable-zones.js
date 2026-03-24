@@ -615,7 +615,7 @@ const ClickableZonesMixin = {
    */
   showZoneContextMenu(e, deviceId, zoneId) {
     // Only show context menu for logged-in users (for delete option)
-    const isLoggedIn = window.AuthSystem && AuthSystem.isLoggedIn();
+    const isLoggedIn = AuthSystem.isLoggedIn();
     if (!isLoggedIn) return;
 
     // Remove existing menu
@@ -738,7 +738,7 @@ const ClickableZonesMixin = {
     const frameContainer = popupEl.querySelector('.camera-frame-container');
     // Show zone buttons at zoom-1 (x2) or zoom-2 (x4)
     const isZoomed = frameContainer?.classList.contains('zoom-1') || frameContainer?.classList.contains('zoom-2');
-    const isLoggedIn = window.AuthSystem && AuthSystem.isLoggedIn();
+    const isLoggedIn = AuthSystem.isLoggedIn();
 
     const drawBtn = popupEl.querySelector('.draw-zone-btn');
     const toggleBtn = popupEl.querySelector('.toggle-zones-btn');

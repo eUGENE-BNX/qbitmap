@@ -4,6 +4,7 @@
  */
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { layers } from './state.js';
 
 const ModelManager = {
   models: new Map(),
@@ -86,7 +87,7 @@ const ModelManager = {
       },
 
       render(gl, args) {
-        if (!window.object3DLayerVisible) return;
+        if (!layers.object3DLayerVisible) return;
         if (mapRef.getZoom() < minZoom) return;
 
         const md = ModelManager.models.get(id);
@@ -151,4 +152,3 @@ const ModelManager = {
 };
 
 export { ModelManager };
-window.ModelManager = ModelManager;

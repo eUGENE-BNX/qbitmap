@@ -1,13 +1,14 @@
 import { QBitmapConfig } from "../config.js";
 import { Logger, escapeHtml } from "../utils.js";
 import { AuthSystem } from "../auth.js";
+import * as AppState from '../state.js';
 
 const MapLayerMixin = {
   initMapLayer() {
-    if (window.map && window.map.isStyleLoaded()) {
-      this.addVideoMessageLayer(window.map);
-    } else if (window.map) {
-      window.map.on('load', () => this.addVideoMessageLayer(window.map));
+    if (AppState.map && AppState.map.isStyleLoaded()) {
+      this.addVideoMessageLayer(AppState.map);
+    } else if (AppState.map) {
+      AppState.map.on('load', () => this.addVideoMessageLayer(AppState.map));
     } else {
       setTimeout(() => this.initMapLayer(), 500);
     }
@@ -233,7 +234,7 @@ const MapLayerMixin = {
   },
 
   updateMapLayer() {
-    const map = window.map;
+    const map = AppState.map;
     if (!map) return;
 
     const allMessages = Array.from(this.videoMessages.values());
@@ -330,7 +331,7 @@ const MapLayerMixin = {
 
     // Wait for map to be ready, then fly to location and open popup
     const openMsg = () => {
-      window.map.flyTo({ center: [msg.lng, msg.lat], zoom: Math.max(window.map.getZoom(), 16) });
+      AppState.map.flyTo({ center: [msg.lng, msg.lat], zoom: Math.max(AppState.map.getZoom(), 16) });
       setTimeout(() => {
         this.openMessagePopup({
           messageId: msg.message_id,
@@ -355,14 +356,14 @@ const MapLayerMixin = {
       }, 1500);
     };
 
-    if (window.map && window.map.isStyleLoaded()) {
+    if (AppState.map && AppState.map.isStyleLoaded()) {
       openMsg();
-    } else if (window.map) {
-      window.map.on('load', openMsg);
+    } else if (AppState.map) {
+      AppState.map.on('load', openMsg);
     } else {
       // Map not yet created, wait for it
       const waitForMap = setInterval(() => {
-        if (window.map && window.map.isStyleLoaded()) {
+        if (AppState.map && AppState.map.isStyleLoaded()) {
           clearInterval(waitForMap);
           openMsg();
         }

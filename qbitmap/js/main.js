@@ -38,12 +38,12 @@ import './user-location.js';
 import './voice-control.js';
 
 // Camera system (index.js imports all mixins)
-import { CameraSystem } from './camera-system/index.js';
+import { CameraSystem, startCameraSystem } from './camera-system/index.js';
 
 // UI
 import './modal.js';
 
 // Start camera system after all modules are loaded
 document.addEventListener('DOMContentLoaded', () => {
-  if (window.startCameraSystem) window.startCameraSystem();
+  startCameraSystem();
 });

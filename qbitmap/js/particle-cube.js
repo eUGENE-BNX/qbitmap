@@ -3,6 +3,7 @@
  * Based on Three.js webgl_buffergeometry_drawrange example
  */
 import * as THREE from "three";
+import { layers } from './state.js';
 
 const ParticleCubeLayer = {
   layers: new Map(),
@@ -164,7 +165,7 @@ const ParticleCubeLayer = {
       },
 
       render(gl, args) {
-        if (!window.object3DLayerVisible) return;
+        if (!layers.object3DLayerVisible) return;
         if (mapRef.getZoom() < minZoom) return;
 
         const ld = ParticleCubeLayer.layers.get(id);
@@ -284,4 +285,3 @@ const ParticleCubeLayer = {
 };
 
 export { ParticleCubeLayer };
-window.ParticleCubeLayer = ParticleCubeLayer;

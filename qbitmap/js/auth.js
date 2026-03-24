@@ -244,9 +244,9 @@ const AuthSystem = {
     this._createRightSideMenu();
 
     // Rebind mic button after dynamic HTML creation
-    if (window.VoiceControl && typeof VoiceControl.bindMicButton === 'function') {
-      VoiceControl.bindMicButton();
-    }
+    import('/js/voice-control.js').then(m => {
+      if (m.VoiceControl?.bindMicButton) m.VoiceControl.bindMicButton();
+    }).catch(() => {});
     // Lazy-load map features (visible to everyone)
     import('/js/video-message/index.js').then(m => {
       if (m.VideoMessage) {
@@ -254,13 +254,13 @@ const AuthSystem = {
         if (this.isLoggedIn()) { m.VideoMessage.bindButton(); m.VideoMessage.bindPhotoButton(); }
       }
     }).catch(err => console.error('[Auth] video-message load failed:', err));
-    import('/js/comments.js').then(() => {
-      if (window.CommentWidget) CommentWidget.init();
+    import('/js/comments.js').then(m => {
+      if (m.CommentWidget) m.CommentWidget.init();
     }).catch(err => console.error('[Auth] comments load failed:', err));
     // Broadcast only for logged-in users
     if (this.isLoggedIn()) {
-      import('/js/live-broadcast.js').then(() => {
-        if (window.LiveBroadcast) { LiveBroadcast.init(); LiveBroadcast.bindButton(); }
+      import('/js/live-broadcast.js').then(m => {
+        if (m.LiveBroadcast) { m.LiveBroadcast.init(); m.LiveBroadcast.bindButton(); }
       }).catch(err => console.error('[Auth] broadcast load failed:', err));
     }
   },
@@ -377,7 +377,7 @@ const AuthSystem = {
       </svg>
     `;
     locateBtn.addEventListener('click', () => {
-      if (window.UserLocationSystem) UserLocationSystem.locateMe();
+      import('/js/user-location.js').then(m => { if (m.UserLocationSystem) m.UserLocationSystem.locateMe(); }).catch(() => {});
     });
     panel.appendChild(locateBtn);
 
@@ -461,15 +461,14 @@ document.addEventListener('click', (e) => {
 
 // Lazy-load helpers for onclick handlers (Vite can analyze these import() calls)
 AuthSystem._openProfile = function() {
-  import('./user-profile.js').then(() => UserProfileSystem.open());
+  import('./user-profile.js').then(m => m.UserProfileSystem.open());
   AuthSystem.toggleDropdown();
 };
 
 AuthSystem._openMyCameras = function() {
-  import('./my-cameras/index.js').then(() => MyCamerasSystem.open());
+  import('./my-cameras/index.js').then(m => m.MyCamerasSystem.open());
   AuthSystem.toggleDropdown();
 };
 
 // ES module export + backward compat
 export { AuthSystem };
-window.AuthSystem = AuthSystem;

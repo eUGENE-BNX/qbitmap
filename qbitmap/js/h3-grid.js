@@ -1,6 +1,7 @@
 import { QBitmapConfig } from './config.js';
 import { Logger } from './utils.js';
 import { Analytics } from './analytics.js';
+import { H3TronTrails } from './h3-tron-trails.js';
 
 /**
  * QBitmap H3 Hexagonal Grid Layer
@@ -171,7 +172,7 @@ const H3Grid = {
     this._currentResolution = resolution;
 
     // Notify TRON trails of new hex data
-    if (window.H3TronTrails?._enabled) {
+    if (H3TronTrails._enabled) {
       H3TronTrails.onHexDataChanged(this._hexagonData, resolution);
     }
 
@@ -210,7 +211,7 @@ const H3Grid = {
       this._renderLayer();
 
       // Notify TRON trails of ownership changes
-      if (window.H3TronTrails?._enabled) {
+      if (H3TronTrails._enabled) {
         H3TronTrails.onOwnershipChanged(this._ownershipData);
       }
     } catch (e) {
@@ -470,4 +471,3 @@ const H3Grid = {
 };
 
 export { H3Grid };
-window.H3Grid = H3Grid;

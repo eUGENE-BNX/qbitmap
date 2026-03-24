@@ -1,6 +1,8 @@
 import { QBitmapConfig } from "../config.js";
 import { Logger, escapeHtml, showNotification } from "../utils.js";
 import { AuthSystem } from "../auth.js";
+import { CameraSystem } from '../camera-system/index.js';
+import * as AppState from '../state.js';
 
 const CameraActionsMixin = {
   async openAndRecord(deviceId, lng, lat) {
@@ -14,8 +16,8 @@ const CameraActionsMixin = {
     }
 
     // Fly to camera location
-    if (window.map) {
-      window.map.flyTo({
+    if (AppState.map) {
+      AppState.map.flyTo({
         center: [lng, lat],
         zoom: 17,
         essential: true
@@ -24,7 +26,7 @@ const CameraActionsMixin = {
       // Wait for map to settle, then open popup and start recording
       setTimeout(() => {
         // Find camera in CameraSystem
-        if (window.CameraSystem) {
+        if (CameraSystem) {
           const camera = CameraSystem.cameras.find(c => c.device_id === deviceId);
           if (camera) {
             // Open popup
@@ -54,9 +56,9 @@ const CameraActionsMixin = {
     }
 
     // Use CameraSystem's recordings modal but pass camera data
-    if (window.CameraSystem && typeof CameraSystem.openRecordingsModalWithCamera === 'function') {
+    if (CameraSystem && typeof CameraSystem.openRecordingsModalWithCamera === 'function') {
       CameraSystem.openRecordingsModalWithCamera(camera);
-    } else if (window.CameraSystem && typeof CameraSystem.openRecordingsModal === 'function') {
+    } else if (CameraSystem && typeof CameraSystem.openRecordingsModal === 'function') {
       // Temporarily add camera to CameraSystem.cameras if not present
       const existingCamera = CameraSystem.cameras.find(c => c.device_id === deviceId);
       if (!existingCamera) {
@@ -72,7 +74,7 @@ const CameraActionsMixin = {
    * Open camera settings for WHEP camera
    */
   openCameraSettings(deviceId, cameraId = null) {
-    if (window.CameraSystem && CameraSystem.openSettings) {
+    if (CameraSystem && CameraSystem.openSettings) {
       CameraSystem.openSettings(deviceId, cameraId);
     } else {
       AuthSystem.showNotification('Ayarlar açılamadı', 'error');
@@ -95,7 +97,7 @@ const CameraActionsMixin = {
     AuthSystem.showNotification('Haritada bir noktaya tiklayarak kamera konumunu belirleyin. Iptal icin ESC tuslayın.', 'info', 5000);
 
     // Change cursor to crosshair
-    if (window.map) {
+    if (AppState.map) {
       map.getCanvas().style.cursor = 'crosshair';
     }
 
@@ -113,12 +115,12 @@ const CameraActionsMixin = {
       const lng = e.lngLat.lng;
 
       // Reset cursor
-      if (window.map) {
+      if (AppState.map) {
         map.getCanvas().style.cursor = '';
       }
 
       // Remove listeners
-      if (window.map) {
+      if (AppState.map) {
         map.off('click', handleMapClick);
       }
       document.removeEventListener('keydown', handleEscKey);
@@ -143,7 +145,7 @@ const CameraActionsMixin = {
           // Refresh cameras display
           self.renderCameras();
           // Update map layer if CameraSystem is available
-          if (window.CameraSystem && CameraSystem.refreshCameras) {
+          if (CameraSystem && CameraSystem.refreshCameras) {
             CameraSystem.refreshCameras();
           }
         } else {
@@ -162,7 +164,7 @@ const CameraActionsMixin = {
         self._isPickingLocation = false;
 
         // Reset cursor
-        if (window.map) {
+        if (AppState.map) {
           map.getCanvas().style.cursor = '';
           map.off('click', handleMapClick);
         }
@@ -173,7 +175,7 @@ const CameraActionsMixin = {
     };
 
     // Register listeners
-    if (window.map) {
+    if (AppState.map) {
       map.once('click', handleMapClick);
     }
     document.addEventListener('keydown', handleEscKey);
@@ -203,8 +205,8 @@ const CameraActionsMixin = {
     document.body.appendChild(instruction);
 
     // Add map click handler with high priority
-    if (window.map) {
-      window.map.getCanvas().style.cursor = 'crosshair';
+    if (AppState.map) {
+      AppState.map.getCanvas().style.cursor = 'crosshair';
 
       // Store the handler reference for removal
       this._locationPickHandler = (e) => {
@@ -214,7 +216,7 @@ const CameraActionsMixin = {
       };
 
       // Use 'click' on map itself (not on layers) for location picking
-      window.map.on('click', this._locationPickHandler);
+      AppState.map.on('click', this._locationPickHandler);
     }
   },
 
@@ -259,14 +261,14 @@ const CameraActionsMixin = {
     this.isPickingLocation = false;
 
     // Remove click handler
-    if (window.map && this._locationPickHandler) {
-      window.map.off('click', this._locationPickHandler);
+    if (AppState.map && this._locationPickHandler) {
+      AppState.map.off('click', this._locationPickHandler);
       this._locationPickHandler = null;
     }
 
     // Restore cursor
-    if (window.map) {
-      window.map.getCanvas().style.cursor = '';
+    if (AppState.map) {
+      AppState.map.getCanvas().style.cursor = '';
     }
 
     // Remove instruction

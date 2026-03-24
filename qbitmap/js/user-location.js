@@ -1,6 +1,8 @@
 import { QBitmapConfig } from './config.js';
 import { Logger, escapeHtml } from './utils.js';
 import { AuthSystem } from './auth.js';
+import { CameraSystem } from './camera-system/index.js';
+import * as AppState from './state.js';
 
 /**
  * UserLocationSystem - Display user's location on map
@@ -38,14 +40,14 @@ const UserLocationSystem = {
         // Wait for auth to be ready (max 10 seconds)
         let attempts = 0;
         while (attempts < 50) {
-            if (window.AuthSystem?.isLoggedIn?.()) {
+            if (AuthSystem.isLoggedIn()) {
                 break;
             }
             await new Promise(r => setTimeout(r, 200));
             attempts++;
         }
 
-        if (!window.AuthSystem?.isLoggedIn?.()) {
+        if (!AuthSystem.isLoggedIn()) {
             return;
         }
 
@@ -65,32 +67,32 @@ const UserLocationSystem = {
             if (location && location.lat && location.lng && location.showOnMap) {
                 // Wait for map to exist first
                 let mapAttempts = 0;
-                while (!window.map && mapAttempts < 50) {
+                while (!AppState.map && mapAttempts < 50) {
                     await new Promise(r => setTimeout(r, 200));
                     mapAttempts++;
                 }
 
-                if (!window.map) {
+                if (!AppState.map) {
                     return;
                 }
 
                 // If style is already loaded, proceed immediately
-                if (!window.map.isStyleLoaded()) {
+                if (!AppState.map.isStyleLoaded()) {
                     // Wait for map load event
                     await new Promise((resolve) => {
-                        if (window.map.isStyleLoaded()) {
+                        if (AppState.map.isStyleLoaded()) {
                             resolve();
                             return;
                         }
 
                         const timeout = setTimeout(resolve, 15000);
 
-                        window.map.once('load', () => {
+                        AppState.map.once('load', () => {
                             clearTimeout(timeout);
                             resolve();
                         });
 
-                        window.map.once('idle', () => {
+                        AppState.map.once('idle', () => {
                             clearTimeout(timeout);
                             resolve();
                         });
@@ -111,7 +113,7 @@ const UserLocationSystem = {
      */
     waitForMapAndLoadPublicLocations() {
         const checkMap = () => {
-            if (window.map && window.map.isStyleLoaded()) {
+            if (AppState.map && AppState.map.isStyleLoaded()) {
                 this.loadPublicLocations();
             } else {
                 setTimeout(checkMap, 500);
@@ -137,7 +139,7 @@ const UserLocationSystem = {
                 return;
             }
 
-            const map = window.map;
+            const map = AppState.map;
 
             // Remove existing markers
             this.clearPublicMarkers();
@@ -261,7 +263,7 @@ const UserLocationSystem = {
         })
         .setLngLat(lngLat)
         .setHTML(html)
-        .addTo(window.map);
+        .addTo(AppState.map);
     },
 
     /**
@@ -293,14 +295,14 @@ const UserLocationSystem = {
     async showLocation(lng, lat, accuracy, skipSave = false) {
         this.currentPosition = { lng, lat, accuracy };
 
-        const map = window.map;
+        const map = AppState.map;
         if (!map) return;
 
         // Get user info
-        const user = window.AuthSystem?.user;
+        const user = AuthSystem.user;
 
         // Save location to backend if logged in (unless skipSave is true)
-        if (!skipSave && window.AuthSystem?.isLoggedIn()) {
+        if (!skipSave && AuthSystem.isLoggedIn()) {
             this.saveLocationToBackend(lat, lng, accuracy);
         }
         const displayName = user?.displayName || 'Kullanıcı';
@@ -402,7 +404,7 @@ const UserLocationSystem = {
 
             const addCanvasImage = () => {
                 const imageData = ctx.getImageData(0, 0, size, size);
-                window.map.addImage('user-location-avatar', {
+                AppState.map.addImage('user-location-avatar', {
                     width: size,
                     height: size,
                     data: imageData.data
@@ -507,7 +509,7 @@ const UserLocationSystem = {
         })
         .setLngLat(coords)
         .setHTML(html)
-        .addTo(window.map);
+        .addTo(AppState.map);
     },
 
     /**
@@ -533,7 +535,7 @@ const UserLocationSystem = {
      * Hide user location from map
      */
     hide() {
-        const map = window.map;
+        const map = AppState.map;
         if (!map) return;
 
         this.hidePopup();
@@ -560,8 +562,8 @@ const UserLocationSystem = {
      * Get user's camera count
      */
     getUserCameraCount() {
-        if (window.CameraSystem) {
-            const userCameras = window.CameraSystem.cameras?.filter(c => !c.isShared) || [];
+        if (CameraSystem) {
+            const userCameras = CameraSystem.cameras?.filter(c => !c.isShared) || [];
             return userCameras.length;
         }
         return 0;
@@ -638,10 +640,10 @@ const UserLocationSystem = {
             const lng = position.coords.longitude;
             const lat = position.coords.latitude;
 
-            if (window.map) {
-                window.map.flyTo({
+            if (AppState.map) {
+                AppState.map.flyTo({
                     center: [lng, lat],
-                    zoom: Math.max(window.map.getZoom(), 17),
+                    zoom: Math.max(AppState.map.getZoom(), 17),
                     duration: 1000
                 });
             }
@@ -674,7 +676,7 @@ const UserLocationSystem = {
 
         this._locateDot = new maplibregl.Marker({ element: el, anchor: 'center' })
             .setLngLat([lng, lat])
-            .addTo(window.map);
+            .addTo(AppState.map);
     }
 };
 
@@ -684,4 +686,3 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 export { UserLocationSystem };
-window.UserLocationSystem = UserLocationSystem;

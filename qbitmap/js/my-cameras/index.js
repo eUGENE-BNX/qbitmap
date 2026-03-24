@@ -1,11 +1,13 @@
 import { QBitmapConfig } from '../config.js';
 import { Logger } from '../utils.js';
 import { AuthSystem } from '../auth.js';
+import { CameraSystem } from '../camera-system/index.js';
 import { DashboardMixin } from './dashboard.js';
 import { ClaimMixin } from './claim.js';
 import { FaceRecognitionMixin } from './face-recognition.js';
 import { CameraActionsMixin } from './camera-actions.js';
 import { SharingMixin } from './sharing.js';
+import * as AppState from '../state.js';
 
 /**
  * QBitmap My Cameras Dashboard
@@ -67,9 +69,9 @@ const MyCamerasSystem = {
         case 'watch': {
           const lng = parseFloat(target.dataset.lng);
           const lat = parseFloat(target.dataset.lat);
-          if (window.CameraSystem && lng && lat) {
+          if (CameraSystem && lng && lat) {
             this.close();
-            window.map?.flyTo({ center: [lng, lat], zoom: 17 });
+            AppState.map?.flyTo({ center: [lng, lat], zoom: 17 });
             setTimeout(() => CameraSystem.openCameraPopup(deviceId, [lng, lat]), 500);
           }
           break;
@@ -254,4 +256,3 @@ Object.assign(MyCamerasSystem,
 MyCamerasSystem.init();
 
 export { MyCamerasSystem };
-window.MyCamerasSystem = MyCamerasSystem;

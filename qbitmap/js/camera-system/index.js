@@ -12,6 +12,7 @@ import { RecordingsModalMixin } from './recordings-modal.js';
 import { FaceDetectionMixin } from './face-detection.js';
 import { ClickableZonesMixin } from './clickable-zones.js';
 import { CameraGridMixin } from './camera-grid.js';
+import * as AppState from '../state.js';
 
 /**
  * QBitmap Camera System - Main Entry Point
@@ -171,7 +172,7 @@ const CameraSystem = {
       ];
 
       // Add user camera fetches if logged in
-      const isLoggedIn = window.AuthSystem && AuthSystem.isLoggedIn();
+      const isLoggedIn = AuthSystem.isLoggedIn();
       if (isLoggedIn) {
         fetchPromises.push(
           // User cameras
@@ -432,8 +433,6 @@ const CameraSystem = {
   }
 };
 
-// Make CameraSystem globally accessible on window
-window.CameraSystem = CameraSystem;
 
 // ==================== MODULE LOADING ====================
 // Modules will be loaded via script tags and merged using Object.assign
@@ -442,16 +441,15 @@ window.CameraSystem = CameraSystem;
 
 // ==================== INITIALIZATION ====================
 function initCameraSystem() {
-  if (window.map) {
-    CameraSystem.init(window.map);
+  if (AppState.map) {
+    CameraSystem.init(AppState.map);
   } else {
     setTimeout(initCameraSystem, 200);
   }
 }
 
 // Start initialization after all modules are loaded
-// This is called from the last module script or can be called manually
-window.startCameraSystem = function() {
+export function startCameraSystem() {
   initCameraSystem();
 
   // Listen for auth events to reload cameras
@@ -475,5 +473,3 @@ Object.assign(CameraSystem,
 );
 
 export { CameraSystem, AI_VISION_PROMPT, CAPTURE_SERVICE_URL, buildPromptFromRules };
-window.CameraSystem = CameraSystem;
-window.startCameraSystem = window.startCameraSystem;

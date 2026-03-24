@@ -1,11 +1,12 @@
 import { Logger, escapeHtml, showNotification } from './utils.js';
+import * as AppState from './state.js';
 
 /**
  * Tesla Dashcam Module — Standalone & Modular
  * Parses Tesla front camera MP4 SEI metadata (GPS, speed, gear, steering, etc.)
  * and displays vehicle on map with synchronized video + driving dashboard.
  *
- * Dependencies: protobuf.min.js (vendor), MapLibre GL JS (global window.map)
+ * Dependencies: protobuf.min.js (vendor), MapLibre GL JS (global AppState.map)
  */
 
 const TeslaDashcam = {
@@ -945,13 +946,13 @@ const TeslaDashcam = {
 
 // ── Auto-Initialize ──────────────────────────────────────
 (function initTeslaDashcam() {
-  if (window.map && typeof window.map.getSource === 'function') {
+  if (AppState.map && typeof AppState.map.getSource === 'function') {
     // Style is what matters — map.loaded() can be false while tiles stream in
-    if (window.map.isStyleLoaded()) {
-      TeslaDashcam.init(window.map);
+    if (AppState.map.isStyleLoaded()) {
+      TeslaDashcam.init(AppState.map);
     } else {
-      window.map.on('load', function() {
-        TeslaDashcam.init(window.map);
+      AppState.map.on('load', function() {
+        TeslaDashcam.init(AppState.map);
       });
     }
   } else {

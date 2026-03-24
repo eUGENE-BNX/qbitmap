@@ -79,4 +79,3 @@ const VoiceCommands = {
 };
 
 export { VoiceCommands };
-window.VoiceCommands = VoiceCommands;

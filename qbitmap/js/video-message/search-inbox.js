@@ -2,6 +2,7 @@ import { QBitmapConfig } from "../config.js";
 import { Logger, escapeHtml } from "../utils.js";
 import { AuthSystem } from "../auth.js";
 import { Analytics } from "../analytics.js";
+import * as AppState from '../state.js';
 
 const SearchInboxMixin = {
   async fetchUnreadCount() {
@@ -96,8 +97,8 @@ const SearchInboxMixin = {
 
         this.closeInbox();
 
-        if (window.map) {
-          window.map.flyTo({ center: [lng, lat], zoom: Math.max(window.map.getZoom(), 16) });
+        if (AppState.map) {
+          AppState.map.flyTo({ center: [lng, lat], zoom: Math.max(AppState.map.getZoom(), 16) });
 
           // Open popup after fly animation
           setTimeout(() => {
@@ -342,8 +343,8 @@ const SearchInboxMixin = {
           if (panel) panel.remove();
 
           // Fly to location
-          if (window.map) {
-            window.map.flyTo({ center: [lng, lat], zoom: Math.max(window.map.getZoom(), 16) });
+          if (AppState.map) {
+            AppState.map.flyTo({ center: [lng, lat], zoom: Math.max(AppState.map.getZoom(), 16) });
 
             // Open popup after fly animation
             setTimeout(() => {

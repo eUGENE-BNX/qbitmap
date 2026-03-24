@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Bu fonksiyon, dışarıdan çağrılarak modal'ı açmak için kullanılacak.
     // Örneğin, cameras-settings.js dosyasından.
-    window.openImageModal = function(imageUrl, imageCaption = "Kamera Görüntüsü") {
+    const openImageModal = function(imageUrl, imageCaption = "Kamera Görüntüsü") {
         modal.style.display = "block"; // Modalı görünür yap
         modalImg.src = imageUrl; // Resim kaynağını ayarla
         captionText.textContent = imageCaption; // Başlık ekle (XSS koruması için textContent)
