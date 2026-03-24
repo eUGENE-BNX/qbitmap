@@ -887,7 +887,6 @@
   .camera-popup-buttons .terminal-btn,
   .camera-popup-buttons .draw-zone-btn,
   .camera-popup-buttons .toggle-zones-btn,
-  .camera-popup-buttons .blur-btn,
   .camera-popup-buttons .ai-search-btn,
   .camera-popup-buttons .ai-active-btn,
   .camera-popup-buttons .ai-btn,
@@ -946,53 +945,6 @@
     opacity: 0.7;
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0);
   }
-}
-
-/* Face Blur Button */
-.cam-btn.blur-btn {
-  color: #666;
-}
-
-.cam-btn.blur-btn:hover {
-  background: #e0e0e0;
-  color: #333;
-}
-
-.cam-btn.blur-btn.loading {
-  opacity: 0.6;
-  cursor: wait;
-}
-
-.cam-btn.blur-btn.active {
-  background: #7c3aed;
-  color: white;
-  animation: blur-pulse 2s ease-in-out infinite;
-}
-
-.cam-btn.blur-btn.active:hover {
-  background: #6d28d9;
-}
-
-@keyframes blur-pulse {
-  0%, 100% {
-    opacity: 1;
-    box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.5);
-  }
-  50% {
-    opacity: 0.85;
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0);
-  }
-}
-
-/* Face Blur Canvas Overlay */
-.blur-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 10;
 }
 
 /* Terminal Button */

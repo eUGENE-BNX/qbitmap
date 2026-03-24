@@ -143,6 +143,27 @@ class LayersDropdownControl {
             }
 
             row.appendChild(label);
+
+            // Add upload button for Vehicles row
+            if (item.id === 'vehicles') {
+                const uploadBtn = document.createElement('button');
+                uploadBtn.className = 'tesla-upload-btn';
+                uploadBtn.title = 'Tesla Dashcam Yükle';
+                uploadBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+                uploadBtn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!window.TeslaDashcam) {
+                        await import('/js/tesla-dashcam.js');
+                    }
+                    if (window.TeslaDashcam) {
+                        if (!TeslaDashcam.map) TeslaDashcam.init(map);
+                        TeslaDashcam.showUploadDialog();
+                    }
+                });
+                row.appendChild(uploadBtn);
+            }
+
             row.appendChild(toggle);
             row.addEventListener('click', () => this._toggleLayer(item.id));
             this._dropdown.appendChild(row);

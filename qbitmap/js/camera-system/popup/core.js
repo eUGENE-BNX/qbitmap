@@ -105,20 +105,7 @@ const PopupCoreMixin = {
                   <path d="M9 11h4M11 9v4" stroke-width="1.5"/>
                 </svg>
               </button>
-              ${isCity ? '' : `<button class="cam-btn blur-btn" title="Yüz Bulanıklaştır" style="display:none;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                  <rect x="3" y="3" width="5" height="5" rx="1"/>
-                  <rect x="10" y="3" width="5" height="5" rx="1"/>
-                  <rect x="17" y="3" width="5" height="5" rx="1"/>
-                  <rect x="3" y="10" width="5" height="5" rx="1"/>
-                  <rect x="10" y="10" width="5" height="5" rx="1"/>
-                  <rect x="17" y="10" width="5" height="5" rx="1"/>
-                  <rect x="3" y="17" width="5" height="5" rx="1"/>
-                  <rect x="10" y="17" width="5" height="5" rx="1"/>
-                  <rect x="17" y="17" width="5" height="5" rx="1"/>
-                </svg>
-              </button>
-              <button class="cam-btn ai-btn ai-active-btn" title="AI Durdur" style="display:none;">
+              ${isCity ? '' : `<button class="cam-btn ai-btn ai-active-btn" title="AI Durdur" style="display:none;">
                 <span style="font-weight:900;font-size:11px;color:#000;">AI</span>
               </button>`}${whepOnlyButtons}
               ${isCity ? '' : `<button class="cam-btn protocol-toggle-btn" title="Gerçek Zamanlı Mod">
@@ -174,19 +161,6 @@ const PopupCoreMixin = {
           <div class="camera-popup-buttons">
             <button class="cam-btn ai-btn ai-active-btn" title="AI Durdur" style="display:none;">
               <span style="font-weight:900;font-size:11px;color:#000;">AI</span>
-            </button>
-            <button class="cam-btn blur-btn" title="Yüz Bulanıklaştır" style="display:none;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                <rect x="3" y="3" width="5" height="5" rx="1"/>
-                <rect x="10" y="3" width="5" height="5" rx="1"/>
-                <rect x="17" y="3" width="5" height="5" rx="1"/>
-                <rect x="3" y="10" width="5" height="5" rx="1"/>
-                <rect x="10" y="10" width="5" height="5" rx="1"/>
-                <rect x="17" y="10" width="5" height="5" rx="1"/>
-                <rect x="3" y="17" width="5" height="5" rx="1"/>
-                <rect x="10" y="17" width="5" height="5" rx="1"/>
-                <rect x="17" y="17" width="5" height="5" rx="1"/>
-              </svg>
             </button>
             <button class="cam-btn terminal-btn" title="Terminal">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -347,7 +321,6 @@ const PopupCoreMixin = {
     const audioBtn = popupEl.querySelector('.audio-btn');
     const drawZoneBtn = popupEl.querySelector('.draw-zone-btn');
     const toggleZonesBtn = popupEl.querySelector('.toggle-zones-btn');
-    const blurBtn = popupEl.querySelector('.blur-btn');
     const protocolToggleBtn = popupEl.querySelector('.protocol-toggle-btn');
     const frameContainer = popupEl.querySelector('.camera-frame-container');
 
@@ -360,7 +333,6 @@ const PopupCoreMixin = {
     if (terminalBtn) terminalBtn.onclick = (e) => this.toggleTerminalPanel(deviceId, e);
     if (drawZoneBtn) drawZoneBtn.onclick = () => this.toggleDrawMode(deviceId);
     if (toggleZonesBtn) toggleZonesBtn.onclick = () => this.toggleZonesVisibility(deviceId);
-    if (blurBtn) blurBtn.onclick = () => this.toggleFaceBlur(deviceId);
     if (audioBtn) {
       const cam = popupData.camera;
       const isPublicCamera = !cam.isOwned && !cam.isShared;
@@ -504,7 +476,6 @@ const PopupCoreMixin = {
       const audioBtn = popupEl.querySelector('.audio-btn');
       const drawZoneBtn = popupEl.querySelector('.draw-zone-btn');
       const toggleZonesBtn = popupEl.querySelector('.toggle-zones-btn');
-      const blurBtn = popupEl.querySelector('.blur-btn');
       const searchBtn = popupEl.querySelector('.search-btn');
       const aiSearchBtn = popupEl.querySelector('.ai-search-btn');
       const aiAnalyzeBtn = popupEl.querySelector('.ai-analyze-btn');
@@ -521,7 +492,6 @@ const PopupCoreMixin = {
       if (audioBtn) audioBtn.onclick = null;
       if (drawZoneBtn) drawZoneBtn.onclick = null;
       if (toggleZonesBtn) toggleZonesBtn.onclick = null;
-      if (blurBtn) blurBtn.onclick = null;
       if (searchBtn) searchBtn.onclick = null;
       if (aiSearchBtn) aiSearchBtn.onclick = null;
       if (aiAnalyzeBtn) aiAnalyzeBtn.onclick = null;
@@ -549,11 +519,6 @@ const PopupCoreMixin = {
     // Cleanup AI analyze (stop interval + remove card)
     if (popupData.aiAnalyzeActive) {
       this.stopAiAnalyze(deviceId);
-    }
-
-    // Cleanup face blur
-    if (this.cleanupFaceBlur) {
-      this.cleanupFaceBlur(deviceId);
     }
 
     // Cleanup tooltip if open for this popup

@@ -30,8 +30,9 @@ const TeslaDashcam = {
 
   // ── Protobuf Schema (inline reflection API) ───────────
   _initProtobuf: function() {
+    if (this.SeiMetadata) return; // already initialized
     if (typeof protobuf === 'undefined') {
-      Logger.log('[TeslaDashcam] protobuf.js not loaded, SEI parsing disabled');
+      Logger.log('[TeslaDashcam] protobuf.js not yet loaded, will retry on parse');
       return;
     }
 
@@ -90,6 +91,9 @@ const TeslaDashcam = {
    * Returns: Array of { time (seconds), lat, lng, heading, speed, gear, ... }
    */
   parseMP4: function(buffer) {
+    // Lazy init protobuf if it wasn't ready during init()
+    if (!this.SeiMetadata) this._initProtobuf();
+
     var view = new DataView(buffer);
     var self = this;
 
@@ -931,48 +935,6 @@ const TeslaDashcam = {
     }
   },
 
-  // ── Inject Upload Button into Layers Dropdown ──────────
-  _injectUploadButton: function() {
-    var self = this;
-
-    // Watch for the layers dropdown to be created, then inject our button
-    // next to the Vehicles toggle
-    var observer = new MutationObserver(function() {
-      self._tryInjectButton();
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // Try immediately too
-    this._tryInjectButton();
-  },
-
-  _tryInjectButton: function() {
-    // Already injected?
-    if (document.querySelector('.tesla-upload-btn')) return;
-
-    // Find the "Vehicles" label in layers dropdown
-    var labels = document.querySelectorAll('.layers-dropdown-label');
-    var self = this;
-
-    labels.forEach(function(label) {
-      var text = (label.textContent || '').trim();
-      if (text === 'Vehicles') {
-        var btn = document.createElement('button');
-        btn.className = 'tesla-upload-btn';
-        btn.title = 'Tesla Dashcam Yukle';
-        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
-        btn.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          self.showUploadDialog();
-        });
-        // Insert into the parent row, after the label
-        label.parentNode.insertBefore(btn, label.nextSibling);
-      }
-    });
-  },
-
   // ── Utility ────────────────────────────────────────────
   _escapeHtml: function(str) {
     var div = document.createElement('div');
@@ -987,11 +949,9 @@ const TeslaDashcam = {
     // Style is what matters — map.loaded() can be false while tiles stream in
     if (window.map.isStyleLoaded()) {
       TeslaDashcam.init(window.map);
-      TeslaDashcam._injectUploadButton();
     } else {
       window.map.on('load', function() {
         TeslaDashcam.init(window.map);
-        TeslaDashcam._injectUploadButton();
       });
     }
   } else {

@@ -7,7 +7,6 @@ import { HlsPlayerMixin } from './hls-player.js';
 import { PopupMixin } from './popup/index.js';
 import { SettingsMixin } from './settings.js';
 import { AIMonitoringMixin } from './ai-monitoring.js';
-import { FaceBlurMixin } from './face-blur.js';
 import { TerminalMixin } from './terminal.js';
 import { RecordingMixin } from './recording.js';
 import { RecordingsModalMixin } from './recordings-modal.js';
@@ -471,7 +470,7 @@ window.startCameraSystem = function() {
 // Merge all mixins into CameraSystem
 Object.assign(CameraSystem,
   WebSocketMixin, CameraLayerMixin, HlsPlayerMixin, PopupMixin,
-  SettingsMixin, AIMonitoringMixin, FaceBlurMixin, TerminalMixin,
+  SettingsMixin, AIMonitoringMixin, TerminalMixin,
   RecordingMixin, RecordingsModalMixin, FaceDetectionMixin,
   ClickableZonesMixin, CameraGridMixin
 );

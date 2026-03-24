@@ -69,11 +69,6 @@ const SearchFaceMixin = {
     // Update search button visibility
     this.updateSearchButtonVisibility(deviceId);
 
-    // Update blur button visibility based on zoom
-    if (this.updateBlurButtonVisibility) {
-      this.updateBlurButtonVisibility(deviceId);
-    }
-
     // Update zone buttons visibility based on zoom
     if (this.updateZoneButtonsVisibility) {
       this.updateZoneButtonsVisibility(deviceId);
@@ -122,11 +117,6 @@ const SearchFaceMixin = {
 
     // Update search button visibility
     this.updateSearchButtonVisibility(deviceId);
-
-    // Update blur button visibility based on zoom
-    if (this.updateBlurButtonVisibility) {
-      this.updateBlurButtonVisibility(deviceId);
-    }
 
     // Update zone buttons visibility
     if (this.updateZoneButtonsVisibility) {
