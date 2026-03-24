@@ -456,11 +456,8 @@ function initCameraSystem() {
 window.startCameraSystem = function() {
   initCameraSystem();
 
-  // Listen for auth events to reload cameras (debounce to avoid duplicate calls on page load)
-  let _initDone = false;
-  setTimeout(() => { _initDone = true; }, 3000);
+  // Listen for auth events to reload cameras
   window.addEventListener('auth:login', () => {
-    if (!_initDone) return; // Skip if still initializing (init already loads cameras)
     Logger.log('[Cameras] User logged in, reloading cameras with private cameras');
     CameraSystem.reloadCamerasWithUserCameras();
   });

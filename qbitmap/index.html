@@ -16,9 +16,6 @@
     gtag('config', 'G-5Y929W13D6', { send_page_view: false });
   </script>
 
-  <!-- Plyr Video Player -->
-  <link rel="stylesheet" href="https://cdn.plyr.io/3.8.4/plyr.css" integrity="sha384-VqqE0KSv00qfHvKpRa8aov+g3xtUu2Rw0NsEmtjTOPGn/JDKVghgd56iw/VObHa7" crossorigin="anonymous">
-
   <!-- Vendor libraries in head so they execute before Vite's module scripts -->
   <script defer src="/vendor/hls.min.js"></script>
   <script defer src="/vendor/maplibre-gl.js"></script>
@@ -35,6 +32,8 @@
     }
   }
   </script>
+  <!-- Plyr Video Player (non-blocking: only needed when user opens video) -->
+  <link rel="stylesheet" href="https://cdn.plyr.io/3.8.4/plyr.css" integrity="sha384-VqqE0KSv00qfHvKpRa8aov+g3xtUu2Rw0NsEmtjTOPGn/JDKVghgd56iw/VObHa7" crossorigin="anonymous" media="print" onload="this.media='all'">
   <script async src="https://cdn.plyr.io/3.8.4/plyr.polyfilled.js" integrity="sha384-ZDYtn77N2Oxc6W8oilE9z73hj1EZqidVlQeqTwsKW19gglwyUYHMn/LzX+ewyFJD" crossorigin="anonymous"></script>
 </head>
 <body>

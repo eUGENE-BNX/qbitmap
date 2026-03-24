@@ -114,7 +114,7 @@ DatabaseService.prototype.updateCamera = async function(cameraId, userId, { name
   const updates = [];
   const values = [];
 
-  if (name !== undefined) { updates.push('name = ?'); values.push(name); }
+  if (name !== undefined && name !== '') { updates.push('name = ?'); values.push(name); }
   if (lng !== undefined) { updates.push('lng = ?'); values.push(lng); }
   if (lat !== undefined) { updates.push('lat = ?'); values.push(lat); }
   if (isPublic !== undefined) { updates.push('is_public = ?'); values.push(isPublic ? 1 : 0); }

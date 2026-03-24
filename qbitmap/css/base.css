@@ -84,3 +84,70 @@
   --z-notification: 8000;
   --z-tooltip: 9000;
 }
+
+/* ==================== Shared Button Styles ==================== */
+
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.btn-primary {
+  background: #333;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #1a1a1a;
+}
+
+.btn-primary:disabled {
+  background: #aaa;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid var(--color-border-dark);
+}
+
+.btn-secondary:hover {
+  background: #e0e0e0;
+}
+
+.btn-danger {
+  background: #d93025;
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: #b3261e;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: var(--font-size-base);
+}
+
+.btn-icon {
+  padding: 8px;
+  min-width: 32px;
+  height: 32px;
+}
+
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
