@@ -1,3 +1,4 @@
+import '../css/user-profile.css';
 import { QBitmapConfig } from './config.js';
 import { Logger, escapeHtml } from './utils.js';
 import { AuthSystem } from './auth.js';

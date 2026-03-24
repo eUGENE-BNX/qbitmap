@@ -222,7 +222,7 @@ const StreamingMixin = {
 
     const isCityCamera = popupData.camera?.camera_type === 'city' || popupData.camera?.is_city_camera;
 
-    const result = this.startHlsStream(videoEl, hlsUrl, {
+    const result = await this.startHlsStream(videoEl, hlsUrl, {
       isVod: isCityCamera,
       onReady: () => {
         frameContainer.classList.remove('loading', 'error');

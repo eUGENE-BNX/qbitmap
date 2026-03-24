@@ -348,7 +348,7 @@ const CameraGridMixin = {
 
       if (hlsUrl && this.startHlsStream) {
         const isVod = hlsUrl.includes('/clips/');
-        hlsInstance = this.startHlsStream(video, hlsUrl, {
+        hlsInstance = await this.startHlsStream(video, hlsUrl, {
           isVod,
           onReady: () => {
             Logger.log(`[CameraGrid] HLS stream ready for cell ${cellIndex}`);

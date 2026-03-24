@@ -1,3 +1,4 @@
+import '../css/vehicles.css';
 import { QBitmapConfig } from './config.js';
 import { AuthSystem } from './auth.js';
 import { escapeHtml } from './utils.js';

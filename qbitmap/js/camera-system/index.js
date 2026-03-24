@@ -1,3 +1,5 @@
+import '../../css/cameras-settings.css';
+import '../../css/camera-grid.css';
 import { QBitmapConfig } from '../config.js';
 import { Logger } from '../utils.js';
 import { AuthSystem } from '../auth.js';

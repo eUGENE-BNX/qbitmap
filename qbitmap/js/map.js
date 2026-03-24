@@ -447,7 +447,7 @@ map.on("load", async () => {
     Logger.log("[Map] loaded");
 
     // Initialize H3 Grid layer
-    H3Grid.init(map);
+    await H3Grid.init(map);
     H3TronTrails.init(map);
 
     // Restore persisted layer states

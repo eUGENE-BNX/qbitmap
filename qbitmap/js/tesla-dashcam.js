@@ -1,5 +1,7 @@
+import '../css/tesla-dashcam.css';
 import { Logger, escapeHtml, showNotification } from './utils.js';
 import * as AppState from './state.js';
+import { loadProtobuf } from './vendor-loader.js';
 
 /**
  * Tesla Dashcam Module — Standalone & Modular
@@ -30,12 +32,9 @@ const TeslaDashcam = {
   },
 
   // ── Protobuf Schema (inline reflection API) ───────────
-  _initProtobuf: function() {
+  _initProtobuf: async function() {
     if (this.SeiMetadata) return; // already initialized
-    if (typeof protobuf === 'undefined') {
-      Logger.log('[TeslaDashcam] protobuf.js not yet loaded, will retry on parse');
-      return;
-    }
+    await loadProtobuf();
 
     var Root = protobuf.Root;
     var Type = protobuf.Type;
@@ -91,9 +90,9 @@ const TeslaDashcam = {
    * Parse a Tesla dashcam MP4 buffer and extract SEI metadata with timestamps.
    * Returns: Array of { time (seconds), lat, lng, heading, speed, gear, ... }
    */
-  parseMP4: function(buffer) {
+  parseMP4: async function(buffer) {
     // Lazy init protobuf if it wasn't ready during init()
-    if (!this.SeiMetadata) this._initProtobuf();
+    if (!this.SeiMetadata) await this._initProtobuf();
 
     var view = new DataView(buffer);
     var self = this;
@@ -301,11 +300,11 @@ const TeslaDashcam = {
     if (onProgress) onProgress('Dosya okunuyor...');
 
     var reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
       if (onProgress) onProgress('SEI metadata parse ediliyor...');
 
       var buffer = e.target.result;
-      var metadata = self.parseMP4(buffer);
+      var metadata = await self.parseMP4(buffer);
 
       if (!metadata || metadata.length === 0) {
         if (onProgress) onProgress('HATA: Bu dosyadan metadata okunamadi');

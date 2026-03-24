@@ -1,3 +1,4 @@
+import '../css/live-broadcast.css';
 import { QBitmapConfig } from './config.js';
 import { Logger, escapeHtml, showNotification } from './utils.js';
 import { AuthSystem } from './auth.js';

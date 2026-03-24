@@ -11,19 +11,16 @@
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-5Y929W13D6"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());gtag('config','G-5Y929W13D6',{send_page_view:false});</script>
 
-  <!-- Vendor libraries in head so they execute before Vite's module scripts -->
-  <script defer src="/vendor/hls.min.js"></script>
+  <!-- Core vendor libraries (maplibre + basemaps required at startup) -->
   <script defer src="/vendor/maplibre-gl.js"></script>
   <script defer src="/vendor/basemaps.js"></script>
-  <script defer src="/vendor/h3-js.umd.js"></script>
-  <script defer src="/vendor/deck.gl.min.js"></script>
-  <script defer src="/vendor/protobuf.min.js"></script>
+  <!-- hls, deck.gl, h3-js, protobuf loaded on demand via vendor-loader.js -->
   <!-- Three.js ES Module Import Map -->
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"
+      "three": "/vendor/three/three.module.js",
+      "three/addons/": "/vendor/three/examples/jsm/"
     }
   }
   </script>

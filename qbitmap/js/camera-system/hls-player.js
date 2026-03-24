@@ -1,5 +1,6 @@
 import { Logger } from '../utils.js';
 import { Analytics } from '../analytics.js';
+import { loadHls } from '../vendor-loader.js';
 
 /**
  * QBitmap Camera System - HLS Player Mixin
@@ -14,7 +15,8 @@ const HlsPlayerMixin = {
    * @param {Object} options - { onReady, onError }
    * @returns {{ hls: Hls|null, destroy: Function }}
    */
-  startHlsStream(videoElement, hlsUrl, options = {}) {
+  async startHlsStream(videoElement, hlsUrl, options = {}) {
+    await loadHls();
     const { onReady, onError, isVod } = options;
     const _hlsStartTime = performance.now();
 

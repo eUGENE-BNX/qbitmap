@@ -2,6 +2,7 @@ import { QBitmapConfig } from './config.js';
 import { Logger } from './utils.js';
 import { Analytics } from './analytics.js';
 import { H3TronTrails } from './h3-tron-trails.js';
+import { loadDeckAndH3 } from './vendor-loader.js';
 
 /**
  * QBitmap H3 Hexagonal Grid Layer
@@ -70,7 +71,8 @@ const H3Grid = {
     { minZoom: 0,  resolution: 1 }
   ],
 
-  init(map) {
+  async init(map) {
+    await loadDeckAndH3();
     this._map = map;
 
     // Rich tooltip for ownership + H3 index
