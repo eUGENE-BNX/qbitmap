@@ -6,7 +6,7 @@
 const db = require('./database');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'photo-ai-queue' });
-const { getVllmUrl, getModelName, getBackendUrl } = require('../utils/ai-config');
+const { getVllmUrl, getVllmApiKey, getModelName, getBackendUrl } = require('../utils/ai-config');
 
 const MAX_RETRIES = 2;
 const TIMEOUT = 60000; // 60s for photo analysis
@@ -58,6 +58,7 @@ async function processItem(item) {
 async function analyzePhoto({ messageId, fileName }) {
   const vllmUrl = await getVllmUrl();
   const model = await getModelName();
+  const apiKey = await getVllmApiKey();
   const backendUrl = await getBackendUrl();
 
   // Use the same /video endpoint which serves any media file by mime_type
@@ -77,9 +78,12 @@ async function analyzePhoto({ messageId, fileName }) {
     max_tokens: 256
   };
 
+  const headers = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
   const resp = await fetchWithTimeout(vllmUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body)
   }, TIMEOUT);
 

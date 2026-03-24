@@ -272,6 +272,7 @@ const AiMixin = {
     try {
       const response = await fetch(`${QBitmapConfig.api.ai}/analyze`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: aiSettings.model,
@@ -568,6 +569,7 @@ const AiMixin = {
       // Send to API
       const response = await fetch(`${QBitmapConfig.api.ai}/analyze`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: aiSettings.model,

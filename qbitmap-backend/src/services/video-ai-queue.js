@@ -6,7 +6,7 @@
 const db = require('./database');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'video-ai-queue' });
-const { getVllmUrl, getModelName, getBackendUrl } = require('../utils/ai-config');
+const { getVllmUrl, getVllmApiKey, getModelName, getBackendUrl } = require('../utils/ai-config');
 
 const MAX_RETRIES = 2;
 const TIMEOUT = 180000; // 180s for video analysis
@@ -58,6 +58,7 @@ async function processItem(item) {
 async function analyzeVideo({ messageId, fileName }) {
   const vllmUrl = await getVllmUrl();
   const model = await getModelName();
+  const apiKey = await getVllmApiKey();
   const backendUrl = await getBackendUrl();
 
   // Build public HTTP URL for the video file - vLLM will fetch it directly
@@ -65,6 +66,7 @@ async function analyzeVideo({ messageId, fileName }) {
 
   logger.info({ messageId, model, videoUrl }, 'Starting video AI analysis (HTTP URL)');
 
+  // Max video duration is 30s, 2 fps = 60 frames
   const body = {
     model,
     messages: [{
@@ -75,12 +77,15 @@ async function analyzeVideo({ messageId, fileName }) {
       ]
     }],
     max_tokens: 256,
-    mm_processor_kwargs: { fps: 2 }
+    mm_processor_kwargs: { num_frames: 60, fps: 2 }
   };
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
   const resp = await fetchWithTimeout(vllmUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body)
   }, TIMEOUT);
 

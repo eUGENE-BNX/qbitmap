@@ -6,7 +6,7 @@
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const { checkFeatureLimit, incrementUsage } = require('../middleware/limits');
 const { validateBody, aiAnalyzeSchema } = require('../utils/validation');
-const { getVllmUrl, getModelName } = require('../utils/ai-config');
+const { getVllmUrl, getVllmApiKey, getModelName } = require('../utils/ai-config');
 const { authHook } = require('../utils/jwt');
 
 // Transform request from Ollama format to vLLM/OpenAI format
@@ -156,12 +156,16 @@ async function aiRoutes(fastify, options) {
 
       const vllmBody = await transformRequest(request.body);
       const vllmUrl = await getVllmUrl();
+      const apiKey = await getVllmApiKey();
 
       fastify.log.info({ url: vllmUrl, model: vllmBody.model }, '[AI Proxy] Calling vLLM');
 
+      const headers = { 'Content-Type': 'application/json' };
+      if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
       const response = await fetchWithTimeout(vllmUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(vllmBody)
       }, 60000); // 60s timeout for AI analysis
 
