@@ -215,7 +215,7 @@ const SettingsMixin = {
                 <input type="number" id="settings-lng" name="camera_lng" value="${lng}" step="0.0001" placeholder="29.1167">
               </div>
             </div>
-            <button type="button" class="btn-pick-location" onclick="CameraSystem.pickLocationFromSettings();">
+            <button type="button" class="btn-pick-location" data-action="pick-location">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                 <circle cx="12" cy="10" r="3"></circle>
@@ -232,7 +232,7 @@ const SettingsMixin = {
             <div style="background: #1a1a2e; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
               <code id="rtmp-url-settings" style="color: #4fc3f7; font-size: 12px; word-break: break-all; display: block; user-select: all;">${escapeHtml(rtmpUrl)}</code>
             </div>
-            <button type="button" class="btn-secondary" data-copy-url="${escapeHtml(rtmpUrl)}" onclick="navigator.clipboard.writeText(this.dataset.copyUrl).then(() => AuthSystem.showNotification('RTMP URL kopyalandi', 'success')).catch(() => AuthSystem.showNotification('Kopyalama basarisiz', 'error'))">
+            <button type="button" class="btn-secondary" data-copy-url="${escapeHtml(rtmpUrl)}" data-action="copy-url">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -294,10 +294,10 @@ const SettingsMixin = {
             <div style="padding: 12px; background: #ffebee; border-radius: 6px; margin-bottom: 12px;">
               <p style="margin: 0 0 12px 0; font-size: 13px; color: #666;">Bu islemler geri alinamaz. Dikkatli olun.</p>
               <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                <button type="button" class="btn-warning" onclick="CameraSystem.releaseCameraFromSettings()" style="background: #ff9800; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                <button type="button" class="btn-warning" data-action="release-camera" style="background: #ff9800; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px;">
                   Kamerayi Birak
                 </button>
-                <button type="button" class="btn-danger" onclick="CameraSystem.deleteCameraFromSettings()" style="background: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                <button type="button" class="btn-danger" data-action="delete-camera" style="background: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px;">
                   Kamerayi Sil
                 </button>
               </div>
@@ -343,7 +343,7 @@ const SettingsMixin = {
               <input type="number" id="settings-lng" name="camera_lng" value="${lng}" step="0.0001" placeholder="29.1167">
             </div>
           </div>
-          <button type="button" class="btn-pick-location" onclick="CameraSystem.pickLocationFromSettings();">
+          <button type="button" class="btn-pick-location" data-action="pick-location">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
               <circle cx="12" cy="10" r="3"></circle>
@@ -555,7 +555,7 @@ const SettingsMixin = {
             <div class="mjpeg-info" style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px; font-size: 12px; color: #666;">
               <p style="margin: 0 0 4px 0;"><strong>Not:</strong> MJPEG stream acikken normal kare yakalama durur.</p>
               <p style="margin: 0;">Stream URL: <code class="stream-url" style="background: #e0e0e0; padding: 2px 6px; border-radius: 3px; word-break: break-all; font-size: 11px;">${escapeHtml(streamUrl)}</code></p>
-              <button type="button" class="copy-stream-url" style="margin-top: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; border: 1px solid #ccc; border-radius: 3px; background: #fff;" data-copy-url="${escapeHtml(streamUrl)}" onclick="navigator.clipboard.writeText(this.dataset.copyUrl); this.textContent='Kopyalandi!'; setTimeout(() => this.textContent='URL Kopyala', 1500);">URL Kopyala</button>
+              <button type="button" class="copy-stream-url" style="margin-top: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; border: 1px solid #ccc; border-radius: 3px; background: #fff;" data-copy-url="${escapeHtml(streamUrl)}" data-action="copy-stream-url">URL Kopyala</button>
             </div>
           </div>
         </div>
@@ -684,6 +684,31 @@ const SettingsMixin = {
         input.previousElementSibling.querySelector('.val').textContent = Math.round(input.value / divisor);
       };
     });
+
+    // Event delegation for data-action buttons
+    const settingsForm = document.querySelector('.settings-form');
+    if (settingsForm) {
+      settingsForm.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        if (action === 'pick-location') {
+          this.pickLocationFromSettings();
+        } else if (action === 'copy-url') {
+          navigator.clipboard.writeText(btn.dataset.copyUrl)
+            .then(() => AuthSystem.showNotification('RTMP URL kopyalandi', 'success'))
+            .catch(() => AuthSystem.showNotification('Kopyalama basarisiz', 'error'));
+        } else if (action === 'copy-stream-url') {
+          navigator.clipboard.writeText(btn.dataset.copyUrl);
+          btn.textContent = 'Kopyalandi!';
+          setTimeout(() => btn.textContent = 'URL Kopyala', 1500);
+        } else if (action === 'release-camera') {
+          this.releaseCameraFromSettings();
+        } else if (action === 'delete-camera') {
+          this.deleteCameraFromSettings();
+        }
+      });
+    }
 
     // Collapsible section toggles
     document.querySelectorAll('.settings-section.collapsible h3').forEach(h3 => {
@@ -979,18 +1004,20 @@ const SettingsMixin = {
               ${profileOptions}
             </select>
             <div style="font-size: 12px; color: #666; margin-top: 4px;">Profili degistirerek farkli event tiplerini destekleyebilirsin.</div>
-            <button id="change-profile-btn" onclick="CameraSystem.changeOnvifProfile(${cameraId})" style="margin-top: 8px; padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+            <button id="change-profile-btn" data-action="change-profile" style="margin-top: 8px; padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
               Profili Degistir
             </button>
           </div>
 
           <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #c8e6c9;">
-            <button class="onvif-unlink-btn" onclick="CameraSystem.unlinkOnvif(${cameraId})" style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+            <button class="onvif-unlink-btn" data-action="unlink-onvif" style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
               Baglantıyi Kaldir
             </button>
           </div>
         </div>
       `;
+      container.querySelector('[data-action="change-profile"]').addEventListener('click', () => this.changeOnvifProfile(cameraId));
+      container.querySelector('[data-action="unlink-onvif"]').addEventListener('click', () => this.unlinkOnvif(cameraId));
     } else {
       // Fetch available cameras from ONVIF service
       let availableCameras = [];
@@ -1039,16 +1066,19 @@ const SettingsMixin = {
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             ${availableCameras.length > 0 && !fetchError ? `
-              <button class="onvif-link-btn" onclick="CameraSystem.linkOnvif(${cameraId})" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
+              <button class="onvif-link-btn" data-action="link-onvif" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
                 Bagla
               </button>
             ` : ''}
-            <button onclick="CameraSystem.showAddOnvifCameraModal()" style="padding: 8px 16px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
+            <button data-action="add-onvif-camera" style="padding: 8px 16px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500;">
               + Yeni Kamera Ekle
             </button>
           </div>
         </div>
       `;
+      const linkBtn = container.querySelector('[data-action="link-onvif"]');
+      if (linkBtn) linkBtn.addEventListener('click', () => this.linkOnvif(cameraId));
+      container.querySelector('[data-action="add-onvif-camera"]').addEventListener('click', () => this.showAddOnvifCameraModal());
     }
   },
 
@@ -1221,7 +1251,7 @@ const SettingsMixin = {
           <button type="submit" style="flex: 1; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500;">
             Kamera Ekle
           </button>
-          <button type="button" onclick="document.getElementById('add-onvif-camera-modal').remove()" style="flex: 1; padding: 12px; background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500;">
+          <button type="button" data-action="cancel-add-onvif" style="flex: 1; padding: 12px; background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500;">
             Iptal
           </button>
         </div>
@@ -1230,6 +1260,11 @@ const SettingsMixin = {
 
     backdrop.appendChild(modal);
     document.body.appendChild(backdrop);
+
+    // Cancel button
+    backdrop.querySelector('[data-action="cancel-add-onvif"]').addEventListener('click', () => {
+      document.getElementById('add-onvif-camera-modal').remove();
+    });
 
     // Add RTSP URL parser on input
     document.getElementById('onvif-cam-rtsp').addEventListener('input', (e) => {
@@ -1442,11 +1477,12 @@ const SettingsMixin = {
           <div style="font-size: 11px; color: #999; margin-top: 4px;">
             Desteklenen olaylar: ${supportedEvents.map(e => escapeHtml(e)).join(', ') || 'Yok'}
           </div>
-          <button type="button" id="change-profile-btn" onclick="CameraSystem.changeOnvifProfile(${cameraId})" style="margin-top: 8px; padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+          <button type="button" id="change-profile-btn" data-action="change-profile" style="margin-top: 8px; padding: 6px 12px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
             Profili Degistir
           </button>
         </div>
       `;
+      container.querySelector('[data-action="change-profile"]').addEventListener('click', () => this.changeOnvifProfile(cameraId));
     } else {
       container.innerHTML = `
         <div style="margin-top: 12px; padding: 12px; background: #fff3cd; border-radius: 6px;">

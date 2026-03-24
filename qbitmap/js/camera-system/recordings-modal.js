@@ -69,11 +69,11 @@ const RecordingsModalMixin = {
     modal.id = 'recordings-modal';
     modal.className = 'recordings-modal';
     modal.innerHTML = `
-      <div class="recordings-modal-overlay" onclick="CameraSystem.closeRecordingsModal()"></div>
+      <div class="recordings-modal-overlay"></div>
       <div class="recordings-modal-content">
         <div class="recordings-modal-header">
           <h2 class="recordings-modal-title">Kayitlar</h2>
-          <button class="recordings-modal-close" onclick="CameraSystem.closeRecordingsModal()">&times;</button>
+          <button class="recordings-modal-close">&times;</button>
         </div>
         <div class="recordings-modal-body">
           <div class="recordings-player-container">
@@ -91,6 +91,43 @@ const RecordingsModalMixin = {
         </div>
       </div>
     `;
+
+    // Static event listeners
+    modal.querySelector('.recordings-modal-overlay').addEventListener('click', () => this.closeRecordingsModal());
+    modal.querySelector('.recordings-modal-close').addEventListener('click', () => this.closeRecordingsModal());
+
+    // Event delegation for dynamic list items
+    modal.querySelector('.recordings-list').addEventListener('click', (e) => {
+      const playBtn = e.target.closest('.recording-play-btn');
+      if (playBtn) {
+        const item = playBtn.closest('.recording-item');
+        this.playRecording(this.currentRecordingCamera.device_id, item.dataset.start, item.dataset.duration);
+        return;
+      }
+      const downloadBtn = e.target.closest('.recording-download-btn');
+      if (downloadBtn) {
+        const item = downloadBtn.closest('.recording-item');
+        this.downloadRecording(this.currentRecordingCamera.device_id, item.dataset.start, item.dataset.duration);
+        return;
+      }
+      const deleteBtn = e.target.closest('.recording-delete-btn');
+      if (deleteBtn) {
+        const item = deleteBtn.closest('.recording-item');
+        this.deleteRecording(this.currentRecordingCamera.device_id, item.dataset.start);
+        return;
+      }
+      const loadMoreBtn = e.target.closest('.recordings-load-more');
+      if (loadMoreBtn) {
+        this.loadMoreRecordings();
+        return;
+      }
+      const retryBtn = e.target.closest('.recordings-error button');
+      if (retryBtn) {
+        this.refreshRecordingsList();
+        return;
+      }
+    });
+
     return modal;
   },
 
@@ -149,7 +186,7 @@ const RecordingsModalMixin = {
 
         return `
           <div class="recording-item" data-start="${rec.start}" data-duration="${rec.duration}">
-            <button class="recording-play-btn" onclick="CameraSystem.playRecording('${escapeHtml(deviceId)}', '${escapeHtml(rec.start)}', '${escapeHtml(String(rec.duration))}')" title="Oynat">
+            <button class="recording-play-btn" title="Oynat">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
@@ -159,14 +196,14 @@ const RecordingsModalMixin = {
               <span class="recording-duration">${duration}</span>
             </div>
             <div class="recording-actions">
-              <button class="recording-download-btn" onclick="CameraSystem.downloadRecording('${escapeHtml(deviceId)}', '${escapeHtml(rec.start)}', '${escapeHtml(String(rec.duration))}')" title="Indir">
+              <button class="recording-download-btn" title="Indir">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                   <polyline points="7 10 12 15 17 10"></polyline>
                   <line x1="12" y1="15" x2="12" y2="3"></line>
                 </svg>
               </button>
-              <button class="recording-delete-btn" onclick="CameraSystem.deleteRecording('${escapeHtml(deviceId)}', '${escapeHtml(rec.start)}')" title="Sil">
+              <button class="recording-delete-btn" title="Sil">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6"></polyline>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -179,7 +216,7 @@ const RecordingsModalMixin = {
 
       // Load more button HTML
       const loadMoreHtml = this.recordingsHasMore ? `
-        <button class="recordings-load-more" onclick="CameraSystem.loadMoreRecordings()">
+        <button class="recordings-load-more">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
@@ -201,7 +238,7 @@ const RecordingsModalMixin = {
       listContainer.innerHTML = `
         <div class="recordings-error">
           <span>Kayitlar yuklenemedi</span>
-          <button onclick="CameraSystem.refreshRecordingsList()">Tekrar Dene</button>
+          <button>Tekrar Dene</button>
         </div>
       `;
     } finally {

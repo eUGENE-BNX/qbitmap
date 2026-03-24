@@ -138,6 +138,43 @@ const AdminPanel = {
     document.getElementById('onvif-modal').addEventListener('click', (e) => {
       if (e.target.id === 'onvif-modal') this.closeOnvifModal();
     });
+
+    // Event delegation for dynamic tables and pagination
+    document.getElementById('users-tbody').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action="edit-user"]');
+      if (btn) this.openUserModal(Number(btn.dataset.id));
+    });
+    document.getElementById('users-pagination').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-page]');
+      if (btn && !btn.disabled) this.goToPage(Number(btn.dataset.page));
+    });
+    document.getElementById('onvif-tbody').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action="edit-onvif"]');
+      if (btn) this.openOnvifModal(Number(btn.dataset.id));
+    });
+    document.getElementById('messages-tbody').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action="delete-message"]');
+      if (btn) this.deleteMessage(btn.dataset.id);
+    });
+    document.getElementById('messages-pagination').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-page]');
+      if (btn && !btn.disabled) this.goToMessagesPage(Number(btn.dataset.page));
+    });
+    document.getElementById('places-tbody').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const id = Number(btn.dataset.id);
+      if (btn.dataset.action === 'edit-place-icon') this.editPlaceIcon(id);
+      else if (btn.dataset.action === 'delete-place') this.deletePlace(id);
+    });
+    document.getElementById('places-pagination').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-page]');
+      if (btn && !btn.disabled) this.goToPlacesPage(Number(btn.dataset.page));
+    });
+    document.getElementById('city-cameras-tbody').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action="edit-city-camera"]');
+      if (btn) this.openCityCameraModal(Number(btn.dataset.id));
+    });
   },
 
   /**
@@ -327,7 +364,7 @@ const AdminPanel = {
           <span class="time-ago">${user.last_login ? this.timeAgo(user.last_login) : 'Never'}</span>
         </td>
         <td>
-          <button class="btn btn-small btn-ghost" onclick="AdminPanel.openUserModal(${user.id})">Edit</button>
+          <button class="btn btn-small btn-ghost" data-action="edit-user" data-id="${user.id}">Edit</button>
         </td>
       </tr>
     `).join('');
@@ -348,19 +385,19 @@ const AdminPanel = {
     let html = '';
 
     // Previous button
-    html += `<button class="page-btn" ${page <= 1 ? 'disabled' : ''} onclick="AdminPanel.goToPage(${page - 1})">Prev</button>`;
+    html += `<button class="page-btn" ${page <= 1 ? 'disabled' : ''} data-page="${page - 1}">Prev</button>`;
 
     // Page numbers
     for (let i = 1; i <= totalPages; i++) {
       if (i === 1 || i === totalPages || (i >= page - 1 && i <= page + 1)) {
-        html += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="AdminPanel.goToPage(${i})">${i}</button>`;
+        html += `<button class="page-btn ${i === page ? 'active' : ''}" data-page="${i}">${i}</button>`;
       } else if (i === page - 2 || i === page + 2) {
         html += `<span class="page-btn">...</span>`;
       }
     }
 
     // Next button
-    html += `<button class="page-btn" ${page >= totalPages ? 'disabled' : ''} onclick="AdminPanel.goToPage(${page + 1})">Next</button>`;
+    html += `<button class="page-btn" ${page >= totalPages ? 'disabled' : ''} data-page="${page + 1}">Next</button>`;
 
     container.innerHTML = html;
   },
@@ -842,7 +879,7 @@ const AdminPanel = {
           </div>
         </td>
         <td>
-          <button class="btn btn-sm btn-ghost" onclick="AdminPanel.openOnvifModal(${template.id})">Edit</button>
+          <button class="btn btn-sm btn-ghost" data-action="edit-onvif" data-id="${template.id}">Edit</button>
         </td>
       </tr>
     `).join('');
@@ -1248,7 +1285,7 @@ const AdminPanel = {
         <td><span class="msg-meta">${msg.view_count}</span></td>
         <td><div class="msg-tags">${tagsHtml}</div></td>
         <td><span class="time-ago">${this.timeAgo(msg.created_at)}</span></td>
-        <td><button class="btn btn-small btn-danger" onclick="AdminPanel.deleteMessage('${msg.message_id}')">Delete</button></td>
+        <td><button class="btn btn-small btn-danger" data-action="delete-message" data-id="${msg.message_id}">Delete</button></td>
       </tr>`;
     }).join('');
   },
@@ -1262,17 +1299,17 @@ const AdminPanel = {
       return;
     }
 
-    let html = `<button class="page-btn" ${page <= 1 ? 'disabled' : ''} onclick="AdminPanel.goToMessagesPage(${page - 1})">Prev</button>`;
+    let html = `<button class="page-btn" ${page <= 1 ? 'disabled' : ''} data-page="${page - 1}">Prev</button>`;
 
     for (let i = 1; i <= totalPages; i++) {
       if (i === 1 || i === totalPages || (i >= page - 1 && i <= page + 1)) {
-        html += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="AdminPanel.goToMessagesPage(${i})">${i}</button>`;
+        html += `<button class="page-btn ${i === page ? 'active' : ''}" data-page="${i}">${i}</button>`;
       } else if (i === page - 2 || i === page + 2) {
         html += '<span class="page-btn">...</span>';
       }
     }
 
-    html += `<button class="page-btn" ${page >= totalPages ? 'disabled' : ''} onclick="AdminPanel.goToMessagesPage(${page + 1})">Next</button>`;
+    html += `<button class="page-btn" ${page >= totalPages ? 'disabled' : ''} data-page="${page + 1}">Next</button>`;
     container.innerHTML = html;
   },
 
@@ -1472,8 +1509,8 @@ const AdminPanel = {
         <td>${typesHtml}</td>
         <td>${p.tag_count || 0}</td>
         <td>
-          <button class="btn btn-small" onclick="AdminPanel.editPlaceIcon(${p.id})">Ikon</button>
-          <button class="btn btn-small btn-danger" onclick="AdminPanel.deletePlace(${p.id})">Sil</button>
+          <button class="btn btn-small" data-action="edit-place-icon" data-id="${p.id}">Ikon</button>
+          <button class="btn btn-small btn-danger" data-action="delete-place" data-id="${p.id}">Sil</button>
         </td>
       </tr>`;
     }).join('');
@@ -1486,15 +1523,15 @@ const AdminPanel = {
 
     if (!totalPages || totalPages <= 1) { container.innerHTML = ''; return; }
 
-    let html = `<button class="page-btn" ${page <= 1 ? 'disabled' : ''} onclick="AdminPanel.goToPlacesPage(${page - 1})">Prev</button>`;
+    let html = `<button class="page-btn" ${page <= 1 ? 'disabled' : ''} data-page="${page - 1}">Prev</button>`;
     for (let i = 1; i <= totalPages; i++) {
       if (i === 1 || i === totalPages || (i >= page - 1 && i <= page + 1)) {
-        html += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="AdminPanel.goToPlacesPage(${i})">${i}</button>`;
+        html += `<button class="page-btn ${i === page ? 'active' : ''}" data-page="${i}">${i}</button>`;
       } else if (i === page - 2 || i === page + 2) {
         html += '<span class="page-btn">...</span>';
       }
     }
-    html += `<button class="page-btn" ${page >= totalPages ? 'disabled' : ''} onclick="AdminPanel.goToPlacesPage(${page + 1})">Next</button>`;
+    html += `<button class="page-btn" ${page >= totalPages ? 'disabled' : ''} data-page="${page + 1}">Next</button>`;
     container.innerHTML = html;
   },
 
@@ -1616,7 +1653,7 @@ JSON formatı:
         <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(cam.rtsp_source_url || '')}">${escapeHtml(cam.rtsp_source_url || '-')}</td>
         <td>${cam.lat ? `${Number(cam.lat).toFixed(4)}, ${Number(cam.lng).toFixed(4)}` : '-'}</td>
         <td>
-          <button class="btn btn-sm" onclick="AdminPanel.openCityCameraModal(${cam.id})">Düzenle</button>
+          <button class="btn btn-sm" data-action="edit-city-camera" data-id="${cam.id}">Düzenle</button>
         </td>
       </tr>
     `).join('');

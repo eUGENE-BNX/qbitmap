@@ -48,7 +48,7 @@ async function buildServer() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://apis.google.com"],
+        scriptSrc: ["'self'", "https://accounts.google.com", "https://apis.google.com"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],

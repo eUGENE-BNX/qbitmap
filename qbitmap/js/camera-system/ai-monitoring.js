@@ -695,7 +695,7 @@ const AIMonitoringMixin = {
       <div class="ai-alarm-header">
         <span class="ai-alarm-icon">🚨</span>
         <span class="ai-alarm-title">ACIL DURUM</span>
-        <button class="ai-alarm-close" onclick="CameraSystem.clearAlarmClick('${escapeHtml(deviceId)}')">&times;</button>
+        <button class="ai-alarm-close">&times;</button>
       </div>
       <div class="ai-alarm-body">
         <div class="ai-alarm-desc">${escapeHtml(result.tasvir) || 'Acil durum tespit edildi!'}</div>
@@ -712,6 +712,7 @@ const AIMonitoringMixin = {
     `;
 
     document.body.appendChild(alarm);
+    alarm.querySelector('.ai-alarm-close').addEventListener('click', () => this.clearAlarmClick(deviceId));
   },
 
   /**

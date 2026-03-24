@@ -330,19 +330,19 @@ const VehicleAnimation = {
     popup.id = 'vehicle-popup-' + vehicleId;
     popup.className = 'vehicle-popup';
     popup.innerHTML = '<div class="vehicle-popup-header">' +
-      '<button class="vehicle-popup-mjpeg" onclick="VehicleAnimation.toggleMjpeg(\'' + vehicleId + '\')" title="MJPEG Stream">' +
+      '<button class="vehicle-popup-mjpeg" title="MJPEG Stream">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
           '<path d="M23 7l-7 5 7 5V7z"></path>' +
           '<rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>' +
         '</svg>' +
       '</button>' +
-      '<button class="vehicle-popup-edit" onclick="VehicleAnimation.editVehicle(\'' + vehicleId + '\')" title="Düzenle">' +
+      '<button class="vehicle-popup-edit" title="Düzenle">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
           '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>' +
           '<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>' +
         '</svg>' +
       '</button>' +
-      '<button class="vehicle-popup-close" onclick="VehicleAnimation.closePopup(\'' + vehicleId + '\')">&times;</button>' +
+      '<button class="vehicle-popup-close">&times;</button>' +
     '</div>' +
     '<div class="vehicle-popup-camera">' +
       '<span class="vehicle-plate"></span>' +
@@ -350,6 +350,12 @@ const VehicleAnimation = {
       '<img class="camera-feed" style="display:none">' +
       '<video class="video-feed" style="display:none" autoplay loop muted playsinline></video>' +
     '</div>';
+
+    var self = this;
+    popup.querySelector('.vehicle-popup-mjpeg').addEventListener('click', function() { self.toggleMjpeg(vehicleId); });
+    popup.querySelector('.vehicle-popup-edit').addEventListener('click', function() { self.editVehicle(vehicleId); });
+    popup.querySelector('.vehicle-popup-close').addEventListener('click', function() { self.closePopup(vehicleId); });
+
     document.body.appendChild(popup);
     return popup;
   },
@@ -690,7 +696,7 @@ const VehicleAnimation = {
     var modal = document.createElement('div');
     modal.id = 'vehicle-edit-modal';
     modal.className = 'vehicle-edit-modal active';
-    modal.innerHTML = '<div class="modal-overlay" onclick="VehicleAnimation.closeEditModal()"></div>' +
+    modal.innerHTML = '<div class="modal-overlay"></div>' +
       '<div class="modal-content">' +
         '<h3>Araç Düzenle</h3>' +
         '<div class="form-group">' +
@@ -705,11 +711,16 @@ const VehicleAnimation = {
         '</div>' +
         '<input type="hidden" id="edit-vehicle-id" value="' + escapeHtml(vehicleId) + '">' +
         '<div class="modal-actions">' +
-          '<button class="btn-secondary" onclick="VehicleAnimation.closeEditModal()">İptal</button>' +
-          '<button class="btn-primary" onclick="VehicleAnimation.saveVehicleEdit()">Kaydet</button>' +
+          '<button class="btn-secondary">İptal</button>' +
+          '<button class="btn-primary">Kaydet</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(modal);
+
+    var self = this;
+    modal.querySelector('.modal-overlay').addEventListener('click', function() { self.closeEditModal(); });
+    modal.querySelector('.btn-secondary').addEventListener('click', function() { self.closeEditModal(); });
+    modal.querySelector('.btn-primary').addEventListener('click', function() { self.saveVehicleEdit(); });
 
     // Async olarak WHEP kameraları yükle
     this.loadWhepCamerasDropdown(vehicle.cameraId);
@@ -723,8 +734,10 @@ const VehicleAnimation = {
     if (!AuthSystem.isLoggedIn()) {
       container.innerHTML = '<div class="camera-auth-warning">' +
         '<span>Kamera seçmek için giriş yapın</span>' +
-        '<button class="btn-secondary btn-sm" onclick="VehicleAnimation.closeEditModal(); AuthSystem.login();">Giriş Yap</button>' +
+        '<button class="btn-secondary btn-sm">Giriş Yap</button>' +
       '</div>';
+      var self = this;
+      container.querySelector('.btn-secondary').addEventListener('click', function() { self.closeEditModal(); AuthSystem.login(); });
       return;
     }
 

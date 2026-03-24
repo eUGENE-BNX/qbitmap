@@ -651,7 +651,7 @@ const AiMixin = {
               <div class="ai-alarm-header">
                 <span class="ai-alarm-icon">\u{1F6A8}</span>
                 <span class="ai-alarm-title">ACIL DURUM</span>
-                <button class="ai-alarm-close" onclick="CameraSystem.clearAlarmClick('${escapeHtml(deviceId)}')">&times;</button>
+                <button class="ai-alarm-close">&times;</button>
               </div>
               <div class="ai-alarm-body">
                 <div class="ai-alarm-desc">${escapeHtml(alarmPayload.tasvir) || 'Acil durum tespit edildi!'}</div>
@@ -667,6 +667,7 @@ const AiMixin = {
               </div>
             `;
             document.body.appendChild(alarmEl);
+            alarmEl.querySelector('.ai-alarm-close').addEventListener('click', () => this.clearAlarmClick(deviceId));
 
             // Play alarm sound
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
