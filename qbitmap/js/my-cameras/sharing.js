@@ -4,7 +4,7 @@ import { AuthSystem } from "../auth.js";
 
 const SharingMixin = {
   async openShareModal(cameraId) {
-    const camera = this.cameras.find(c => c.id === cameraId);
+    const camera = this.cameras.find(c => String(c.id) === String(cameraId));
     if (!camera) return;
 
     this.sharingCameraId = cameraId;

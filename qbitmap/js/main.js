@@ -3,6 +3,23 @@
  * Imports all modules in the correct order for the main map page
  */
 
+// Stylesheets (processed by Vite into a single hashed bundle)
+import '../vendor/maplibre-gl.css';
+import '../css/base.css';
+import '../css/animations.css';
+import '../css/style.css';
+import '../css/modal.css';
+import '../css/cameras-settings.css';
+import '../css/auth.css';
+import '../css/my-cameras.css';
+import '../css/user-profile.css';
+import '../css/camera-grid.css';
+import '../css/vehicles.css';
+import '../css/tesla-dashcam.css';
+import '../css/video-message.css';
+import '../css/comments.css';
+import '../css/live-broadcast.css';
+
 // Core modules (config, utils loaded as dependencies)
 import './config.js';
 import './utils.js';

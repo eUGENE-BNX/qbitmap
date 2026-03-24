@@ -13,19 +13,6 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 
-// Lazy script loader (caches loaded scripts)
-function loadScript(src) {
-    if (loadScript._cache[src]) return loadScript._cache[src];
-    loadScript._cache[src] = new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = src;
-        s.onload = resolve;
-        s.onerror = reject;
-        document.head.appendChild(s);
-    });
-    return loadScript._cache[src];
-}
-loadScript._cache = {};
 
 const sourceId = "protomaps";
 const baseLayers = basemaps.layers(sourceId, basemaps.LIGHT || basemaps.namedTheme("light"));
@@ -450,7 +437,7 @@ map.on("load", async () => {
     }
 
     // Lazy-load non-critical modules after map is ready
-    loadScript('/vendor/protobuf.min.js').then(() => import('/js/tesla-dashcam.js'));
+    import('/js/tesla-dashcam.js');
 
     const styleObj = map.getStyle();
     const vectorSourceId = Object.entries(styleObj.sources).find(([, src]) => src.type === "vector")?.[0];
@@ -761,4 +748,3 @@ map.on("load", async () => {
     updateTrafficCamVisibility(); // Initial check
 });
 
-export { loadScript };

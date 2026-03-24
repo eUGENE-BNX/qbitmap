@@ -135,7 +135,7 @@ const CameraActionsMixin = {
         if (response.ok) {
           AuthSystem.showNotification('Konum kaydedildi', 'success');
           // Update local camera data
-          const camera = self.cameras.find(c => c.id === cameraId);
+          const camera = self.cameras.find(c => String(c.id) === String(cameraId));
           if (camera) {
             camera.lat = lat;
             camera.lng = lng;

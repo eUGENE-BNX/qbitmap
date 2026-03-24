@@ -41,7 +41,8 @@ export default defineConfig({
         const { cpSync, existsSync } = await import('fs');
         const outDir = options.dir || resolve(__dirname, 'dist');
 
-        const staticDirs = ['vendor', '3d', 'model', 'models', 'videos'];
+        // Large dirs (3d, model, videos) are deployed separately via rsync
+        const staticDirs = ['vendor', 'models'];
         for (const dir of staticDirs) {
           const src = resolve(__dirname, dir);
           if (existsSync(src)) {
@@ -60,7 +61,7 @@ export default defineConfig({
         const jsNonModuleFiles = [
           'js/faceplugin.bundle.js', 'js/faceplugin.bundle.js.LICENSE.txt',
           'js/3e1194e05c0d74968f65.mjs', 'js/3e1194e05c0d74968f65.mjs.LICENSE.txt',
-          'js/9b38a8c18d5f4d131491.wasm', 'js/liveness-detector.js', 'js/face-api.min.js'
+          'js/9b38a8c18d5f4d131491.wasm', 'js/liveness-detector.js'
         ];
         for (const file of jsNonModuleFiles) {
           const src = resolve(__dirname, file);

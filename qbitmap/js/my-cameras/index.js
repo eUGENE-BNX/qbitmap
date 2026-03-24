@@ -44,6 +44,17 @@ const MyCamerasSystem = {
 
   setupEventDelegation() {
     document.addEventListener('click', (e) => {
+      // Filter bar controls (no data-action attribute)
+      const viewBtn = e.target.closest('.view-btn');
+      if (viewBtn) { this.setViewMode(viewBtn.dataset.view); return; }
+
+      const filterChip = e.target.closest('.filter-chip');
+      if (filterChip) { this.setTypeFilter(filterChip.dataset.type); return; }
+
+      const statusBtn = e.target.closest('.status-btn');
+      if (statusBtn) { this.setStatusFilter(statusBtn.dataset.status); return; }
+
+      // Action buttons
       const target = e.target.closest('[data-action]');
       if (!target) return;
 
@@ -52,8 +63,8 @@ const MyCamerasSystem = {
       const cameraId = target.dataset.cameraId || target.closest('[data-camera-id]')?.dataset.cameraId;
 
       switch (action) {
-        case 'expand-card': this.toggleCardExpand(deviceId || cameraId); break;
-        case 'open-popup': {
+        case 'toggle-expand': this.toggleCardExpand(cameraId || deviceId); break;
+        case 'watch': {
           const lng = parseFloat(target.dataset.lng);
           const lat = parseFloat(target.dataset.lat);
           if (window.CameraSystem && lng && lat) {
@@ -63,31 +74,31 @@ const MyCamerasSystem = {
           }
           break;
         }
-        case 'open-recordings': this.openRecordings(deviceId); break;
-        case 'open-settings': this.openCameraSettings(deviceId, cameraId); break;
-        case 'pick-location': this.pickCameraLocation(deviceId, cameraId); break;
-        case 'open-face-recognition': this.openFaceRecognition(deviceId); break;
-        case 'delete-camera': {
+        case 'recordings': this.openRecordings(deviceId); break;
+        case 'settings': this.openCameraSettings(deviceId, cameraId); break;
+        case 'location': this.pickCameraLocation(deviceId, cameraId); break;
+        case 'face': this.openFaceRecognition(deviceId); break;
+        case 'delete': {
           const name = target.dataset.cameraName || '';
           const type = target.dataset.cameraType || '';
           this.confirmDeleteCamera(cameraId, name, type);
           break;
         }
-        case 'toggle-voice-call': this.toggleVoiceCall(deviceId, target); break;
-        case 'open-and-record': {
+        case 'voice': this.toggleVoiceCall(deviceId, target); break;
+        case 'record': {
           const lng = parseFloat(target.dataset.lng);
           const lat = parseFloat(target.dataset.lat);
           this.openAndRecord(deviceId, lng, lat);
           break;
         }
-        case 'share-camera': this.openShareModal(cameraId); break;
+        case 'share': this.openShareModal(cameraId); break;
         case 'view-shared': {
           const lng = parseFloat(target.dataset.lng);
           const lat = parseFloat(target.dataset.lat);
           this.viewSharedCamera(deviceId, lng, lat);
           break;
         }
-        case 'open-shared-popup': {
+        case 'watch-shared': {
           const lng = parseFloat(target.dataset.lng);
           const lat = parseFloat(target.dataset.lat);
           this.openSharedCameraPopup(deviceId, lng, lat);
@@ -196,10 +207,11 @@ const MyCamerasSystem = {
   },
 
   toggleCardExpand(cameraId) {
-    if (this.expandedCardIds.has(cameraId)) {
-      this.expandedCardIds.delete(cameraId);
+    const id = String(cameraId);
+    if (this.expandedCardIds.has(id)) {
+      this.expandedCardIds.delete(id);
     } else {
-      this.expandedCardIds.add(cameraId);
+      this.expandedCardIds.add(id);
     }
     this.renderCameras();
   },

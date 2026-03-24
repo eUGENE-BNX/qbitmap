@@ -17,8 +17,9 @@
 
 ## SSH/Deployment
 ```bash
-# Frontend - ALWAYS use these exact commands
-rsync -avz --delete --exclude='.git' --exclude='maps' --exclude='uploads' /home/eugene/Documents/CODES/qbitmap/ root@91.99.219.248:/opt/qbitmap/
+# Frontend - build then deploy dist/ (NOT source!)
+cd qbitmap && npm run build
+rsync -avz --delete --exclude='maps' --exclude='uploads' --exclude='teslacam' --exclude='3d' --exclude='model' --exclude='videos' dist/ root@91.99.219.248:/opt/qbitmap/
 
 # Backend
 rsync -avz --delete --exclude='.git' --exclude='node_modules' --exclude='*.db' --exclude='*.db-wal' --exclude='*.db-shm' --exclude='uploads' /home/eugene/Documents/CODES/qbitmap-backend/ root@91.99.219.248:/opt/qbitmap-backend/

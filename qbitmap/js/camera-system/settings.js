@@ -917,8 +917,8 @@ const SettingsMixin = {
 
       // Load templates and existing link in parallel
       const [templatesResp, linkResp] = await Promise.all([
-        fetch(`${QBitmapConfig.api.onvif}/templates`),
-        fetch(`${QBitmapConfig.api.onvif}/link/${cameraId}`)
+        fetch(`${QBitmapConfig.api.onvif}/templates`, { credentials: 'include' }),
+        fetch(`${QBitmapConfig.api.onvif}/link/${cameraId}`, { credentials: 'include' })
       ]);
 
       const templatesData = await templatesResp.json();
@@ -997,7 +997,7 @@ const SettingsMixin = {
       let fetchError = false;
 
       try {
-        const camerasResp = await fetch(`${QBitmapConfig.api.onvif}/available-cameras`);
+        const camerasResp = await fetch(`${QBitmapConfig.api.onvif}/available-cameras`, { credentials: 'include' });
         if (camerasResp.ok) {
           const camerasData = await camerasResp.json();
           availableCameras = camerasData.cameras || [];
@@ -1071,6 +1071,7 @@ const SettingsMixin = {
 
       const response = await fetch(`${QBitmapConfig.api.onvif}/link`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
@@ -1101,7 +1102,8 @@ const SettingsMixin = {
 
     try {
       const response = await fetch(`${QBitmapConfig.api.onvif}/link/${cameraId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -1347,6 +1349,7 @@ const SettingsMixin = {
 
       const response = await fetch(`${QBitmapConfig.api.onvif}/cameras`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, name, host, port: parseInt(port), username, password })
       });
@@ -1392,8 +1395,8 @@ const SettingsMixin = {
     try {
       // Load templates and existing link in parallel
       const [templatesResp, linkResp] = await Promise.all([
-        fetch(`${QBitmapConfig.api.onvif}/templates`),
-        fetch(`${QBitmapConfig.api.onvif}/link/${cameraId}`)
+        fetch(`${QBitmapConfig.api.onvif}/templates`, { credentials: 'include' }),
+        fetch(`${QBitmapConfig.api.onvif}/link/${cameraId}`, { credentials: 'include' })
       ]);
 
       const templatesData = await templatesResp.json();

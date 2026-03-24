@@ -57,7 +57,7 @@ const DashboardMixin = {
   renderCompactCard(camera) {
     const type = this.getCameraType(camera);
     const isOnline = this.isCameraOnline(camera);
-    const isExpanded = this.expandedCardIds.has(camera.id);
+    const isExpanded = this.expandedCardIds.has(String(camera.id));
     const isWhep = camera.camera_type === 'whep';
     const isCity = camera.camera_type === 'city';
     const locationText = camera.lng && camera.lat
