@@ -2,8 +2,7 @@ const config = require('../config');
 const db = require('../services/database');
 const { generateToken, verifyToken, extractToken, invalidateTokenCache } = require('../utils/jwt');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
-const { validateBody, biometricVerifySchema } = require('../utils/validation');
-const faceApi = require('../services/face-api');
+const { validateBody } = require('../utils/validation');
 const logger = require('../utils/logger').child({ module: 'auth' });
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -93,118 +92,6 @@ async function authRoutes(fastify, options) {
     }
   });
 
-  // ==================== BIOMETRIC LOGIN ====================
-
-  // Verify face for biometric login (rate limited: 5 req/min)
-  fastify.post('/auth/biometric/verify', {
-    preHandler: validateBody(biometricVerifySchema),
-    config: {
-      rateLimit: {
-        max: 5,
-        timeWindow: '1 minute'
-      }
-    }
-  }, async (request, reply) => {
-    const { image } = request.body;
-
-    try {
-      // Convert base64 to buffer for Face API
-      // Remove data URI prefix if present (e.g., "data:image/jpeg;base64,")
-      let base64Data = image;
-      if (image.includes(',')) {
-        base64Data = image.split(',')[1];
-      }
-      const imageBuffer = Buffer.from(base64Data, 'base64');
-
-      // Call Face API recognition (1:N search to identify who this is)
-      const apiResult = await faceApi.recognizeFace(imageBuffer);
-
-      if (!apiResult.ok) {
-        logger.error({ apiResult }, 'Face API error');
-        return { success: false, error: 'Yüz doğrulama servisi hatası' };
-      }
-
-      const result = apiResult.data;
-      logger.debug({ result }, 'Face API response');
-
-      // Check if API returned success and has results
-      // API returns: { success: true, result: [{ name, score, thresold, isMatchFound, ... }] }
-      if (!result.success || !result.result || result.result.length === 0) {
-        return { success: false, error: 'Yüz tanınamadı' };
-      }
-
-      // Get the best match (highest score)
-      const bestMatch = result.result.reduce((best, current) =>
-        (current.score > best.score) ? current : best
-      );
-
-      // Check if match was found and score is above threshold
-      if (!bestMatch.isMatchFound) {
-        logger.info('No face match found');
-        return { success: false, error: 'Yüz eşleşmesi bulunamadı' };
-      }
-
-      if (bestMatch.score < bestMatch.thresold) {
-        logger.info({ score: bestMatch.score, threshold: bestMatch.thresold }, 'Low face match score');
-        return { success: false, error: 'Yüz eşleşmesi güvenilir değil' };
-      }
-
-      logger.info({ name: bestMatch.name, score: bestMatch.score }, 'Face match found');
-
-      // Find user - the name field contains what we stored as firstname (user's email)
-      let user = null;
-
-      // Try by email (we stored email as firstname when creating person)
-      if (bestMatch.name && bestMatch.name.includes('@')) {
-        user = await db.getUserByEmail(bestMatch.name);
-      }
-
-      // Try by display name
-      if (!user && bestMatch.name) {
-        user = await db.getUserByDisplayName(bestMatch.name);
-      }
-
-      if (!user) {
-        logger.warn({ name: bestMatch.name }, 'No user found for face match');
-        return { success: false, error: 'Kayıtlı kullanıcı bulunamadı' };
-      }
-
-      // Check if account is active
-      const limits = await db.getUserEffectiveLimits(user.id);
-      if (limits && !limits.is_active) {
-        logger.warn({ email: user.email }, 'Inactive account FaceID login attempt');
-        return { success: false, error: 'Hesap devre dışı' };
-      }
-
-      // Update last login
-      await db.updateLastLogin(user.id);
-
-      // Generate JWT token
-      const jwtToken = generateToken(user);
-
-      logger.info({ email: user.email, confidence: bestMatch.confidence }, 'Biometric authentication successful');
-
-      // Set HttpOnly cookie
-      reply.setCookie('qbitmap_token', jwtToken, getCookieOptions());
-
-      // [SB-2] Token removed from response body - cookie is already set above
-      // Frontend uses cookie-based auth via AuthSystem.loadUserInfo()
-      return {
-        success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          displayName: user.display_name,
-          avatarUrl: user.avatar_url
-        }
-      };
-
-    } catch (error) {
-      logger.error({ err: error }, 'Biometric verification error');
-      return reply.code(500).send({ success: false, error: 'Yüz doğrulama hatası' });
-    }
-  });
-
   // ==================== STANDARD AUTH ROUTES ====================
 
   // Get current user info
@@ -245,7 +132,6 @@ async function authRoutes(fastify, options) {
       isActive: limits?.is_active ?? true,
       features: {
         voiceControl: limits?.voice_control_enabled || false,
-        faceLogin: limits?.face_login_enabled || false,
         publicSharing: limits?.public_sharing_enabled || false
       }
     };

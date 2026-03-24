@@ -34,7 +34,6 @@ import './h3-tron-trails.js';
 
 // Auth and user features
 import './auth.js';
-import './biometric-auth.js';
 import './user-location.js';
 import './voice-control.js';
 

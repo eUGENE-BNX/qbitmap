@@ -52,7 +52,6 @@ const QBitmapConfig = {
 
   // Feature Flags
   features: {
-    biometricAuth: true,
     voiceControl: true,
     aiMonitoring: true,
     onvifIntegration: true

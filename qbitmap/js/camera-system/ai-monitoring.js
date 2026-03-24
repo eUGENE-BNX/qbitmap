@@ -57,7 +57,7 @@ const AIMonitoringMixin = {
           throw new Error('Backend monitoring start failed');
         }
 
-        this.terminalWrite(deviceId, '[SYS] AI monitoring backend\'e kaydedildi.', true);
+        Logger.log('[SYS] AI monitoring backend\'e kaydedildi.');
 
         // Backend will broadcast via WebSocket, which will trigger handleMonitoringChanged
         // But start immediately for this client if popup is open
@@ -68,7 +68,7 @@ const AIMonitoringMixin = {
 
       } catch (error) {
         Logger.error('[AI] Failed to start monitoring:', error);
-        this.terminalWrite(deviceId, '[ERR] Backend baglantisi basarisiz', true);
+        Logger.log('[ERR] Backend baglantisi basarisiz');
       }
     } else {
       // Stop monitoring
@@ -80,12 +80,12 @@ const AIMonitoringMixin = {
           body: JSON.stringify({ enabled: false })
         });
 
-        this.terminalWrite(deviceId, '[SYS] AI monitoring durduruldu.', true);
+        Logger.log('[SYS] AI monitoring durduruldu.');
         await this.stopAIMonitoring(deviceId);
 
       } catch (error) {
         Logger.error('[AI] Failed to stop monitoring:', error);
-        this.terminalWrite(deviceId, '[ERR] Durdurma basarisiz', true);
+        Logger.log('[ERR] Durdurma basarisiz');
       }
     }
   },
@@ -139,11 +139,11 @@ const AIMonitoringMixin = {
       streamId = this.extractStreamIdFromWhepUrl(whepUrl);
 
       if (streamId) {
-        this.terminalWrite(deviceId, `[SYS] Capture servisi başlatılıyor (${streamId}, ${intervalMs}ms)...`, true);
+        Logger.log(`[SYS] Capture servisi başlatılıyor (${streamId}, ${intervalMs}ms)...`);
         await this.startCaptureService(streamId, intervalMs);
         await new Promise(resolve => setTimeout(resolve, 1500));
       } else {
-        this.terminalWrite(deviceId, '[ERR] Stream ID alınamadı!', true);
+        Logger.log('[ERR] Stream ID alınamadı!');
       }
     }
 
@@ -258,8 +258,8 @@ const AIMonitoringMixin = {
    * Stop AI when clicking indicator in title
    */
   async stopAIFromTitle(deviceId) {
-    await this.toggleFallDetection(deviceId, false);
-    this.terminalWrite(deviceId, '[SYS] AI monitoring durduruldu (title tiklamasi).', true);
+    await this.toggleFallDetection(deviceId);
+    Logger.log('[SYS] AI monitoring durduruldu (title tiklamasi).');
   },
 
   /**
@@ -494,28 +494,28 @@ const AIMonitoringMixin = {
             }
 
             // Local alarm display (will also be triggered by WebSocket broadcast)
-            this.terminalWrite(deviceId, `[ALARM] ${result.tasvir} (avg: ${avgConfidence.toFixed(0)}%)`, true);
+            Logger.log(`[ALARM] ${result.tasvir} (avg: ${avgConfidence.toFixed(0)}%)`);
             aiState.recentResults = []; // Reset after alarm
           } else {
-            // Henuz yeterli kare yok, terminale yaz
-            this.terminalWrite(deviceId, `[${confidence}%] ${result.tasvir || 'Analiz...'} (${aiState.recentResults.length}/${requiredFrames})`, false);
+            // Henuz yeterli kare yok
+            Logger.log(`[${confidence}%] ${result.tasvir || 'Analiz...'} (${aiState.recentResults.length}/${requiredFrames})`);
           }
         } else {
-          // Esik altinda - terminale yaz
-          this.terminalWrite(deviceId, `[${confidence}%] ${result.tasvir || 'Analiz...'} (avg: ${avgConfidence.toFixed(0)}% < ${threshold}% esik)`, false);
+          // Esik altinda
+          Logger.log(`[${confidence}%] ${result.tasvir || 'Analiz...'} (avg: ${avgConfidence.toFixed(0)}% < ${threshold}% esik)`);
         }
       } else {
         // Normal durum - alarm yok, recentResults'i sifirla
         aiState.recentResults = [];
         // Kullaniciya AI'in calistigini goster
-        this.terminalWrite(deviceId, `[Normal] ${result?.tasvir || 'Tehlikeli durum tespit edilmedi'} (${confidence}%)`, false);
+        Logger.log(`[Normal] ${result?.tasvir || 'Tehlikeli durum tespit edilmedi'} (${confidence}%)`);
       }
 
       Logger.log(`[AI] Analysis result:`, result, `| avg threshold: ${threshold}, frames: ${requiredFrames}`);
 
     } catch (error) {
       Logger.error('[AI] Analysis error:', error);
-      this.terminalWrite(deviceId, `[HATA] AI analiz hatasi: ${error.message}`, true);
+      Logger.log(`[HATA] AI analiz hatasi: ${error.message}`);
     } finally {
       aiState.isAnalyzing = false;
       // [FE-004] Clear timeout and resolve the promise lock

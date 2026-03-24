@@ -1,7 +1,6 @@
 const db = require('../services/database');
 const { authHook } = require('../utils/jwt');
 const frameCache = require('../services/frame-cache');
-const faceApi = require('../services/face-api');
 const mediamtx = require('../services/mediamtx');
 const { validateBody, addRtspCameraSchema, safePath } = require('../utils/validation');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
@@ -165,127 +164,6 @@ async function userRoutes(fastify, options) {
         }
       }
     };
-  });
-
-  // ==================== FACE REGISTRATION ====================
-
-  // Upload face image
-  fastify.put('/me/face', async (request, reply) => {
-    try {
-      const data = await request.file();
-
-      if (!data) {
-        return reply.code(400).send({ error: 'No file uploaded' });
-      }
-
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png'];
-      if (!allowedTypes.includes(data.mimetype)) {
-        return reply.code(400).send({ error: 'Only JPEG and PNG images are allowed' });
-      }
-
-      // Read file buffer
-      const chunks = [];
-      for await (const chunk of data.file) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
-
-      // Check file size (2MB limit)
-      if (buffer.length > 2 * 1024 * 1024) {
-        return reply.code(400).send({ error: 'File size must be less than 2MB' });
-      }
-
-      const userId = request.user.userId;
-      const user = await db.getUserById(userId);
-
-      // Check if user already has a face registered
-      let personId = user.face_api_person_id;
-
-      // If no person exists, create one
-      if (!personId) {
-        const createResult = await faceApi.createPerson(user.email, `qbitmap_user_${userId}`);
-
-        if (!createResult.ok || !createResult.data.success || !createResult.data.result?.id) {
-          logger.error({ result: createResult, userId }, 'Failed to create person in Face API');
-          return reply.code(500).send({ error: 'Failed to create face profile' });
-        }
-
-        personId = createResult.data.result.id;
-        logger.info({ personId, userId }, 'Created person in Face API');
-      }
-
-      // Add face to the person (send buffer directly, not base64)
-      const addFaceResult = await faceApi.addFace(personId, buffer, data.mimetype);
-
-      if (!addFaceResult.ok) {
-        logger.error({ result: addFaceResult, personId }, 'Failed to add face');
-        return reply.code(400).send({ error: addFaceResult.data?.error || 'Failed to register face. Please try a clearer photo.' });
-      }
-
-      // Save image to filesystem
-      const uploadsDir = path.join(__dirname, '../../uploads/faces');
-      await mkdir(uploadsDir, { recursive: true });
-      const ext = data.mimetype === 'image/png' ? 'png' : 'jpg';
-      const filename = `${userId}_${crypto.randomUUID()}.${ext}`;
-      const filePath = path.join(uploadsDir, filename);
-
-      await writeFile(filePath, buffer);
-
-      // Update database
-      await db.updateUserFace(userId, `/uploads/faces/${filename}`, personId);
-
-      logger.info({ user: request.user.email, personId }, 'Face registered');
-
-      return {
-        status: 'ok',
-        message: 'Face registered successfully',
-        hasFaceRegistered: true
-      };
-    } catch (error) {
-      logger.error({ err: error }, 'Face upload error');
-      return reply.code(500).send({ error: 'Failed to process face image' });
-    }
-  });
-
-  // Delete face registration
-  fastify.delete('/me/face', async (request, reply) => {
-    const userId = request.user.userId;
-    const faceInfo = await db.getUserFaceInfo(userId);
-
-    if (!faceInfo || !faceInfo.hasFaceRegistered) {
-      return reply.code(400).send({ error: 'No face registered' });
-    }
-
-    try {
-      // Delete from Face API
-      if (faceInfo.faceApiPersonId) {
-        await faceApi.deletePerson(faceInfo.faceApiPersonId);
-        logger.info({ personId: faceInfo.faceApiPersonId }, 'Deleted person from Face API');
-      }
-
-      // Delete local file (path traversal safe)
-      if (faceInfo.faceImagePath) {
-        const filePath = safePath(faceInfo.faceImagePath, 'uploads');
-        if (filePath && fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      }
-
-      // Clear database
-      await db.clearUserFace(userId);
-
-      logger.info({ user: request.user.email }, 'Face deleted');
-
-      return {
-        status: 'ok',
-        message: 'Face registration deleted',
-        hasFaceRegistered: false
-      };
-    } catch (error) {
-      logger.error({ err: error }, 'Face delete error');
-      return reply.code(500).send({ error: 'Failed to delete face registration' });
-    }
   });
 
   // ==================== CAMERA ROUTES ====================

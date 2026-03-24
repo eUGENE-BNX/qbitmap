@@ -228,14 +228,6 @@ const AuthSystem = {
             </svg>
             Google ile Giriş
           </button>
-          ${new URLSearchParams(window.location.search).has('faceid') ? `<button class="login-button biometric-btn" onclick="BiometricAuth.open()" title="Yüz Tanıma ile Giriş" aria-label="Yüz tanıma ile giriş yap">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="18" height="18" rx="3"/>
-              <circle cx="12" cy="10" r="3"/>
-              <path d="M7 21v-2a5 5 0 0 1 10 0v2"/>
-            </svg>
-            <span>FaceID</span>
-          </button>` : ''}
         </div>
       `;
     }

@@ -147,7 +147,8 @@ const FaceRecognitionMixin = {
     const displayFaces = faces.slice(-8);
     grid.innerHTML = displayFaces.map(face => `
       <div class="face-thumbnail ${face.trigger_alarm ? 'alarm-active' : ''}" data-face-id="${face.id}">
-        <img src="${escapeHtml(face.face_image_url || '')}" alt="${escapeHtml(face.name)}" onerror="this.onerror=null;this.outerHTML='<div class=\\'face-placeholder\\'>👤</div>';">
+        <img src="${escapeHtml(face.face_image_url || '')}" alt="${escapeHtml(face.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+        <div class="face-placeholder" style="display:none;">👤</div>
         <span class="face-name">${escapeHtml(face.name)}</span>
         <label class="face-alarm-toggle" title="Alarm Ver">
           <input type="checkbox" ${face.trigger_alarm ? 'checked' : ''} onchange="MyCamerasSystem.toggleFaceAlarm(${face.id}, this.checked)">
@@ -177,7 +178,7 @@ const FaceRecognitionMixin = {
       const dateStr = date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
       const name = log.person_name || log.name || 'Bilinmeyen';
       const thumbHtml = log.face_image_url
-        ? `<img src="${log.face_image_url}" alt="${escapeHtml(name)}" class="detection-thumb" onerror="this.onerror=null;this.outerHTML='<div class=\\'detection-thumb-placeholder\\'>👤</div>';">`
+        ? `<img src="${escapeHtml(log.face_image_url)}" alt="${escapeHtml(name)}" class="detection-thumb" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="detection-thumb-placeholder" style="display:none;">👤</div>`
         : `<div class="detection-thumb-placeholder">👤</div>`;
       return `
         <div class="detection-item">

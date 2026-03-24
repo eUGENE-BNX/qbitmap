@@ -884,7 +884,6 @@
     aspect-ratio: 16/9;
   }
 
-  .camera-popup-buttons .terminal-btn,
   .camera-popup-buttons .draw-zone-btn,
   .camera-popup-buttons .toggle-zones-btn,
   .camera-popup-buttons .ai-search-btn,
@@ -945,154 +944,6 @@
     opacity: 0.7;
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0);
   }
-}
-
-/* Terminal Button */
-.cam-btn.terminal-btn svg {
-  stroke: #666;
-}
-
-.cam-btn.terminal-btn:hover svg {
-  stroke: #333;
-}
-
-/* AI Vision Panel - Matrix/Terminal Style */
-.ai-panel {
-  background: rgba(10, 10, 10, 0.90);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(0, 255, 0, 0.2);
-  border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0, 255, 0, 0.1), 0 0 20px rgba(0, 0, 0, 0.5);
-  width: 400px;
-  opacity: 0;
-  transform: translateX(-10px) scale(0.95);
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.ai-panel.active {
-  opacity: 1;
-  transform: translateX(0) scale(1);
-}
-
-/* AI Panel Header */
-.ai-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: rgba(10, 26, 10, 0.5);
-  border-bottom: 1px solid rgba(0, 255, 0, 0.15);
-  border-radius: 8px 8px 0 0;
-}
-
-.ai-panel-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  font-family: 'Consolas', 'Monaco', 'Lucida Console', monospace;
-  letter-spacing: 1px;
-}
-
-.ai-panel-header .ai-panel-close {
-  background: transparent;
-  border: none;
-  color: #666;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0 4px;
-  transition: color 0.2s;
-}
-
-.ai-panel-header .ai-panel-close:hover {
-  color: #aaa;
-}
-
-/* Terminal Container - 16:9 ratio */
-.ai-terminal {
-  background: rgba(5, 5, 5, 0.5);
-  border-radius: 0 0 8px 8px;
-  padding: 12px;
-  font-family: 'Consolas', 'Monaco', 'Lucida Console', monospace;
-  height: 225px;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Terminal Output - fixed height with scroll */
-.ai-terminal-output {
-  overflow-y: auto;
-  margin-bottom: 8px;
-  font-size: 11px;
-  line-height: 1.5;
-  padding-right: 6px;
-  height: 170px;
-}
-
-.terminal-line {
-  color: #0f0;
-  text-shadow: 0 0 5px #0f0;
-  margin-bottom: 4px;
-  word-wrap: break-word;
-}
-
-.terminal-line.system {
-  color: #0ff;
-  text-shadow: 0 0 5px #0ff;
-}
-
-.terminal-line.error {
-  color: #f55;
-  text-shadow: 0 0 5px #f00;
-}
-
-/* Terminal Input */
-.ai-terminal-input-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border-top: 1px solid #0f02;
-  padding-top: 8px;
-}
-
-.ai-terminal-prompt {
-  color: #0f0;
-  font-weight: bold;
-  text-shadow: 0 0 5px #0f0;
-}
-
-.ai-terminal-input {
-  background: transparent;
-  border: none;
-  color: #0f0;
-  font-family: 'Consolas', 'Monaco', 'Lucida Console', monospace;
-  font-size: 12px;
-  outline: none;
-  caret-color: #0f0;
-  text-shadow: 0 0 3px #0f0;
-}
-
-.ai-terminal-input::placeholder {
-  color: #0f04;
-  text-shadow: none;
-}
-
-/* Terminal Scrollbar - Matrix style */
-.ai-terminal-output::-webkit-scrollbar {
-  width: 4px;
-}
-
-.ai-terminal-output::-webkit-scrollbar-track {
-  background: #111;
-}
-
-.ai-terminal-output::-webkit-scrollbar-thumb {
-  background: #0f03;
-  border-radius: 2px;
-}
-
-.ai-terminal-output::-webkit-scrollbar-thumb:hover {
-  background: #0f05;
 }
 
 /* ========================================
@@ -1241,27 +1092,6 @@
   }
 
   /* AI Panel mobile - daha geniş */
-  .ai-panel {
-    width: calc(100vw - 20px);
-    max-width: 360px;
-  }
-
-  .ai-panel-title {
-    font-size: 11px;
-  }
-
-  .ai-terminal {
-    height: 200px;
-    padding: 10px;
-  }
-
-  .ai-terminal-output {
-    font-size: 10px;
-  }
-
-  .ai-terminal-input {
-    font-size: 11px;
-  }
 }
 
 /* ========================================

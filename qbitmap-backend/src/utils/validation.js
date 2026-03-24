@@ -5,12 +5,6 @@
 
 const { z } = require('zod');
 
-// ==================== AUTH SCHEMAS ====================
-
-const biometricVerifySchema = z.object({
-  image: z.string().min(100).max(10_000_000) // Base64 image
-});
-
 // ==================== MONITORING SCHEMAS ====================
 
 const monitoringToggleSchema = z.object({
@@ -179,7 +173,6 @@ function safePath(relativePath, allowedSubdir = '') {
 module.exports = {
   // Schemas
   userOverridesSchema,
-  biometricVerifySchema,
   monitoringToggleSchema,
   createAlarmSchema,
   addOnvifCameraSchema,

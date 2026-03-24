@@ -122,12 +122,6 @@ const PopupCoreMixin = {
                   <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                 </svg>
               </button>${recordButton}
-              ${isCity ? '' : `<button class="cam-btn terminal-btn" title="Terminal">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="4 17 10 11 4 5"></polyline>
-                  <line x1="12" y1="19" x2="20" y2="19"></line>
-                </svg>
-              </button>`}
               <button class="cam-btn close-btn" title="Kapat">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -161,12 +155,6 @@ const PopupCoreMixin = {
           <div class="camera-popup-buttons">
             <button class="cam-btn ai-btn ai-active-btn" title="AI Durdur" style="display:none;">
               <span style="font-weight:900;font-size:11px;color:#000;">AI</span>
-            </button>
-            <button class="cam-btn terminal-btn" title="Terminal">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="4 17 10 11 4 5"></polyline>
-                <line x1="12" y1="19" x2="20" y2="19"></line>
-              </svg>
             </button>
             <button class="cam-btn mjpeg-btn" title="MJPEG Stream">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -317,7 +305,6 @@ const PopupCoreMixin = {
     const recordBtn = popupEl.querySelector('.record-btn');
     const mjpegBtn = popupEl.querySelector('.mjpeg-btn');
     const aiBtn = popupEl.querySelector('.ai-btn');
-    const terminalBtn = popupEl.querySelector('.terminal-btn');
     const audioBtn = popupEl.querySelector('.audio-btn');
     const drawZoneBtn = popupEl.querySelector('.draw-zone-btn');
     const toggleZonesBtn = popupEl.querySelector('.toggle-zones-btn');
@@ -330,7 +317,6 @@ const PopupCoreMixin = {
     if (recordBtn) recordBtn.onclick = () => this.toggleRecording(deviceId);
     if (mjpegBtn) mjpegBtn.onclick = () => this.toggleMjpeg(deviceId);
     if (aiBtn) aiBtn.onclick = () => this.stopAIFromTitle(deviceId);
-    if (terminalBtn) terminalBtn.onclick = (e) => this.toggleTerminalPanel(deviceId, e);
     if (drawZoneBtn) drawZoneBtn.onclick = () => this.toggleDrawMode(deviceId);
     if (toggleZonesBtn) toggleZonesBtn.onclick = () => this.toggleZonesVisibility(deviceId);
     if (audioBtn) {
@@ -472,7 +458,6 @@ const PopupCoreMixin = {
       const recordBtn = popupEl.querySelector('.record-btn');
       const mjpegBtn = popupEl.querySelector('.mjpeg-btn');
       const aiBtn = popupEl.querySelector('.ai-btn');
-      const terminalBtn = popupEl.querySelector('.terminal-btn');
       const audioBtn = popupEl.querySelector('.audio-btn');
       const drawZoneBtn = popupEl.querySelector('.draw-zone-btn');
       const toggleZonesBtn = popupEl.querySelector('.toggle-zones-btn');
@@ -488,7 +473,6 @@ const PopupCoreMixin = {
       if (recordBtn) recordBtn.onclick = null;
       if (mjpegBtn) mjpegBtn.onclick = null;
       if (aiBtn) aiBtn.onclick = null;
-      if (terminalBtn) terminalBtn.onclick = null;
       if (audioBtn) audioBtn.onclick = null;
       if (drawZoneBtn) drawZoneBtn.onclick = null;
       if (toggleZonesBtn) toggleZonesBtn.onclick = null;

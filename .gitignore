@@ -3,8 +3,8 @@ node_modules/
 
 # Environment variables
 .env
-.env.local
-.env.production
+.env.*
+.env*.local
 
 # Database files
 *.db
@@ -37,17 +37,10 @@ qbit-citycam/
 # rtcgateway recordings
 rtcgateway/recordings/
 
-# qbitmap large binary assets (videos, 3D models, ML models, wasm)
+# qbitmap large binary assets (videos, 3D models)
 qbitmap/videos/
 qbitmap/3d/
 qbitmap/model/
-qbitmap/models/
-qbitmap/js/faceplugin.bundle.js
-qbitmap/js/face-api.min.js
-qbitmap/js/faceplugin/
-qbitmap/js/*.wasm
-qbitmap/js/*.mjs
-qbitmap/*.wasm
 
 # onvif cameras config (contains real IPs/credentials)
 onvif-events/cameras.json

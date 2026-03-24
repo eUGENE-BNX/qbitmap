@@ -601,7 +601,7 @@ const SettingsMixin = {
     return `
       <div class="detection-rules-container">
         <label style="font-weight:600;margin-bottom:8px;display:block;">Algilama Kurallari</label>
-        <div style="font-size:11px;color:#999;margin-bottom:8px;">Her satira tespit edilecek bir durum yazin. Alarm kutusu isaretliyse alarm verilir, degilse sadece terminal'de raporlanir.</div>
+        <div style="font-size:11px;color:#999;margin-bottom:8px;">Her satira tespit edilecek bir durum yazin. Alarm kutusu isaretliyse alarm verilir, degilse sadece loglanir.</div>
         <div class="detection-rules-list">${rowsHtml}</div>
         <button type="button" class="detection-rule-add" style="margin-top:6px;padding:4px 12px;font-size:12px;border:1px dashed #ccc;background:none;border-radius:4px;cursor:pointer;color:#666;">+ Kural Ekle</button>
         <details style="margin-top:10px;">

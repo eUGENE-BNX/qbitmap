@@ -44,36 +44,6 @@ DatabaseService.prototype.getUserByDisplayName = async function(displayName) {
   return rows[0];
 };
 
-DatabaseService.prototype.updateUserFace = async function(userId, faceImagePath, faceApiPersonId) {
-  await this.pool.execute(
-    'UPDATE users SET face_image_path = ?, face_api_person_id = ? WHERE id = ?',
-    [faceImagePath, faceApiPersonId, userId]
-  );
-  return this.getUserById(userId);
-};
-
-DatabaseService.prototype.getUserFaceInfo = async function(userId) {
-  const [rows] = await this.pool.execute(
-    'SELECT id, face_image_path, face_api_person_id FROM users WHERE id = ?',
-    [userId]
-  );
-  const user = rows[0];
-
-  return user ? {
-    userId: user.id,
-    faceImagePath: user.face_image_path,
-    faceApiPersonId: user.face_api_person_id,
-    hasFaceRegistered: !!user.face_api_person_id
-  } : null;
-};
-
-DatabaseService.prototype.clearUserFace = async function(userId) {
-  await this.pool.execute(
-    'UPDATE users SET face_image_path = NULL, face_api_person_id = NULL WHERE id = ?',
-    [userId]
-  );
-};
-
 DatabaseService.prototype.updateUserLocation = async function(userId, lat, lng, accuracy) {
   await this.pool.execute(
     'UPDATE users SET last_lat = ?, last_lng = ?, last_location_accuracy = ?, last_location_updated = NOW() WHERE id = ?',
@@ -116,11 +86,6 @@ DatabaseService.prototype.getUsersWithVisibleLocation = async function() {
     WHERE u.show_location_on_map = 1 AND u.last_lat IS NOT NULL AND u.last_lng IS NOT NULL
   `);
   return rows;
-};
-
-DatabaseService.prototype.getUserByFaceApiPersonId = async function(faceApiPersonId) {
-  const [rows] = await this.pool.execute('SELECT * FROM users WHERE face_api_person_id = ?', [faceApiPersonId]);
-  return rows[0];
 };
 
 DatabaseService.prototype.getUserCameras = async function(userId) {
