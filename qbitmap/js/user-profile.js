@@ -34,7 +34,7 @@ const UserProfileSystem = {
       <div class="profile-panel">
         <div class="profile-panel-header">
           <h2>Profilim</h2>
-          <button class="profile-panel-close" onclick="UserProfileSystem.close()">&times;</button>
+          <button class="profile-panel-close">&times;</button>
         </div>
         <div class="profile-panel-content">
           <div class="profile-face-loading">
@@ -44,6 +44,7 @@ const UserProfileSystem = {
         </div>
       </div>
     `;
+    panel.querySelector('.profile-panel-close').addEventListener('click', () => UserProfileSystem.close());
     document.body.appendChild(panel);
   },
 
@@ -150,6 +151,11 @@ const UserProfileSystem = {
 
     this.setupEventListeners();
     this.setupLocationListeners(user.location);
+
+    // Bind media card click handlers
+    content.querySelectorAll('.media-card[data-message-id]').forEach(card => {
+      card.addEventListener('click', () => UserProfileSystem.openMessage(card.dataset.messageId));
+    });
   },
 
   renderUserInfo(user) {
@@ -225,7 +231,7 @@ const UserProfileSystem = {
       const thumbUrl = `${QBitmapConfig.api.base}/api/video-messages/${encodeURIComponent(msg.message_id)}/thumbnail`;
       const timeAgo = this.formatTimeAgo(msg.created_at);
       return `
-        <div class="media-card" onclick="UserProfileSystem.openMessage('${escapeHtml(msg.message_id)}')">
+        <div class="media-card" data-message-id="${escapeHtml(msg.message_id)}">
           <div class="media-card-thumb">
             <img src="${thumbUrl}" alt="" loading="lazy">
             <span class="media-type-badge">${badge}</span>
@@ -323,7 +329,7 @@ const UserProfileSystem = {
                 </label>
                 <span class="toggle-label">Haritada göster</span>
               </div>
-              <button class="profile-location-find-btn" onclick="UserProfileSystem.findLocation()">
+              <button class="profile-location-find-btn" data-action="find-location">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="3"/>
                   <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
@@ -336,7 +342,7 @@ const UserProfileSystem = {
         ` : `
           <div class="profile-location-empty">
             <p>Konum bilgisi yok</p>
-            <button class="profile-location-find-btn" onclick="UserProfileSystem.findLocation()">
+            <button class="profile-location-find-btn" data-action="find-location">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
@@ -373,6 +379,11 @@ const UserProfileSystem = {
         }
       });
     }
+
+    // Bind find location buttons
+    document.querySelectorAll('[data-action="find-location"]').forEach(btn => {
+      btn.addEventListener('click', () => UserProfileSystem.findLocation());
+    });
   },
 
   async findLocation() {
@@ -457,7 +468,7 @@ const UserProfileSystem = {
         </svg>
         <div class="profile-face-registered-info">
           <p>Yüzünüz kayıtlı</p>
-          <button class="profile-face-delete-btn" onclick="UserProfileSystem.deleteFace()">
+          <button class="profile-face-delete-btn">
             Kaydı Sil
           </button>
         </div>
@@ -484,6 +495,10 @@ const UserProfileSystem = {
       uploadArea.classList.remove('dragover');
       if (e.dataTransfer.files.length > 0) this.uploadFace(e.dataTransfer.files[0]);
     });
+
+    // Bind face delete button
+    const deleteBtn = document.querySelector('.profile-face-delete-btn');
+    if (deleteBtn) deleteBtn.addEventListener('click', () => UserProfileSystem.deleteFace());
   },
 
   async uploadFace(file) {

@@ -149,7 +149,7 @@ const AuthSystem = {
       container.innerHTML = `
         <div class="auth-buttons">
           <div class="user-menu">
-          <button class="user-button" onclick="AuthSystem.toggleDropdown()" aria-label="Kullanıcı menüsü" aria-haspopup="true" aria-expanded="false">
+          <button class="user-button" aria-label="Kullanıcı menüsü" aria-haspopup="true" aria-expanded="false">
             <img src="${escapeHtml(this.user.avatarUrl)}" alt="" class="user-avatar">
             <span class="user-name">${escapeHtml(this.user.displayName)}</span>
             <span class="video-msg-badge" id="video-msg-badge" style="display:none;">0</span>
@@ -166,14 +166,14 @@ const AuthSystem = {
               </div>
             </div>
             <div class="dropdown-divider"></div>
-            <button class="dropdown-item" onclick="AuthSystem._openProfile()" role="menuitem">
+            <button class="dropdown-item" id="profile-menu-btn" role="menuitem">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
               Profilim
             </button>
-            <button class="dropdown-item" onclick="AuthSystem._openMyCameras()" role="menuitem">
+            <button class="dropdown-item" id="mycameras-menu-btn" role="menuitem">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                 <circle cx="12" cy="13" r="4"></circle>
@@ -193,7 +193,7 @@ const AuthSystem = {
               </svg>
               Foto Mesaj
             </button>
-            <button class="dropdown-item" id="broadcast-dropdown-item" onclick="LiveBroadcast.toggleBroadcast(); AuthSystem.toggleDropdown();" role="menuitem">
+            <button class="dropdown-item" id="broadcast-dropdown-item" role="menuitem">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M8.59 16.59a5.5 5.5 0 0 1 0-9.18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -204,7 +204,7 @@ const AuthSystem = {
               Canlı Yayın
             </button>
             <div class="dropdown-divider"></div>
-            <button class="dropdown-item" onclick="AuthSystem.logout()" role="menuitem">
+            <button class="dropdown-item" id="logout-menu-btn" role="menuitem">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                 <polyline points="16 17 21 12 16 7"></polyline>
@@ -216,10 +216,16 @@ const AuthSystem = {
         </div>
         </div>
       `;
+      // Bind logged-in menu handlers
+      container.querySelector('.user-button')?.addEventListener('click', () => AuthSystem.toggleDropdown());
+      document.getElementById('profile-menu-btn')?.addEventListener('click', () => AuthSystem._openProfile());
+      document.getElementById('mycameras-menu-btn')?.addEventListener('click', () => AuthSystem._openMyCameras());
+      document.getElementById('broadcast-dropdown-item')?.addEventListener('click', () => { LiveBroadcast.toggleBroadcast(); AuthSystem.toggleDropdown(); });
+      document.getElementById('logout-menu-btn')?.addEventListener('click', () => AuthSystem.logout());
     } else {
       container.innerHTML = `
         <div class="auth-buttons">
-          <button class="login-button" onclick="AuthSystem.login()" aria-label="Google ile giriş yap">
+          <button class="login-button" aria-label="Google ile giriş yap">
             <svg width="18" height="18" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -230,6 +236,8 @@ const AuthSystem = {
           </button>
         </div>
       `;
+      // Bind login button handler
+      container.querySelector('.login-button')?.addEventListener('click', () => AuthSystem.login());
     }
 
     // Create right-side menu (toggle + dropdown panel with all buttons)
