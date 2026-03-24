@@ -267,7 +267,7 @@ const AIMonitoringMixin = {
    * Returns: { model, monitoringPrompt, searchPrompt, maxTokens, temperature }
    */
   async getEffectiveAiSettings(deviceId) {
-    const global = CameraSystem.aiSettings || {};
+    const global = this.aiSettings || {};
     const effective = {
       model: global.model || 'qwen3-vl:32b-instruct',
       monitoringPrompt: global.monitoringPrompt || AI_VISION_PROMPT,
@@ -381,7 +381,7 @@ const AIMonitoringMixin = {
       let threshold = 70;
       let requiredFrames = 3;
       let captureInterval = 3000;
-      const globalAi = CameraSystem.aiSettings || {};
+      const globalAi = this.aiSettings || {};
       let model = globalAi.model || 'qwen3-vl:32b-instruct';
       let prompt = globalAi.monitoringPrompt || AI_VISION_PROMPT;
       let maxTokens = globalAi.maxTokens || 1024;
