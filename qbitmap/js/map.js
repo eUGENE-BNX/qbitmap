@@ -676,43 +676,5 @@ map.on("load", async () => {
     map.on('zoom', debouncedVideoUpdate);
     map.on('move', debouncedVideoUpdate);
 
-    // Traffic Camera Tags
-    const trafficCams = [
-        { lng: 29.12730344, lat: 40.99258284, label: 'Live Cam' }
-    ];
-
-    trafficCams.forEach(cam => {
-        const el = document.createElement('div');
-        el.className = 'traffic-cam-tag';
-        el.textContent = cam.label;
-
-        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([cam.lng, cam.lat])
-            .addTo(map);
-
-        // Store marker reference for visibility updates
-        cam.marker = marker;
-        cam.element = el;
-    });
-
-    // Update traffic cam visibility based on zoom (visible between 17-18.5)
-    const updateTrafficCamVisibility = () => {
-        const zoom = map.getZoom();
-        trafficCams.forEach(cam => {
-            if (zoom >= 17 && zoom < 18.5) {
-                cam.element.classList.add('visible');
-            } else {
-                cam.element.classList.remove('visible');
-            }
-        });
-    };
-
-    let _tcDebounce;
-    const debouncedTrafficUpdate = () => {
-        clearTimeout(_tcDebounce);
-        _tcDebounce = setTimeout(updateTrafficCamVisibility, 100);
-    };
-    map.on('zoom', debouncedTrafficUpdate);
-    updateTrafficCamVisibility(); // Initial check
 });
 

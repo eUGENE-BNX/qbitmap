@@ -388,38 +388,3 @@ html, body {
     content: '📍 ';
 }
 
-/* ==================== TRAFFIC CAM TAG ==================== */
-.traffic-cam-tag {
-    display: none;
-    background: rgba(220, 38, 38, 0.9);
-    color: #fff;
-    padding: 2px 4px;
-    border-radius: 2px;
-    font-size: 7px;
-    font-weight: 600;
-    letter-spacing: 0.25px;
-    white-space: nowrap;
-    box-shadow: 0 1px 4px rgba(220, 38, 38, 0.4);
-    animation: traffic-cam-blink 1.2s ease-in-out infinite;
-    cursor: pointer;
-    transition: transform 0.2s ease;
-}
-
-.traffic-cam-tag.visible {
-    display: block;
-}
-
-.traffic-cam-tag:hover {
-    transform: scale(1.1);
-}
-
-@keyframes traffic-cam-blink {
-    0%, 100% {
-        opacity: 1;
-        box-shadow: 0 1px 4px rgba(220, 38, 38, 0.4);
-    }
-    50% {
-        opacity: 0.6;
-        box-shadow: 0 1px 8px rgba(220, 38, 38, 0.8);
-    }
-}
