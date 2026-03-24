@@ -519,6 +519,26 @@ CREATE TABLE IF NOT EXISTS like_counts (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================
+-- 30. ai_jobs (persistent queue for AI analysis)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS ai_jobs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  message_id VARCHAR(64) NOT NULL,
+  job_type ENUM('photo', 'video') NOT NULL,
+  status ENUM('pending', 'processing', 'completed', 'failed') NOT NULL DEFAULT 'pending',
+  retries TINYINT UNSIGNED DEFAULT 0,
+  max_retries TINYINT UNSIGNED DEFAULT 2,
+  error_message TEXT DEFAULT NULL,
+  next_retry_at DATETIME DEFAULT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  completed_at DATETIME DEFAULT NULL,
+  INDEX idx_aijobs_status (status, next_retry_at),
+  INDEX idx_aijobs_message (message_id),
+  UNIQUE KEY uk_aijobs_message (message_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================
 -- Performance indexes (added during optimization)
 -- =================================================================
 CREATE INDEX IF NOT EXISTS idx_video_messages_place ON video_messages(place_id);

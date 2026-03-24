@@ -1,67 +1,70 @@
 /**
- * Video AI Analysis Queue
- * Processes video messages sequentially through vLLM for content description
+ * Video AI Analysis Queue (DB-backed)
+ * Persistent queue — survives backend restarts
  */
 
 const db = require('./database');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'video-ai-queue' });
 const { getVllmUrl, getVllmApiKey, getModelName, getBackendUrl } = require('../utils/ai-config');
+const circuitBreaker = require('./ai-circuit-breaker');
 
-const MAX_RETRIES = 2;
 const TIMEOUT = 180000; // 180s for video analysis
-const MAX_QUEUE_SIZE = 100;
-const MAX_CONCURRENCY = 2; // Process up to 2 videos in parallel (video is heavier than photo)
-
-const queue = [];
-let activeCount = 0;
+const MAX_CONCURRENCY = 2;
+const POLL_INTERVAL = 3000; // Check DB every 3s for new jobs
 
 const PROMPT = 'Bu videoyu analiz et ve Turkce olarak 300-350 karakter arasinda bir icerik aciklamasi yaz. Videodaki onemli gorsel ogeleri, olaylari, ortami ve dikkate deger detaylari acikla. Sadece aciklama metnini yaz, baska bir sey ekleme ve Videoda görünmeyen bir şeyi varsayma.';
 
-function enqueue(messageId, fileName) {
-  if (queue.length >= MAX_QUEUE_SIZE) {
-    logger.warn({ messageId, queueLength: queue.length }, 'Queue full, dropping item');
-    return false;
-  }
-  queue.push({ messageId, fileName, retries: 0 });
-  logger.info({ messageId, queueLength: queue.length }, 'Video enqueued for AI analysis');
-  drainQueue();
+let activeCount = 0;
+let pollTimer = null;
+let onComplete = null; // callback for WebSocket notification
+
+function setOnComplete(cb) { onComplete = cb; }
+
+async function enqueue(messageId, fileName) {
+  await db.createAiJob(messageId, 'video');
+  logger.info({ messageId }, 'Video enqueued for AI analysis (DB)');
+  pollOnce();
 }
 
-function drainQueue() {
-  while (queue.length > 0 && activeCount < MAX_CONCURRENCY) {
-    const item = queue.shift();
-    activeCount++;
-    processItem(item);
-  }
-}
+async function pollOnce() {
+  if (activeCount >= MAX_CONCURRENCY) return;
+  if (!circuitBreaker.canRequest()) return;
 
-async function processItem(item) {
   try {
-    await analyzeVideo(item);
-  } catch (err) {
-    logger.error({ messageId: item.messageId, err: err.message, retries: item.retries }, 'Video AI analysis failed');
-    if (item.retries < MAX_RETRIES && queue.length < MAX_QUEUE_SIZE) {
-      item.retries++;
-      // Exponential backoff: 10s, 20s (longer for video since vLLM may be overloaded)
-      const delay = 10000 * item.retries;
-      logger.info({ messageId: item.messageId, retry: item.retries, delayMs: delay }, 'Re-queued for retry with backoff');
-      setTimeout(() => { queue.push(item); drainQueue(); }, delay);
-      activeCount--;
-      return;
+    const slots = MAX_CONCURRENCY - activeCount;
+    const jobs = await db.claimAiJobs('video', slots);
+
+    for (const job of jobs) {
+      activeCount++;
+      processJob(job);
     }
+  } catch (err) {
+    logger.error({ err: err.message }, 'Poll error');
+  }
+}
+
+async function processJob(job) {
+  try {
+    await analyzeVideo(job.message_id);
+    await db.completeAiJob(job.message_id);
+    circuitBreaker.onSuccess();
+    if (onComplete) onComplete(job.message_id, 'video');
+  } catch (err) {
+    logger.error({ messageId: job.message_id, err: err.message, retries: job.retries }, 'Video AI analysis failed');
+    circuitBreaker.onFailure(err.message);
+    await db.failAiJob(job.message_id, err.message);
   }
   activeCount--;
-  drainQueue();
+  pollOnce();
 }
 
-async function analyzeVideo({ messageId, fileName }) {
+async function analyzeVideo(messageId) {
   const vllmUrl = await getVllmUrl();
   const model = await getModelName();
   const apiKey = await getVllmApiKey();
   const backendUrl = await getBackendUrl();
 
-  // Build public HTTP URL for the video file - vLLM will fetch it directly
   const videoUrl = `${backendUrl.replace(/\/$/, '')}/api/video-messages/${messageId}/video`;
 
   logger.info({ messageId, model, videoUrl }, 'Starting video AI analysis (HTTP URL)');
@@ -104,8 +107,24 @@ async function analyzeVideo({ messageId, fileName }) {
   logger.info({ messageId, len: text.length }, 'AI description saved');
 }
 
-function getStats() {
-  return { queueLength: queue.length, activeCount, processing: activeCount > 0 };
+function start() {
+  db.recoverStuckAiJobs(5).then(count => {
+    if (count > 0) logger.info({ recovered: count }, 'Recovered stuck AI jobs');
+  }).catch(() => {});
+
+  pollTimer = setInterval(pollOnce, POLL_INTERVAL);
+  logger.info({ pollInterval: POLL_INTERVAL, maxConcurrency: MAX_CONCURRENCY }, 'Video AI queue started (DB-backed)');
+  pollOnce();
 }
 
-module.exports = { enqueue, getStats };
+function stop() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+async function getStats() {
+  const counts = await db.getPendingAiJobCount();
+  const video = counts.find(c => c.job_type === 'video');
+  return { pending: video?.cnt || 0, activeCount };
+}
+
+module.exports = { enqueue, start, stop, getStats, setOnComplete };

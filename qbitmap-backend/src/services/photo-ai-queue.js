@@ -1,67 +1,72 @@
 /**
- * Photo AI Analysis Queue
- * Processes photo messages sequentially through vLLM for content description
+ * Photo AI Analysis Queue (DB-backed)
+ * Persistent queue — survives backend restarts
  */
 
 const db = require('./database');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'photo-ai-queue' });
 const { getVllmUrl, getVllmApiKey, getModelName, getBackendUrl } = require('../utils/ai-config');
+const circuitBreaker = require('./ai-circuit-breaker');
 
-const MAX_RETRIES = 2;
 const TIMEOUT = 60000; // 60s for photo analysis
-const MAX_QUEUE_SIZE = 100;
-const MAX_CONCURRENCY = 3; // Process up to 3 photos in parallel
-
-const queue = [];
-let activeCount = 0;
+const MAX_CONCURRENCY = 3;
+const POLL_INTERVAL = 3000; // Check DB every 3s for new jobs
 
 const PROMPT = 'Bu fotografi analiz et ve Turkce olarak 300-350 karakter arasinda bir icerik aciklamasi yaz. Fotograftaki onemli gorsel ogeleri, ortami ve dikkate deger detaylari acikla. Sadece aciklama metnini yaz, baska bir sey ekleme ve Fotografta gorunmeyen bir seyi varsayma.';
 
-function enqueue(messageId, fileName) {
-  if (queue.length >= MAX_QUEUE_SIZE) {
-    logger.warn({ messageId, queueLength: queue.length }, 'Queue full, dropping item');
-    return false;
-  }
-  queue.push({ messageId, fileName, retries: 0 });
-  logger.info({ messageId, queueLength: queue.length }, 'Photo enqueued for AI analysis');
-  drainQueue();
+let activeCount = 0;
+let pollTimer = null;
+let onComplete = null; // callback for WebSocket notification
+
+function setOnComplete(cb) { onComplete = cb; }
+
+async function enqueue(messageId, fileName) {
+  await db.createAiJob(messageId, 'photo');
+  logger.info({ messageId }, 'Photo enqueued for AI analysis (DB)');
+  // Trigger immediate poll
+  pollOnce();
 }
 
-function drainQueue() {
-  while (queue.length > 0 && activeCount < MAX_CONCURRENCY) {
-    const item = queue.shift();
-    activeCount++;
-    processItem(item);
-  }
-}
+async function pollOnce() {
+  if (activeCount >= MAX_CONCURRENCY) return;
+  if (!circuitBreaker.canRequest()) return;
 
-async function processItem(item) {
   try {
-    await analyzePhoto(item);
-  } catch (err) {
-    logger.error({ messageId: item.messageId, err: err.message, retries: item.retries }, 'Photo AI analysis failed');
-    if (item.retries < MAX_RETRIES && queue.length < MAX_QUEUE_SIZE) {
-      item.retries++;
-      // Exponential backoff: 5s, 10s
-      const delay = 5000 * item.retries;
-      logger.info({ messageId: item.messageId, retry: item.retries, delayMs: delay }, 'Re-queued for retry with backoff');
-      setTimeout(() => { queue.push(item); drainQueue(); }, delay);
-      activeCount--;
-      return;
+    const slots = MAX_CONCURRENCY - activeCount;
+    const jobs = await db.claimAiJobs('photo', slots);
+
+    for (const job of jobs) {
+      activeCount++;
+      processJob(job);
     }
+  } catch (err) {
+    logger.error({ err: err.message }, 'Poll error');
+  }
+}
+
+async function processJob(job) {
+  try {
+    await analyzePhoto(job.message_id);
+    await db.completeAiJob(job.message_id);
+    circuitBreaker.onSuccess();
+    if (onComplete) onComplete(job.message_id, 'photo');
+  } catch (err) {
+    logger.error({ messageId: job.message_id, err: err.message, retries: job.retries }, 'Photo AI analysis failed');
+    circuitBreaker.onFailure(err.message);
+    await db.failAiJob(job.message_id, err.message);
   }
   activeCount--;
-  drainQueue();
+  // Check for more work
+  pollOnce();
 }
 
-async function analyzePhoto({ messageId, fileName }) {
+async function analyzePhoto(messageId) {
   const vllmUrl = await getVllmUrl();
   const model = await getModelName();
   const apiKey = await getVllmApiKey();
   const backendUrl = await getBackendUrl();
 
-  // Use the same /video endpoint which serves any media file by mime_type
   const imageUrl = `${backendUrl.replace(/\/$/, '')}/api/video-messages/${messageId}/video`;
 
   logger.info({ messageId, model, imageUrl }, 'Starting photo AI analysis');
@@ -102,8 +107,27 @@ async function analyzePhoto({ messageId, fileName }) {
   logger.info({ messageId, len: text.length }, 'Photo AI description saved');
 }
 
-function getStats() {
-  return { queueLength: queue.length, activeCount, processing: activeCount > 0 };
+function start() {
+  // Recover stuck jobs from previous crash
+  db.recoverStuckAiJobs(5).then(count => {
+    if (count > 0) logger.info({ recovered: count }, 'Recovered stuck AI jobs');
+  }).catch(() => {});
+
+  // Start polling
+  pollTimer = setInterval(pollOnce, POLL_INTERVAL);
+  logger.info({ pollInterval: POLL_INTERVAL, maxConcurrency: MAX_CONCURRENCY }, 'Photo AI queue started (DB-backed)');
+  // Initial poll
+  pollOnce();
 }
 
-module.exports = { enqueue, getStats };
+function stop() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+async function getStats() {
+  const counts = await db.getPendingAiJobCount();
+  const photo = counts.find(c => c.job_type === 'photo');
+  return { pending: photo?.cnt || 0, activeCount };
+}
+
+module.exports = { enqueue, start, stop, getStats, setOnComplete };

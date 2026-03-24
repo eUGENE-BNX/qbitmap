@@ -120,6 +120,10 @@ const WebSocketMixin = {
         if (window.VideoMessage) VideoMessage.handleTagsUpdated(payload);
         break;
 
+      case 'ai_description_ready':
+        if (window.VideoMessage) VideoMessage.handleAiDescriptionReady(payload);
+        break;
+
       case 'comment_new':
         if (window.CommentWidget) CommentWidget.handleCommentNew(payload);
         break;

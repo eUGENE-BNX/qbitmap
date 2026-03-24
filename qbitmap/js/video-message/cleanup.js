@@ -45,6 +45,53 @@ const CleanupMixin = {
     if (msg) msg.tags = payload.tags || [];
   },
 
+  handleAiDescriptionReady(payload) {
+    const msg = this.videoMessages.get(payload.messageId);
+
+    // Fetch updated ai_description from API
+    fetch(`${this.apiBase}/${encodeURIComponent(payload.messageId)}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const aiText = data?.message?.ai_description || data?.ai_description;
+        if (!aiText) return;
+
+        // Update in-memory cache
+        if (msg) {
+          msg.ai_description = aiText;
+          this.updateMapLayer();
+        }
+
+        // Update open popup if showing this message
+        const popupRoot = document.querySelector(`[data-message-id="${payload.messageId}"]`);
+        if (!popupRoot) return;
+
+        const existing = popupRoot.querySelector('.video-msg-popup-ai-description');
+        if (existing) {
+          existing.textContent = aiText;
+          existing.style.display = '';
+        } else {
+          // No ai-description element yet — inject into meta section
+          let meta = popupRoot.querySelector('.video-msg-popup-meta');
+          if (!meta) {
+            // Meta section doesn't exist — create it after body
+            const body = popupRoot.querySelector('.video-msg-popup-body');
+            if (body) {
+              meta = document.createElement('div');
+              meta.className = 'video-msg-popup-meta';
+              body.after(meta);
+            }
+          }
+          if (meta) {
+            const div = document.createElement('div');
+            div.className = 'video-msg-popup-ai-description';
+            div.textContent = aiText;
+            meta.appendChild(div);
+          }
+        }
+      })
+      .catch(() => {});
+  },
+
   // ==================== HELPERS ====================
 
   formatTimeAgo(dateStr) {

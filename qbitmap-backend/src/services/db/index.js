@@ -106,5 +106,6 @@ require('./onvif')(DatabaseService);
 require('./admin')(DatabaseService);
 require('./sharing')(DatabaseService);
 require('./content')(DatabaseService);
+require('./ai-jobs')(DatabaseService);
 
 module.exports = new DatabaseService();
