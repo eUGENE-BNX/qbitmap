@@ -626,7 +626,7 @@ const CameraGridMixin = {
    * Open in-place zoom view for a camera cell
    * Zoom animates from grid center and expands to full grid size
    */
-  openZoomView(cellIndex) {
+  async openZoomView(cellIndex) {
     const cellData = this.gridCells.get(cellIndex);
     if (!cellData) return;
 
@@ -678,11 +678,18 @@ const CameraGridMixin = {
     video.playsinline = true;
     video.muted = true;
 
+    let zoomHlsResult = null;
     if (cellData.videoElement && cellData.videoElement.srcObject) {
+      // WHEP: clone the MediaStream
       video.srcObject = cellData.videoElement.srcObject;
-    } else if (cellData.videoElement && cellData.videoElement.src) {
-      // HLS: share the same source (hls.js manages the buffer)
-      video.src = cellData.videoElement.src;
+    } else {
+      // HLS: start a new independent stream for zoom view
+      const saved = this.savedGridAssignments.get(cellIndex);
+      if (saved?.hlsUrl && this.startHlsStream) {
+        zoomHlsResult = await this.startHlsStream(video, saved.hlsUrl, {
+          isVod: saved.hlsUrl.includes('/clips/'),
+        });
+      }
     }
 
     popup.appendChild(video);
@@ -699,6 +706,7 @@ const CameraGridMixin = {
     const closeZoom = () => {
       popup.classList.remove('zoomed');
       popup.classList.add('zooming-out');
+      if (zoomHlsResult?.destroy) zoomHlsResult.destroy();
       setTimeout(() => popup.remove(), 250);
       document.removeEventListener('keydown', handleEsc);
     };
