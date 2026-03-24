@@ -83,15 +83,16 @@ const FaceRecognitionMixin = {
     `;
     document.body.appendChild(modal);
 
-    // Bind static event handlers
-    modal.querySelector('.modal-overlay').addEventListener('click', () => MyCamerasSystem.closeFaceRecognitionModal());
-    modal.querySelector('.close-btn').addEventListener('click', () => MyCamerasSystem.closeFaceRecognitionModal());
-    document.getElementById('face-detection-toggle').addEventListener('change', () => MyCamerasSystem.toggleFaceDetection());
-    document.getElementById('face-detection-interval').addEventListener('change', () => MyCamerasSystem.updateFaceInterval());
+    // Bind static event handlers (capture `this` since arrow functions lose mixin context)
+    const self = this;
+    modal.querySelector('.modal-overlay').addEventListener('click', () => self.closeFaceRecognitionModal());
+    modal.querySelector('.close-btn').addEventListener('click', () => self.closeFaceRecognitionModal());
+    document.getElementById('face-detection-toggle').addEventListener('change', () => self.toggleFaceDetection());
+    document.getElementById('face-detection-interval').addEventListener('change', () => self.updateFaceInterval());
     document.getElementById('face-upload-area').addEventListener('click', () => document.getElementById('face-file-input').click());
-    document.getElementById('face-file-input').addEventListener('change', (e) => MyCamerasSystem.handleFaceFileSelect(e));
-    document.getElementById('add-face-btn').addEventListener('click', () => MyCamerasSystem.addFace());
-    modal.querySelector('.face-preview-remove').addEventListener('click', () => MyCamerasSystem.clearFacePreview());
+    document.getElementById('face-file-input').addEventListener('change', (e) => self.handleFaceFileSelect(e));
+    document.getElementById('add-face-btn').addEventListener('click', () => self.addFace());
+    modal.querySelector('.face-preview-remove').addEventListener('click', () => self.clearFacePreview());
 
     // Load settings and faces
     await this.loadFaceRecognitionData(deviceId);
@@ -171,10 +172,10 @@ const FaceRecognitionMixin = {
 
     // Bind dynamic handlers
     grid.querySelectorAll('.face-alarm-toggle input').forEach(cb => {
-      cb.addEventListener('change', () => MyCamerasSystem.toggleFaceAlarm(Number(cb.dataset.faceId), cb.checked));
+      cb.addEventListener('change', () => this.toggleFaceAlarm(Number(cb.dataset.faceId), cb.checked));
     });
     grid.querySelectorAll('.face-remove-btn').forEach(btn => {
-      btn.addEventListener('click', () => MyCamerasSystem.removeFace(Number(btn.dataset.faceId)));
+      btn.addEventListener('click', () => this.removeFace(Number(btn.dataset.faceId)));
     });
   },
 
