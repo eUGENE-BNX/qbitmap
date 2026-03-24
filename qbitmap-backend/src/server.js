@@ -251,7 +251,7 @@ async function syncRtspCamerasWithMediamtx() {
       }
     }
 
-    const total = rtspCameras.length + rtmpCameras.length + cityCameras.length;
+    const total = rtspCameras.length + rtmpCameras.length;
     if (total > 0) {
       logger.info({ synced: totalSynced, skipped: totalSkipped, failed: totalFailed, total }, 'MediaMTX sync completed');
     }
