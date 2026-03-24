@@ -304,7 +304,7 @@ const TeslaDashcam = {
 
       if (!metadata || metadata.length === 0) {
         if (onProgress) onProgress('HATA: Bu dosyadan metadata okunamadi');
-        if (window.showNotification) showNotification('Bu dosyadan SEI metadata okunamadi', 'error');
+        showNotification('Bu dosyadan SEI metadata okunamadi', 'error');
         return;
       }
 
@@ -351,20 +351,18 @@ const TeslaDashcam = {
       }
 
       if (onProgress) onProgress('OK');
-      if (window.showNotification) {
-        showNotification(
-          gpsMetadata.length + ' metadata noktasi yuklendi' +
-          (session.hasGPS ? '' : ' (GPS verisi yok)'),
-          'success'
-        );
-      }
+      showNotification(
+        gpsMetadata.length + ' metadata noktasi yuklendi' +
+        (session.hasGPS ? '' : ' (GPS verisi yok)'),
+        'success'
+      );
 
       Logger.log('[TeslaDashcam] Session created:', sessionId, '- GPS points:', gpsMetadata.length);
     };
 
     reader.onerror = function() {
       if (onProgress) onProgress('HATA: Dosya okunamadi');
-      if (window.showNotification) showNotification('Dosya okunamadi', 'error');
+      showNotification('Dosya okunamadi', 'error');
     };
 
     reader.readAsArrayBuffer(file);

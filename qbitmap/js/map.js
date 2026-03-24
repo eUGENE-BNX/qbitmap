@@ -762,4 +762,3 @@ map.on("load", async () => {
 });
 
 export { loadScript };
-window.loadScript = loadScript;

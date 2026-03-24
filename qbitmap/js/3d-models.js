@@ -150,4 +150,5 @@ const ModelManager = {
   }
 };
 
+export { ModelManager };
 window.ModelManager = ModelManager;

@@ -101,6 +101,4 @@ Object.freeze(QBitmapConfig.map);
 Object.freeze(QBitmapConfig.ai);
 Object.freeze(QBitmapConfig.voiceDefaults);
 
-// ES module export + backward compat for non-module pages
 export { QBitmapConfig };
-window.QBitmapConfig = QBitmapConfig;

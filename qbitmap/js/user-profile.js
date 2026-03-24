@@ -1,5 +1,5 @@
 import { QBitmapConfig } from './config.js';
-import { Logger } from './utils.js';
+import { Logger, escapeHtml } from './utils.js';
 import { AuthSystem } from './auth.js';
 import { Analytics } from './analytics.js';
 

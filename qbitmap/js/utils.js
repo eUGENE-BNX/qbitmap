@@ -187,12 +187,4 @@ const TimerManager = {
   }
 };
 
-// ES module exports + backward compat for non-module pages
 export { Logger, escapeHtml, sanitize, fetchWithTimeout, loadUserCameras, showNotification, TimerManager };
-window.Logger = Logger;
-window.escapeHtml = escapeHtml;
-window.sanitize = sanitize;
-window.fetchWithTimeout = fetchWithTimeout;
-window.loadUserCameras = loadUserCameras;
-window.showNotification = showNotification;
-window.TimerManager = TimerManager;

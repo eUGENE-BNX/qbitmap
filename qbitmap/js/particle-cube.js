@@ -283,4 +283,5 @@ const ParticleCubeLayer = {
   }
 };
 
+export { ParticleCubeLayer };
 window.ParticleCubeLayer = ParticleCubeLayer;
