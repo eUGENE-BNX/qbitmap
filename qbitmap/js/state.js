@@ -10,7 +10,6 @@ export function setMap(m) { map = m; }
 // Layer visibility toggles
 export const layers = {
   videoLayerVisible: false,
-  object3DLayerVisible: false,
   buildings3DVisible: false,
   h3GridVisible: localStorage.getItem('qbitmap_h3grid') === 'true',
   h3TrailsVisible: false,

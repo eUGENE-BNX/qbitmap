@@ -118,7 +118,6 @@ class LayersDropdownControl {
             { id: 'photo-messages', label: 'Foto Mesaj' },
             { id: 'satellite', label: 'Uydu' },
             { id: 'video', label: 'Live Videos' },
-            { id: '3d-objects', label: '3D Objeler' },
             { id: '3d-buildings', label: '3D Binalar' },
             { id: 'vehicles', label: 'Vehicles' }
         ];
@@ -226,11 +225,6 @@ class LayersDropdownControl {
                     this._showToast('Canl\u0131 video \u015Fu an yaln\u0131zca Ata\u015Fehir b\u00F6lgesinde kullan\u0131labilir');
                 }
                 break;
-            case '3d-objects':
-                layers.object3DLayerVisible = !layers.object3DLayerVisible;
-                toggle.classList.toggle('active', layers.object3DLayerVisible);
-                this._map.triggerRepaint();
-                break;
             case '3d-buildings':
                 _buildings3DVisible = !_buildings3DVisible;
                 toggle.classList.toggle('active', _buildings3DVisible);
@@ -330,7 +324,7 @@ class LayersDropdownControl {
     }
 
     _updateButtonState() {
-        const anyActive = _satelliteMode || _videoLayerVisible || layers.object3DLayerVisible || _buildings3DVisible || layers.h3GridVisible || layers.vehiclesVisible || _videoMessagesVisible || _photoMessagesVisible;
+        const anyActive = _satelliteMode || _videoLayerVisible || _buildings3DVisible || layers.h3GridVisible || layers.vehiclesVisible || _videoMessagesVisible || _photoMessagesVisible;
         this._button.style.backgroundColor = anyActive ? '#a0a0a0' : '';
         this._button.style.color = anyActive ? '#fff' : '';
     }
@@ -423,25 +417,6 @@ class GridCameraControl {
 }
 
 map.addControl(new GridCameraControl(), 'top-right');
-
-/**
- * Wait for ModelManager to be available
- * @returns {Promise} Resolves when ModelManager is ready
- */
-function waitForModelManager() {
-  return new Promise((resolve) => {
-    if (window.ModelManager) {
-      resolve();
-    } else {
-      const checkInterval = setInterval(() => {
-        if (window.ModelManager) {
-          clearInterval(checkInterval);
-          resolve();
-        }
-      }, 50); // Check every 50ms
-    }
-  });
-}
 
 map.on("load", async () => {
     Logger.log("[Map] loaded");
@@ -700,33 +675,6 @@ map.on("load", async () => {
     };
     map.on('zoom', debouncedVideoUpdate);
     map.on('move', debouncedVideoUpdate);
-
-    // Wait for ModelManager before using it
-    await waitForModelManager();
-
-    // 3D Model - iPhone (rotating)
-    ModelManager.addModel(map, {
-        id: '3d-iphone',
-        url: '/3d/iphone.gltf',
-        coordinates: [29.1250457, 40.99394],
-        altitude: 10,
-        rotation: [Math.PI / 2, 0, 0],
-        scale: 1.5,
-        minZoom: 14,
-        animate: { axis: 'y', speed: 0.005 },
-        popupContent: '<strong>iPhone</strong>'
-    });
-
-    // 3D Particle Cube (replaces Woman model)
-    ParticleCubeLayer.add(map, {
-        id: '3d-particle-cube',
-        coordinates: [29.11669738, 40.99496741],
-        altitude: 50,
-        cubeSize: 80,
-        particleCount: 500,
-        minDistance: 25,
-        minZoom: 14
-    });
 
     // Traffic Camera Tags
     const trafficCams = [

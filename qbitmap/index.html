@@ -15,15 +15,6 @@
   <script defer src="/vendor/maplibre-gl.js"></script>
   <script defer src="/vendor/basemaps.js"></script>
   <!-- hls, deck.gl, h3-js, protobuf loaded on demand via vendor-loader.js -->
-  <!-- Three.js ES Module Import Map -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "/vendor/three/three.module.js",
-      "three/addons/": "/vendor/three/examples/jsm/"
-    }
-  }
-  </script>
   <!-- Plyr Video Player (non-blocking: only needed when user opens video) -->
   <link rel="stylesheet" href="https://cdn.plyr.io/3.8.4/plyr.css" integrity="sha384-VqqE0KSv00qfHvKpRa8aov+g3xtUu2Rw0NsEmtjTOPGn/JDKVghgd56iw/VObHa7" crossorigin="anonymous" media="print" id="plyr-css">
   <script>document.getElementById('plyr-css').onload=function(){this.media='all'};</script>
@@ -57,9 +48,6 @@
   </div>
   <!-- ================== MODAL PENCERE BİTİŞ ================== -->
 
-  <!-- 3D models (ES modules) -->
-  <script type="module" src="/js/3d-models.js"></script>
-  <script type="module" src="/js/particle-cube.js"></script>
   <!-- Main app entry point -->
   <script type="module" src="/js/main.js"></script>
 </body>
