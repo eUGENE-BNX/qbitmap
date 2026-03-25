@@ -1210,15 +1210,50 @@
   padding: 8px 14px;
 }
 
+.video-msg-ai-wrap {
+  position: relative;
+  margin-top: 5px;
+}
 .video-msg-popup-ai-description {
   font-size: 11.5px;
   color: #777;
   line-height: 1.4;
-  margin-top: 5px;
+  max-height: 12.6em; /* ~9 lines */
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.video-msg-popup-ai-description::-webkit-scrollbar {
+  display: none;
 }
 .video-msg-popup-ai-description strong {
   color: #555;
   font-weight: 700;
+}
+.video-msg-ai-fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 2px;
+  color: #555;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+.video-msg-ai-fade svg {
+  display: block;
+  filter: drop-shadow(0 -1px 2px rgba(237,234,228,0.9));
+  animation: vmsg-fade-bounce 1.8s ease-in-out infinite;
+}
+@keyframes vmsg-fade-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
+}
+.video-msg-ai-fade.hidden {
+  opacity: 0;
 }
 
 .video-msg-popup-tags {

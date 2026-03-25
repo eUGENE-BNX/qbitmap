@@ -2,6 +2,7 @@ import { QBitmapConfig } from "../config.js";
 import { Logger, escapeHtml, sanitize } from "../utils.js";
 import { AuthSystem } from "../auth.js";
 import { Analytics } from "../analytics.js";
+import { CommentWidget } from "../comments.js";
 import * as AppState from '../state.js';
 
 const PopupMixin = {
@@ -89,7 +90,7 @@ const PopupMixin = {
         <div class="video-msg-popup-meta">
           ${description ? `<div class="video-msg-popup-title">${esc(description)}</div>` : ''}
           ${placeName ? `<div class="video-msg-popup-place"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg> ${esc(placeName)}</div>` : ''}
-          ${aiDescription ? `<div class="video-msg-popup-ai-description">${esc(aiDescription)}</div>` : ''}
+          ${aiDescription ? `<div class="video-msg-ai-wrap"><div class="video-msg-popup-ai-description" data-ai-desc>${esc(aiDescription)}</div><div class="video-msg-ai-fade" data-ai-fade><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div></div>` : ''}
           <div class="video-msg-popup-tags" data-tags-container>
             ${tags.map(t => `<span class="video-msg-popup-tag">${esc(t)}${isOwn ? '<button class="video-msg-tag-remove" data-tag="' + esc(t) + '">&times;</button>' : ''}</span>`).join('')}
             ${isOwn ? `<button class="video-msg-tag-add" data-action="add-tag" title="Etiket ekle">+</button>` : ''}
@@ -222,9 +223,21 @@ const PopupMixin = {
         };
       });
 
+      // AI description scroll fade indicator
+      const aiDesc = popupEl.querySelector('[data-ai-desc]');
+      const aiFade = popupEl.querySelector('[data-ai-fade]');
+      if (aiDesc && aiFade) {
+        const checkScroll = () => {
+          const atBottom = aiDesc.scrollHeight - aiDesc.scrollTop - aiDesc.clientHeight < 4;
+          aiFade.classList.toggle('hidden', atBottom || aiDesc.scrollHeight <= aiDesc.clientHeight);
+        };
+        aiDesc.addEventListener('scroll', checkScroll);
+        checkScroll();
+      }
+
       // Render comments
       const commentsContainer = popupEl.querySelector('[data-comments-container]');
-      if (commentsContainer && typeof CommentWidget !== 'undefined') {
+      if (commentsContainer) {
         CommentWidget.render(commentsContainer, 'video_message', messageId);
       }
     }, 0);
@@ -474,7 +487,7 @@ const PopupMixin = {
   },
 
   closeMessagePopup() {
-    if (typeof CommentWidget !== 'undefined') CommentWidget.destroy();
+    CommentWidget.destroy();
     if (this.currentPopup) {
       this.currentPopup.remove();
       this.currentPopup = null;

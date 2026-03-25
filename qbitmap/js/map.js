@@ -111,15 +111,15 @@ class LayersDropdownControl {
 
         const items = [
             { id: 'h3-grid', label: 'Qbitmap' },
-            { id: 'h3-trails', label: 'AI Mesh Search' },
+            { id: 'h3-trails', label: 'Qbit Search' },
             { id: 'city-cameras', label: 'Şehir Kameraları' },
-            { id: 'user-cameras', label: 'WHEP/RTSP Kameralar' },
-            { id: 'video-messages', label: 'Video Mesaj' },
-            { id: 'photo-messages', label: 'Foto Mesaj' },
-            { id: 'satellite', label: 'Uydu' },
-            { id: 'video', label: 'Live Videos' },
+            { id: 'user-cameras', label: 'Kameralar' },
+            { id: 'video-messages', label: 'Video Mesajlar' },
+            { id: 'photo-messages', label: 'Resim Mesajlar' },
+            { id: 'satellite', label: 'Uydu Görüntüleri' },
+            { id: 'video', label: 'Canlı Uydu Görüntüleri' },
             { id: '3d-buildings', label: '3D Binalar' },
-            { id: 'vehicles', label: 'Vehicles' }
+            { id: 'vehicles', label: 'Online Araçlar' }
         ];
 
         this._toggles = {};

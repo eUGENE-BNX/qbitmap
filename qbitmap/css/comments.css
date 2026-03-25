@@ -162,27 +162,30 @@
 }
 
 .comments-input:focus {
-  border-color: #4caf50;
+  border-color: #999;
   background: #fff;
 }
 
 .comments-submit {
-  width: 28px;
-  height: 28px;
+  height: 26px;
+  padding: 0 8px;
   border: none;
-  border-radius: 50%;
-  background: #4caf50;
+  border-radius: 5px;
+  background: #555;
   color: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  gap: 3px;
   transition: background 0.15s, opacity 0.15s;
 }
 
 .comments-submit:hover {
-  background: #43a047;
+  background: #444;
 }
 
 .comments-submit:disabled {

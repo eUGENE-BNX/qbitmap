@@ -13,7 +13,7 @@ const TIMEOUT = 180000; // 180s for video analysis
 const MAX_CONCURRENCY = 2;
 const POLL_INTERVAL = 3000; // Check DB every 3s for new jobs
 
-const PROMPT = 'Bu videoyu analiz et ve Turkce olarak 300-350 karakter arasinda bir icerik aciklamasi yaz. Videodaki onemli gorsel ogeleri, olaylari, ortami ve dikkate deger detaylari acikla. Sadece aciklama metnini yaz, baska bir sey ekleme ve Videoda görünmeyen bir şeyi varsayma.';
+const PROMPT = 'You are analyzing a 30-second video sampled at 2 frames per second.\n\nWrite a single, fluent paragraph in Turkish only, around 300–350 tokens, suitable for showing directly under the video in a social media style interface. The text should briefly but clearly explain what is visually happening in the video so that someone who has not watched it can still understand the content. Focus on the most important visible details: setting, prominent objects or people, actions, visual highlights, visible text, atmosphere, and any striking or meaningful detail. Do not use headings, bullet points, labels, or technical analysis language. Do not describe frames one by one. Do not hallucinate or infer unsupported facts. If something is unclear, mention it naturally. The paragraph should sound like a polished user-facing video description, not an AI report.';
 
 let activeCount = 0;
 let pollTimer = null;
@@ -79,7 +79,7 @@ async function analyzeVideo(messageId) {
         { type: 'video_url', video_url: { url: videoUrl } }
       ]
     }],
-    max_tokens: 256,
+    max_tokens: 512,
     mm_processor_kwargs: { num_frames: 60, fps: 2 }
   };
 
@@ -103,7 +103,7 @@ async function analyzeVideo(messageId) {
   let text = (data.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   if (!text) throw new Error('Empty AI description');
 
-  await db.updateVideoMessageAiDescription(messageId, text.substring(0, 400));
+  await db.updateVideoMessageAiDescription(messageId, text.substring(0, 1000));
   logger.info({ messageId, len: text.length }, 'AI description saved');
 }
 

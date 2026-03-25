@@ -13,7 +13,7 @@ const TIMEOUT = 60000; // 60s for photo analysis
 const MAX_CONCURRENCY = 3;
 const POLL_INTERVAL = 3000; // Check DB every 3s for new jobs
 
-const PROMPT = 'Bu fotografi analiz et ve Turkce olarak 300-350 karakter arasinda bir icerik aciklamasi yaz. Fotograftaki onemli gorsel ogeleri, ortami ve dikkate deger detaylari acikla. Sadece aciklama metnini yaz, baska bir sey ekleme ve Fotografta gorunmeyen bir seyi varsayma.';
+const PROMPT = 'You are analyzing a single image.\n\nYour task is to generate one fluent, user-facing paragraph in Turkish only. This paragraph will be displayed directly under the image in an app, and it will also be used as searchable semantic metadata. The goal is to help a person quickly understand the image and to make the image discoverable through text search later.\n\nFocus only on clearly visible, reliable, and visually verifiable details. Prefer concrete and discriminative details over generic wording. Include the most important visible elements such as the type of scene, main objects or products, people if present, readable brand names, labels, prices, packaging, visible text/OCR, spatial arrangement, colors, materials, store or environment clues, and any distinctive details that make this image different from similar images.\n\nMention only things you are visually confident about. Do not hallucinate, speculate, or infer unsupported identity, location, intent, backstory, or hidden context. If a detail is unclear, leave it out instead of guessing.\n\nWrite the result as a single natural paragraph of 300 to 350 tokens. Do not use headings, bullet points, labels, JSON, or list formatting. Do not write like a technical AI report. The final response must read like a polished image description for end users, while still being rich enough for indexing and retrieval.\n\nOutput language must be Turkish only. Do not use English in the final answer.';
 
 let activeCount = 0;
 let pollTimer = null;
@@ -80,7 +80,7 @@ async function analyzePhoto(messageId) {
         { type: 'image_url', image_url: { url: imageUrl } }
       ]
     }],
-    max_tokens: 256
+    max_tokens: 512
   };
 
   const headers = { 'Content-Type': 'application/json' };
@@ -103,7 +103,7 @@ async function analyzePhoto(messageId) {
   let text = (data.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   if (!text) throw new Error('Empty AI description');
 
-  await db.updateVideoMessageAiDescription(messageId, text.substring(0, 400));
+  await db.updateVideoMessageAiDescription(messageId, text.substring(0, 1000));
   logger.info({ messageId, len: text.length }, 'Photo AI description saved');
 }
 
