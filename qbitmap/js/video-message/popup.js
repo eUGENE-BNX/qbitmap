@@ -99,7 +99,7 @@ const PopupMixin = {
         ` : ''}
         <div data-comments-container></div>
         <div class="video-msg-popup-footer">
-          ${isOwn ? `<button class="video-msg-popup-action delete" data-action="delete">Sil</button>` : ''}
+          ${isOwn ? `<button class="video-msg-popup-action delete" data-action="delete-message">Sil</button>` : ''}
           ${!isPrivateMsg ? `
           <div class="video-msg-share-buttons">
             <button class="video-msg-share-btn whatsapp" data-action="share-whatsapp" title="WhatsApp'ta Paylaş">
@@ -144,7 +144,7 @@ const PopupMixin = {
       if (closeBtn) closeBtn.onclick = () => this.closeMessagePopup();
 
       // Delete button
-      const deleteBtn = popupEl.querySelector('[data-action="delete"]');
+      const deleteBtn = popupEl.querySelector('[data-action="delete-message"]');
       if (deleteBtn) deleteBtn.onclick = () => this.deleteMessage(messageId);
 
       // Mark as read if private and unread
