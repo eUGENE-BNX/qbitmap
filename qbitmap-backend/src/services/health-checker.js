@@ -4,12 +4,12 @@
  */
 
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
+const { getVllmUrl } = require('../utils/ai-config');
 const logger = require('../utils/logger').child({ module: 'health-checker' });
 
 // Server hostnames from environment (with defaults for backwards compatibility)
 const QBITMAP_HOST = process.env.QBITMAP_HOST || '91.99.219.248';
 const MEDIAMTX_HOST = process.env.MEDIAMTX_HOST || '91.98.90.57';
-const AI_HOST = process.env.AI_HOST || '92.44.163.139';
 const VOICE_HOST = process.env.VOICE_HOST || '91.98.131.74';
 
 // Service URLs from environment
@@ -17,7 +17,6 @@ const ONVIF_SERVICE_URL = process.env.ONVIF_SERVICE_URL || `http://${MEDIAMTX_HO
 const CAPTURE_SERVICE_URL = process.env.CAPTURE_SERVICE_URL || `http://${MEDIAMTX_HOST}:3002`;
 const MEDIAMTX_WHEP_BASE = process.env.MEDIAMTX_WHEP_BASE || `http://${MEDIAMTX_HOST}:8889`;
 const MEDIAMTX_API = process.env.MEDIAMTX_API || `http://${MEDIAMTX_HOST}:9997`;
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || `http://${AI_HOST}:8080`;
 const VOICE_API_URL = process.env.ENTANGLE_API_URL || `http://${VOICE_HOST}:8000`;
 
 // Service configurations
@@ -87,12 +86,13 @@ const SERVICES = [
   {
     id: 'ai-service',
     name: 'AI Service',
-    description: 'Ollama LLM Server',
-    host: AI_HOST,
-    url: `${AI_SERVICE_URL}/`,
+    description: 'vLLM Vision Server',
+    host: '', // resolved dynamically from ai-config
+    url: '',  // resolved dynamically from ai-config
     method: 'GET',
     timeout: 10000,
-    icon: 'brain'
+    icon: 'brain',
+    dynamic: true
   },
   {
     id: 'face-recognition',
@@ -143,6 +143,10 @@ async function checkService(service) {
   const startTime = Date.now();
 
   try {
+    if (!service.url) {
+      throw new Error('Service URL not configured');
+    }
+
     const response = await fetchWithTimeout(
       service.url,
       { method: service.method },
@@ -209,6 +213,23 @@ async function checkService(service) {
  * @param {boolean} forceRefresh - Force refresh ignoring cache
  * @returns {Promise<Object>} Aggregated health status
  */
+async function resolveAiServiceUrl() {
+  try {
+    const chatUrl = await getVllmUrl();
+    const baseUrl = chatUrl.replace(/\/v1\/chat\/completions$/, '');
+    const aiService = SERVICES.find(s => s.id === 'ai-service');
+    if (aiService) {
+      aiService.url = `${baseUrl}/health`;
+      try {
+        const urlObj = new URL(baseUrl);
+        aiService.host = urlObj.host;
+      } catch {}
+    }
+  } catch (e) {
+    logger.warn({ err: e }, 'Failed to resolve AI service URL');
+  }
+}
+
 async function checkAllServices(forceRefresh = false) {
   const now = Date.now();
 
@@ -218,6 +239,9 @@ async function checkAllServices(forceRefresh = false) {
   }
 
   logger.info('Running health checks for all services');
+
+  // Resolve dynamic service URLs (AI service URL from DB/config)
+  await resolveAiServiceUrl();
 
   // Check all services in parallel
   const results = await Promise.all(

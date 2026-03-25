@@ -23,10 +23,9 @@ export async function loadHls() {
 
 export async function loadDeckAndH3() {
   if (typeof deck !== 'undefined' && typeof h3 !== 'undefined') return;
-  await Promise.all([
-    typeof deck === 'undefined' ? loadScript('/vendor/deck.gl.min.js') : Promise.resolve(),
-    typeof h3 === 'undefined' ? loadScript('/vendor/h3-js.umd.js') : Promise.resolve(),
-  ]);
+  // h3-js must load first — deck.gl captures globalThis.h3 at init time
+  if (typeof h3 === 'undefined') await loadScript('/vendor/h3-js.umd.js');
+  if (typeof deck === 'undefined') await loadScript('/vendor/deck.gl.min.js');
 }
 
 export async function loadProtobuf() {

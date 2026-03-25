@@ -402,48 +402,17 @@ body {
   stroke-opacity: 0.5;
 }
 
-/* Data Packets */
-.packets-container {
-  display: block;
+/* Animated flow on online connections */
+.connection-line.online.flow-active {
+  stroke-dasharray: 8 12;
+  stroke-opacity: 0.6;
+  animation: dashFlow var(--flow-speed, 30s) linear infinite;
 }
 
-/* Data Packet - Clean glowing dot */
-.data-packet {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 8px #22c55e, 0 0 4px #22c55e;
-  pointer-events: none;
-  z-index: 10;
-}
-
-/* High intensity - smaller dots for dense traffic */
-.data-packet.high {
-  width: 5px;
-  height: 5px;
-  box-shadow: 0 0 6px #22c55e;
-}
-
-/* Medium intensity */
-.data-packet.medium {
-  width: 6px;
-  height: 6px;
-}
-
-/* Sparse intensity - slightly larger */
-.data-packet.sparse {
-  width: 7px;
-  height: 7px;
-  box-shadow: 0 0 10px #22c55e, 0 0 5px #22c55e;
-}
-
-/* Rare intensity - most visible */
-.data-packet.rare {
-  width: 8px;
-  height: 8px;
-  box-shadow: 0 0 12px #22c55e, 0 0 6px #22c55e;
+@keyframes dashFlow {
+  to {
+    stroke-dashoffset: -200;
+  }
 }
 
 /* Summary Section */
