@@ -68,8 +68,8 @@ const CameraLayerMixin = {
         type: 'geojson',
         data: this.cameraGeojson,
         cluster: true,
-        clusterMaxZoom: 14,
-        clusterRadius: 50
+        clusterMaxZoom: 17,
+        clusterRadius: 60
       });
 
       // Cluster circle layer

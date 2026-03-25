@@ -32,8 +32,8 @@ const MapLayerMixin = {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
           cluster: true,
-          clusterMaxZoom: 14,
-          clusterRadius: 50
+          clusterMaxZoom: 17,
+          clusterRadius: 60
         });
 
         map.addLayer({
@@ -78,8 +78,8 @@ const MapLayerMixin = {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
           cluster: true,
-          clusterMaxZoom: 14,
-          clusterRadius: 50
+          clusterMaxZoom: 17,
+          clusterRadius: 60
         });
 
         map.addLayer({
