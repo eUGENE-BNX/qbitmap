@@ -16,25 +16,32 @@ class CameraManager {
   }
 
   /**
-   * Load cameras from persistent storage (credentials not stored — cameras loaded as disconnected stubs)
+   * Load cameras from persistent storage and connect those with credentials
    */
   async loadFromFile() {
     try {
       if (fs.existsSync(CAMERAS_FILE)) {
         const data = fs.readFileSync(CAMERAS_FILE, 'utf8');
         const cameras = JSON.parse(data);
-        console.log(`[ONVIF] Loading ${cameras.length} camera stubs from file (credentials not stored)...`);
+        console.log(`[ONVIF] Loading ${cameras.length} cameras from file...`);
 
         for (const cam of cameras) {
-          // Register camera stub without connecting (no credentials on disk)
           if (!this.cameras.has(cam.id)) {
             this.cameras.set(cam.id, {
-              config: { id: cam.id, name: cam.name, host: cam.host, port: cam.port },
+              config: { id: cam.id, name: cam.name, host: cam.host, port: cam.port, username: cam.username, password: cam.password },
               cam: null,
               connected: false,
               connecting: false
             });
-            console.log(`[ONVIF] Loaded stub for ${cam.id} (${cam.host}:${cam.port}) — awaiting credentials via API`);
+
+            if (cam.username && cam.password) {
+              // Connect in background — don't block startup
+              this.connect(cam.id).catch(err => {
+                console.error(`[ONVIF] Failed to load camera ${cam.id}:`, err.message);
+              });
+            } else {
+              console.log(`[ONVIF] Loaded stub for ${cam.id} (${cam.host}:${cam.port}) — no credentials`);
+            }
           }
         }
       } else {
@@ -46,18 +53,16 @@ class CameraManager {
   }
 
   /**
-   * Save cameras to persistent storage (credentials excluded for security)
+   * Save cameras to persistent storage (with credentials for reconnect on restart)
    */
   saveToFile() {
     try {
       const cameras = [];
       for (const [id, camera] of this.cameras) {
-        // Never persist credentials to disk
-        const { username, password, ...safeConfig } = camera.config;
-        cameras.push(safeConfig);
+        cameras.push({ ...camera.config });
       }
       fs.writeFileSync(CAMERAS_FILE, JSON.stringify(cameras, null, 2));
-      console.log(`[ONVIF] Saved ${cameras.length} cameras to file (credentials excluded)`);
+      console.log(`[ONVIF] Saved ${cameras.length} cameras to file`);
     } catch (err) {
       console.error('[ONVIF] Failed to save cameras to file:', err.message);
     }
@@ -159,7 +164,10 @@ class CameraManager {
   }
 
   /**
-   * Subscribe to camera events using PullPoint
+   * Subscribe to camera events.
+   * The onvif library auto-creates a PullPoint subscription when the first
+   * 'event' listener is attached (via newListener → _eventRequest).
+   * No manual createPullPointSubscription call needed.
    */
   subscribeToEvents(cameraId) {
     const camera = this.cameras.get(cameraId);
@@ -171,7 +179,6 @@ class CameraManager {
 
     console.log(`[ONVIF] Subscribing to events for ${cameraId}...`);
 
-    // Listen for events
     cam.on('event', (event) => {
       this.handleEvent(cameraId, event);
     });
@@ -179,20 +186,6 @@ class CameraManager {
     cam.on('eventsError', (err) => {
       console.error(`[ONVIF] Event error for ${cameraId}:`, err.message);
     });
-
-    // Start event service - using PullPoint subscription
-    try {
-      // Create PullPoint subscription
-      cam.createPullPointSubscription((err) => {
-        if (err) {
-          console.error(`[ONVIF] Failed to create PullPoint for ${cameraId}:`, err.message);
-          return;
-        }
-        console.log(`[ONVIF] PullPoint subscription created for ${cameraId}`);
-      });
-    } catch (e) {
-      console.error(`[ONVIF] Event subscription error for ${cameraId}:`, e.message);
-    }
   }
 
   /**
