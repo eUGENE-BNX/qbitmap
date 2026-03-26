@@ -1685,6 +1685,14 @@
   max-height: 400px;
   object-fit: contain;
   background: #1a1a1a;
+  aspect-ratio: 16 / 9;
+}
+
+.vmsg-popup-photo:not([src]),
+.vmsg-popup-photo[src=""] {
+  visibility: hidden;
+  height: 0;
+  aspect-ratio: unset;
 }
 
 /* Photo controls layout */

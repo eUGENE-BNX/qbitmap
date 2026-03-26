@@ -121,29 +121,30 @@ const PhotoCaptureMixin = {
     if (!video) return;
 
     const track = this.mediaStream.getVideoTracks()[0];
-    const settings = track.getSettings();
     const res = this.PHOTO_RESOLUTIONS[this._photoResolution];
     const targetW = res.width;
     const targetH = res.height; // Already 16:9 (1920x1080, 2560x1440, 3840x2160)
 
-    // Try ImageCapture API (higher quality), then crop to 16:9
-    if (typeof ImageCapture !== 'undefined') {
-      try {
-        const imageCapture = new ImageCapture(track);
-        const rawBlob = await imageCapture.takePhoto();
+    // Always use canvas capture — ImageCapture.takePhoto() produces black frames
+    // on many mobile devices due to GPU-only video decode paths
+    this.capturedPhotoBlob = await this._canvasCapture(video, targetW, targetH);
 
-        // ImageCapture may return sensor's native ratio (4:3, 1:1 etc.)
-        // Always crop to 16:9 via canvas
-        const bitmap = await createImageBitmap(rawBlob);
+    // If canvas capture failed, try ImageCapture.grabFrame() as fallback
+    if (!this.capturedPhotoBlob && typeof ImageCapture !== 'undefined') {
+      try {
+        Logger.log('[VideoMessage] Canvas capture failed, trying grabFrame()');
+        const imageCapture = new ImageCapture(track);
+        const bitmap = await imageCapture.grabFrame();
         this.capturedPhotoBlob = await this._cropTo16x9(bitmap, targetW, targetH);
         bitmap.close();
       } catch (e) {
-        Logger.warn('[VideoMessage] ImageCapture failed, falling back to canvas:', e);
-        this.capturedPhotoBlob = await this._canvasCapture(video, targetW, targetH);
+        Logger.warn('[VideoMessage] grabFrame also failed:', e);
       }
-    } else {
-      // Safari, Firefox: canvas capture from video element
-      this.capturedPhotoBlob = await this._canvasCapture(video, targetW, targetH);
+    }
+
+    if (!this.capturedPhotoBlob) {
+      AuthSystem.showNotification('Fotoğraf çekilemedi, tekrar deneyin', 'error');
+      return;
     }
 
     this._capturedWidth = targetW;
@@ -193,8 +194,22 @@ const PhotoCaptureMixin = {
 
   // Canvas capture from video element, cropped to 16:9
   async _canvasCapture(video, targetW, targetH) {
+    // Ensure video has a rendered frame before capture
+    if (video.readyState < 2) { // HAVE_CURRENT_DATA
+      await new Promise((resolve) => {
+        video.addEventListener('canplay', resolve, { once: true });
+        setTimeout(resolve, 1000); // Timeout safety
+      });
+    }
+
     const vw = video.videoWidth;
     const vh = video.videoHeight;
+
+    if (!vw || !vh) {
+      Logger.warn('[VideoMessage] Canvas capture: video has no dimensions', vw, vh);
+      return null;
+    }
+
     const targetRatio = 16 / 9;
     const srcRatio = vw / vh;
 
@@ -211,11 +226,67 @@ const PhotoCaptureMixin = {
       sy = Math.round((vh - sh) / 2);
     }
 
+    // Use a smaller canvas matching video dimensions first, then scale
+    // This avoids mobile GPU limits with large canvases (e.g. 3840x2160)
+    const captureW = Math.min(targetW, vw);
+    const captureH = Math.min(targetH, vh);
+
     const canvas = document.createElement('canvas');
-    canvas.width = targetW;
-    canvas.height = targetH;
+    canvas.width = captureW;
+    canvas.height = captureH;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, targetW, targetH);
+    if (!ctx) {
+      Logger.warn('[VideoMessage] Canvas 2d context unavailable');
+      return null;
+    }
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, captureW, captureH);
+
+    // Check if the captured image is all black (GPU decode issue on mobile)
+    try {
+      const sample = ctx.getImageData(
+        Math.floor(captureW / 4), Math.floor(captureH / 4),
+        Math.min(32, captureW), Math.min(32, captureH)
+      );
+      const d = sample.data;
+      let nonBlack = 0;
+      for (let i = 0; i < d.length; i += 16) { // Sample every 4th pixel
+        if (d[i] > 5 || d[i + 1] > 5 || d[i + 2] > 5) nonBlack++;
+      }
+      if (nonBlack === 0) {
+        Logger.warn('[VideoMessage] Canvas captured all-black frame, retrying after delay');
+        // Wait and retry once — GPU may need a tick to make pixels readable
+        await new Promise(r => setTimeout(r, 200));
+        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, captureW, captureH);
+
+        const retry = ctx.getImageData(
+          Math.floor(captureW / 4), Math.floor(captureH / 4),
+          Math.min(32, captureW), Math.min(32, captureH)
+        );
+        let retryNonBlack = 0;
+        for (let i = 0; i < retry.data.length; i += 16) {
+          if (retry.data[i] > 5 || retry.data[i + 1] > 5 || retry.data[i + 2] > 5) retryNonBlack++;
+        }
+        if (retryNonBlack === 0) {
+          Logger.warn('[VideoMessage] Still all-black after retry');
+          return null;
+        }
+      }
+    } catch (e) {
+      // getImageData may fail on tainted canvas — proceed anyway
+      Logger.warn('[VideoMessage] Pixel check failed:', e);
+    }
+
+    // If we captured at smaller size, scale up to target
+    if (captureW < targetW || captureH < targetH) {
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = targetW;
+      finalCanvas.height = targetH;
+      const fctx = finalCanvas.getContext('2d');
+      fctx.drawImage(canvas, 0, 0, targetW, targetH);
+      return new Promise((resolve) => {
+        finalCanvas.toBlob(resolve, 'image/jpeg', 0.92);
+      });
+    }
 
     return new Promise((resolve) => {
       canvas.toBlob(resolve, 'image/jpeg', 0.92);

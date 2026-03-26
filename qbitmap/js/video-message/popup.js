@@ -257,16 +257,31 @@ const PopupMixin = {
   },
 
   async loadPhotoWithCredentials(imgEl, url) {
+    const removeShimmer = () => imgEl.parentElement?.querySelector('.vmsg-media-shimmer')?.remove();
+
+    // Try fetch with credentials first (needed for private messages)
     try {
       const response = await fetch(url, { credentials: 'include' });
-      if (!response.ok) return;
-      const blob = await response.blob();
-      imgEl.src = URL.createObjectURL(blob);
-      imgEl.parentElement?.querySelector('.vmsg-media-shimmer')?.remove();
+      if (response.ok) {
+        const blob = await response.blob();
+        if (blob.size > 0) {
+          imgEl.src = URL.createObjectURL(blob);
+          removeShimmer();
+          return;
+        }
+      }
     } catch (e) {
-      Logger.warn('[VideoMessage] Photo load failed:', e);
-      imgEl.parentElement?.querySelector('.vmsg-media-shimmer')?.remove();
+      Logger.warn('[VideoMessage] Photo fetch failed, trying direct src:', e);
     }
+
+    // Fallback: set src directly and let browser handle cookies
+    imgEl.crossOrigin = 'use-credentials';
+    imgEl.onload = removeShimmer;
+    imgEl.onerror = () => {
+      Logger.warn('[VideoMessage] Photo direct load also failed');
+      removeShimmer();
+    };
+    imgEl.src = url;
   },
 
   openPhotoOverlay(blobUrl) {
