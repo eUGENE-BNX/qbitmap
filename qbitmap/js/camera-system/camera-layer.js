@@ -81,8 +81,10 @@ const CameraLayerMixin = {
         paint: {
           'circle-color': ['step', ['get', 'point_count'], '#51bbd6', 10, '#f1f075', 30, '#f28cb1'],
           'circle-radius': ['step', ['get', 'point_count'], 18, 10, 24, 30, 30],
+          'circle-opacity': 0.75,
           'circle-stroke-width': 2,
-          'circle-stroke-color': '#fff'
+          'circle-stroke-color': '#fff',
+          'circle-stroke-opacity': 0.85
         }
       });
 

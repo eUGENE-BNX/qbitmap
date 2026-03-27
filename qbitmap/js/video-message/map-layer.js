@@ -44,8 +44,10 @@ const MapLayerMixin = {
           paint: {
             'circle-color': ['step', ['get', 'point_count'], '#e8a87c', 10, '#d4946a', 30, '#c07f58'],
             'circle-radius': ['step', ['get', 'point_count'], 14, 10, 18, 30, 22],
+            'circle-opacity': 0.75,
             'circle-stroke-width': 2,
-            'circle-stroke-color': '#fff'
+            'circle-stroke-color': '#fff',
+            'circle-stroke-opacity': 0.85
           }
         });
 
@@ -90,8 +92,10 @@ const MapLayerMixin = {
           paint: {
             'circle-color': ['step', ['get', 'point_count'], '#7cb3e8', 10, '#5a9ad4', 30, '#3d7ebf'],
             'circle-radius': ['step', ['get', 'point_count'], 14, 10, 18, 30, 22],
+            'circle-opacity': 0.75,
             'circle-stroke-width': 2,
-            'circle-stroke-color': '#fff'
+            'circle-stroke-color': '#fff',
+            'circle-stroke-opacity': 0.85
           }
         });
 
