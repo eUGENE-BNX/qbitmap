@@ -20,6 +20,7 @@ const H3Grid = {
   _hexagonData: [],
   _ownershipData: [],
   _ownershipMap: null,
+  _fogRingData: [],
   _tooltip: null,
   _ownershipFetchController: null,
   _userColorMap: new Map(),
@@ -53,6 +54,47 @@ const H3Grid = {
     const color = this._PASTEL_COLORS[idx];
     this._userColorMap.set(userId, color);
     return color;
+  },
+
+  _FOG_RINGS: 3,
+  _FOG_COLORS: {
+    1: { fill: [140, 150, 160, 30], line: [120, 130, 140, 45] },
+    2: { fill: [140, 150, 160, 18], line: [120, 130, 140, 30] },
+    3: { fill: [140, 150, 160, 8],  line: [120, 130, 140, 15] },
+  },
+
+  _computeFogRings() {
+    if (!this._ownershipMap || this._ownershipMap.size === 0) {
+      this._fogRingData = [];
+      return;
+    }
+
+    const fogMap = new Map(); // h3Index → minimum ring distance
+
+    for (const [h3Index] of this._ownershipMap) {
+      let rings;
+      try {
+        rings = h3.gridDiskDistances(h3Index, this._FOG_RINGS);
+      } catch (e) {
+        continue; // skip pentagons or errors
+      }
+
+      for (let dist = 1; dist <= this._FOG_RINGS; dist++) {
+        if (!rings[dist]) continue;
+        for (const cellId of rings[dist]) {
+          if (this._ownershipMap.has(cellId)) continue;
+          const existing = fogMap.get(cellId);
+          if (existing === undefined || dist < existing) {
+            fogMap.set(cellId, dist);
+          }
+        }
+      }
+    }
+
+    this._fogRingData = [];
+    for (const [h3Index, ringDistance] of fogMap) {
+      this._fogRingData.push({ h3Index, ringDistance });
+    }
   },
 
   ZOOM_RESOLUTION_MAP: [
@@ -105,6 +147,7 @@ const H3Grid = {
       this._hexagonData = [];
       this._ownershipData = [];
       this._ownershipMap = null;
+      this._fogRingData = [];
       this._userColorMap.clear();
       if (this._tooltip) this._tooltip.style.display = 'none';
       this._showLeaderboardBtn(false);
@@ -178,10 +221,8 @@ const H3Grid = {
       H3TronTrails.onHexDataChanged(this._hexagonData, resolution);
     }
 
-    // Render base grid immediately
-    this._renderLayer();
-
-    // Fetch ownership data in background
+    // Fetch ownership data (fog rings + owned cells rendered after fetch)
+    // No initial render needed — nothing to show until ownership arrives
     this._fetchOwnership(sw.lat - latPad, sw.lng - lngPad, ne.lat + latPad, ne.lng + lngPad, zoom);
   },
 
@@ -209,6 +250,9 @@ const H3Grid = {
         cell._line = c.line;
       }
 
+      // Compute fog rings around owned cells
+      this._computeFogRings();
+
       // Re-render with ownership data
       this._renderLayer();
 
@@ -227,55 +271,51 @@ const H3Grid = {
     if (!this._overlay) return;
 
     const beforeId = this._getBeforeId();
+    const layers = [];
 
-    // Base grid layer (all hexagons, gray)
-    const baseLayer = new deck.H3HexagonLayer({
-      id: 'h3-grid-layer',
-      data: this._hexagonData,
-      pickable: true,
-      filled: true,
-      stroked: true,
-      extruded: false,
-      beforeId: beforeId,
-      getHexagon: d => d.h3Index,
-      getFillColor: [160, 165, 170, 20],
-      getLineColor: [120, 125, 130, 50],
-      getLineWidth: 1,
-      lineWidthMinPixels: 1,
-      lineWidthMaxPixels: 1,
-      coverage: 1,
-      highPrecision: true,
-      opacity: 0.5,
-      autoHighlight: true,
-      highlightColor: [140, 145, 150, 70],
+    // Fog ring layer (fading hexagons around owned cells)
+    if (this._fogRingData.length > 0) {
+      const fogColors = this._FOG_COLORS;
+      const fogLayer = new deck.H3HexagonLayer({
+        id: 'h3-fog-ring-layer',
+        data: this._fogRingData,
+        pickable: true,
+        filled: true,
+        stroked: true,
+        extruded: false,
+        beforeId: beforeId,
+        getHexagon: d => d.h3Index,
+        getFillColor: d => fogColors[d.ringDistance]?.fill || [140, 150, 160, 5],
+        getLineColor: d => fogColors[d.ringDistance]?.line || [120, 130, 140, 10],
+        getLineWidth: 1,
+        lineWidthMinPixels: 1,
+        lineWidthMaxPixels: 1,
+        coverage: 1,
+        highPrecision: true,
+        opacity: 0.5,
+        autoHighlight: true,
+        highlightColor: [140, 145, 150, 40],
 
-      onHover: (info) => {
-        if (info.object) {
-          const owner = this._ownershipMap && this._ownershipMap.get(info.object.h3Index);
-          if (owner) {
-            this._showOwnerTooltipTimed(info.x, info.y, info.object.h3Index, owner);
-          } else if (this._currentResolution >= 13) {
-            this._showUnownedTooltip(info.x, info.y, info.object.h3Index);
+        onHover: (info) => {
+          if (info.object && this._currentResolution >= 13) {
+            this._showFogTooltip(info.x, info.y, info.object.h3Index);
           } else {
             this._tooltip.style.display = 'none';
           }
-        } else {
-          this._tooltip.style.display = 'none';
-        }
-      },
+        },
 
-      onClick: (info) => {
-        if (info.object && this._currentResolution < 13) {
-          const center = h3.cellToLatLng(info.object.h3Index);
-          this._map.easeTo({
-            center: [center[1], center[0]],
-            zoom: this._map.getZoom() + 2
-          });
+        onClick: (info) => {
+          if (info.object && this._currentResolution < 13) {
+            const center = h3.cellToLatLng(info.object.h3Index);
+            this._map.easeTo({
+              center: [center[1], center[0]],
+              zoom: this._map.getZoom() + 2
+            });
+          }
         }
-      }
-    });
-
-    const layers = [baseLayer];
+      });
+      layers.push(fogLayer);
+    }
 
     // Ownership layer (owned cells, per-user colors)
     if (this._ownershipData.length > 0) {
@@ -395,6 +435,25 @@ const H3Grid = {
         <div style="font-weight:600;font-size:12px;color:#666;">Sahipsiz</div>
       </div>`;
     this._animateTooltipIn(x, y);
+  },
+
+  _showFogTooltip(x, y, h3Index) {
+    this._tooltipH3Index = h3Index;
+    clearTimeout(this._tooltipTimer);
+    this._tooltip.innerHTML = `
+      <div style="text-align:center;">
+        <div style="font:10px monospace;opacity:0.5;margin-bottom:4px;">${h3Index}</div>
+        <div style="font-weight:600;font-size:12px;color:#555;">Ke\u015Ffedilmemi\u015F</div>
+      </div>`;
+    this._animateTooltipIn(x, y);
+    this._tooltipTimer = setTimeout(() => {
+      this._tooltip.style.opacity = '0';
+      this._tooltip.style.transform = 'translateY(6px) scale(0.97)';
+      setTimeout(() => {
+        this._tooltip.style.display = 'none';
+        this._tooltipH3Index = null;
+      }, 220);
+    }, 3000);
   },
 
   _formatArea(m2) {
