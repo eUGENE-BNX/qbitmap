@@ -76,6 +76,16 @@ async function syncRoutes(fastify) {
     return result;
   });
 
+  // Item view count sync
+  fastify.post('/item-views', async (request, reply) => {
+    const { itemId, viewCount } = request.body;
+    if (!itemId || viewCount == null) {
+      return reply.code(400).send({ error: 'Missing fields: itemId, viewCount' });
+    }
+    await contentSync.syncItemViewCount({ itemId, viewCount });
+    return { ok: true };
+  });
+
   // Sync status
   fastify.get('/status', async () => {
     const pool = require('../services/db-pool');

@@ -1,4 +1,5 @@
 const db = require('../services/database');
+const { notifyH3ItemViews } = require('../utils/h3-sync');
 const logger = require('../utils/logger').child({ module: 'view-counts' });
 
 const ALLOWED_ENTITY_TYPES = ['video_message', 'camera'];
@@ -19,6 +20,14 @@ async function viewCountRoutes(fastify, options) {
 
     try {
       await db.incrementViewCount(entityType, entityId);
+
+      // Fire-and-forget: sync item view count to h3-service
+      if (entityType === 'video_message') {
+        db.getViewCount(entityType, entityId).then(viewCount => {
+          notifyH3ItemViews({ itemId: entityId, viewCount });
+        }).catch(() => {});
+      }
+
       return { status: 'ok' };
     } catch (error) {
       logger.error({ err: error, entityType, entityId }, 'View count increment failed');

@@ -11,20 +11,24 @@ async function getViewportOwnership(swLat, swLng, neLat, neLng, zoom) {
 
   const { rows } = await pool.query(
     `SELECT DISTINCT ON (cell)
-       cell, user_id, display_name, avatar_url, total_points
+       cell, user_id, display_name, avatar_url, total_points,
+       video_count, photo_count, cell_views
      FROM (
        SELECT
          h3_cell_to_parent(ci.h3_res14, $1) AS cell,
          ci.user_id,
          up.display_name,
          up.avatar_url,
+         COALESCE(up.video_count, 0) AS video_count,
+         COALESCE(up.photo_count, 0) AS photo_count,
          SUM(ci.points) AS total_points,
+         SUM(COALESCE(ci.view_count, 0)) AS cell_views,
          MIN(ci.created_at) AS earliest
        FROM content_items ci
        JOIN user_profiles up ON up.id = ci.user_id
        WHERE ci.lat BETWEEN $2 AND $3
          AND ci.lng BETWEEN $4 AND $5
-       GROUP BY h3_cell_to_parent(ci.h3_res14, $1), ci.user_id, up.display_name, up.avatar_url
+       GROUP BY h3_cell_to_parent(ci.h3_res14, $1), ci.user_id, up.display_name, up.avatar_url, up.video_count, up.photo_count
      ) sub
      ORDER BY cell, total_points DESC, earliest ASC`,
     [resolution, swLat, neLat, swLng, neLng]
@@ -35,7 +39,10 @@ async function getViewportOwnership(swLat, swLng, neLat, neLng, zoom) {
     userId: r.user_id,
     displayName: r.display_name,
     avatarUrl: r.avatar_url,
-    points: parseInt(r.total_points)
+    points: parseInt(r.total_points),
+    videoCount: parseInt(r.video_count),
+    photoCount: parseInt(r.photo_count),
+    cellViews: parseInt(r.cell_views)
   }));
 
   const result = { resolution, cells };

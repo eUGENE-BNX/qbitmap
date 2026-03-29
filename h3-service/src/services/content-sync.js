@@ -16,6 +16,8 @@ async function upsertContentItem({ itemType, itemId, userId, lat, lng, points })
     [itemType, itemId, userId, lat, lng, points]
   );
   cache.invalidateAll();
+  // Recalculate user's video/photo counts
+  await recalcUserContentCounts(userId);
 }
 
 async function removeContentItem(itemId) {
@@ -99,10 +101,34 @@ async function bulkUpsertUserProfiles(profiles) {
   }
 }
 
+async function recalcUserContentCounts(userId) {
+  await pool.query(
+    `UPDATE user_profiles SET
+       video_count = COALESCE(s.vc, 0),
+       photo_count = COALESCE(s.pc, 0)
+     FROM (
+       SELECT
+         COUNT(*) FILTER (WHERE item_type = 'video') AS vc,
+         COUNT(*) FILTER (WHERE item_type = 'photo') AS pc
+       FROM content_items WHERE user_id = $1
+     ) s
+     WHERE id = $1`,
+    [userId]
+  );
+}
+
+async function syncItemViewCount({ itemId, viewCount }) {
+  await pool.query(
+    `UPDATE content_items SET view_count = $2 WHERE item_id = $1`,
+    [itemId, viewCount]
+  );
+}
+
 module.exports = {
   upsertContentItem,
   removeContentItem,
   upsertUserProfile,
   bulkUpsertContentItems,
-  bulkUpsertUserProfiles
+  bulkUpsertUserProfiles,
+  syncItemViewCount
 };

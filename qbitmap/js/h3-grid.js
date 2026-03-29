@@ -77,7 +77,7 @@ const H3Grid = {
 
     // Rich tooltip for ownership + H3 index
     const tip = document.createElement('div');
-    tip.style.cssText = 'position:fixed;display:none;pointer-events:none;z-index:9999;background:rgba(50,50,55,0.93);color:#fff;padding:8px 12px;border-radius:8px;font:12px sans-serif;white-space:nowrap;max-width:280px;';
+    tip.style.cssText = 'position:fixed;display:none;pointer-events:none;z-index:9999;background:rgba(18,20,28,0.80);color:#fff;padding:14px 16px;border-radius:12px;font:12px sans-serif;white-space:nowrap;width:180px;border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,0.45);transition:opacity 0.22s ease,transform 0.22s ease;';
     document.body.appendChild(tip);
     this._tooltip = tip;
 
@@ -254,6 +254,8 @@ const H3Grid = {
           const owner = this._ownershipMap && this._ownershipMap.get(info.object.h3Index);
           if (owner) {
             this._showOwnerTooltipTimed(info.x, info.y, info.object.h3Index, owner);
+          } else if (this._currentResolution >= 13) {
+            this._showUnownedTooltip(info.x, info.y, info.object.h3Index);
           } else {
             this._tooltip.style.display = 'none';
           }
@@ -328,30 +330,71 @@ const H3Grid = {
     this._tooltipH3Index = h3Index;
     this._showOwnerTooltip(x, y, h3Index, owner);
     this._tooltipTimer = setTimeout(() => {
-      this._tooltip.style.display = 'none';
-      this._tooltipH3Index = null;
+      this._tooltip.style.opacity = '0';
+      this._tooltip.style.transform = 'translateY(6px) scale(0.97)';
+      setTimeout(() => {
+        this._tooltip.style.display = 'none';
+        this._tooltipH3Index = null;
+      }, 220);
     }, 5000);
+  },
+
+  _animateTooltipIn(x, y) {
+    this._tooltip.style.display = 'block';
+    this._tooltip.style.left = (x + 14) + 'px';
+    this._tooltip.style.top = (y - 40) + 'px';
+    this._tooltip.style.opacity = '0';
+    this._tooltip.style.transform = 'translateY(6px) scale(0.97)';
+    requestAnimationFrame(() => {
+      this._tooltip.style.opacity = '1';
+      this._tooltip.style.transform = 'translateY(0) scale(1)';
+    });
+  },
+
+  _statRow(label, value, valueStyle) {
+    return `<div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:3px;">
+      <span style="color:#999;font-size:11px;">${label}</span>
+      <span style="font-size:12px;font-weight:500;${valueStyle || ''}">${value}</span>
+    </div>`;
   },
 
   _showOwnerTooltip(x, y, h3Index, owner) {
     const userColor = this._getUserColor(owner.userId);
     const avatarHtml = owner.avatarUrl
-      ? `<img src="${this._escapeHtml(owner.avatarUrl)}" style="width:36px;height:36px;border-radius:6px;flex-shrink:0;border:2px solid ${userColor.hex};" onerror="this.style.display='none'" />`
-      : `<div style="width:36px;height:36px;border-radius:6px;flex-shrink:0;background:${userColor.hex};opacity:0.5;"></div>`;
+      ? `<img src="${this._escapeHtml(owner.avatarUrl)}" style="width:40px;height:40px;border-radius:10px;flex-shrink:0;border:2px solid ${userColor.hex};" onerror="this.style.display='none'" />`
+      : `<div style="width:40px;height:40px;border-radius:10px;flex-shrink:0;background:${userColor.hex};opacity:0.5;"></div>`;
     const cellArea = h3.cellArea(h3Index, 'm2');
     const areaStr = this._formatArea(cellArea);
+    const cellViews = (owner.cellViews || 0).toLocaleString('tr-TR');
+    const videos = owner.videoCount || 0;
+    const photos = owner.photoCount || 0;
+
     this._tooltip.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:2px;">
         ${avatarHtml}
         <div>
-          <div style="font-weight:600;font-size:13px;margin-bottom:2px;">${this._escapeHtml(owner.displayName)}</div>
-          <div style="font:10px monospace;opacity:0.6;margin-bottom:2px;">${h3Index}</div>
-          <div style="color:${userColor.hex};font-weight:500;font-size:12px;">${owner.points} qbits <span style="opacity:0.7;">(${areaStr})</span></div>
+          <div style="font-weight:600;font-size:14px;">${this._escapeHtml(owner.displayName)}</div>
+          <div style="font-size:11px;opacity:0.5;margin-top:2px;">Qbitscore: ${owner.points.toLocaleString('tr-TR')}</div>
         </div>
+      </div>
+      <div style="height:1px;background:rgba(255,255,255,0.08);margin:10px 0;"></div>
+      ${this._statRow('Lokasyon', h3Index, 'font:9px/1.4 monospace;')}
+      ${this._statRow('Dijital Toprak', areaStr)}
+      ${this._statRow('Pop\u00fclerlik', cellViews)}
+      ${this._statRow('Video', videos)}
+      ${this._statRow('Foto\u011fraf', photos)}`;
+    this._animateTooltipIn(x, y);
+  },
+
+  _showUnownedTooltip(x, y, h3Index) {
+    this._tooltipH3Index = h3Index;
+    clearTimeout(this._tooltipTimer);
+    this._tooltip.innerHTML = `
+      <div style="text-align:center;">
+        <div style="font:10px monospace;opacity:0.7;margin-bottom:4px;">${h3Index}</div>
+        <div style="font-weight:600;font-size:12px;color:#666;">Sahipsiz</div>
       </div>`;
-    this._tooltip.style.display = 'block';
-    this._tooltip.style.left = (x + 14) + 'px';
-    this._tooltip.style.top = (y - 40) + 'px';
+    this._animateTooltipIn(x, y);
   },
 
   _formatArea(m2) {

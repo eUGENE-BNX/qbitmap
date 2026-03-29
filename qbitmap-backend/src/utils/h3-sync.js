@@ -102,10 +102,32 @@ async function notifyH3UserProfile({ id, displayName, avatarUrl }) {
   }
 }
 
+async function notifyH3ItemViews({ itemId, viewCount }) {
+  if (!H3_SERVICE_URL || !H3_SERVICE_KEY) return;
+
+  try {
+    const response = await fetch(`${H3_SERVICE_URL}/api/v1/sync/item-views`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Service-Key': H3_SERVICE_KEY
+      },
+      body: JSON.stringify({ itemId, viewCount })
+    });
+
+    if (!response.ok) {
+      logger.warn({ status: response.status, itemId }, 'H3 item views sync returned non-ok');
+    }
+  } catch (e) {
+    logger.warn({ err: e.message, itemId }, 'H3 item views sync failed');
+  }
+}
+
 module.exports = {
   notifyH3CameraChange,
   notifyH3CameraRemove,
   notifyH3ContentItem,
   notifyH3ContentItemRemove,
-  notifyH3UserProfile
+  notifyH3UserProfile,
+  notifyH3ItemViews
 };
