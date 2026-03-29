@@ -6,17 +6,16 @@
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const { getVllmUrl } = require('../utils/ai-config');
 const logger = require('../utils/logger').child({ module: 'health-checker' });
+const { services } = require('../config');
 
-// Server hostnames from environment (with defaults for backwards compatibility)
-const QBITMAP_HOST = process.env.QBITMAP_HOST || '91.99.219.248';
-const MEDIAMTX_HOST = process.env.MEDIAMTX_HOST || '91.98.90.57';
+const QBITMAP_HOST = services.qbitmapHost;
+const MEDIAMTX_HOST = services.mediamtxHost;
 const VOICE_HOST = process.env.VOICE_HOST || '91.98.131.74';
 
-// Service URLs from environment
-const ONVIF_SERVICE_URL = process.env.ONVIF_SERVICE_URL || `http://${MEDIAMTX_HOST}:3003`;
-const CAPTURE_SERVICE_URL = process.env.CAPTURE_SERVICE_URL || `http://${MEDIAMTX_HOST}:3002`;
-const MEDIAMTX_WHEP_BASE = process.env.MEDIAMTX_WHEP_BASE || `http://${MEDIAMTX_HOST}:8889`;
-const MEDIAMTX_API = process.env.MEDIAMTX_API || `http://${MEDIAMTX_HOST}:9997`;
+const ONVIF_SERVICE_URL = services.onvifServiceUrl;
+const CAPTURE_SERVICE_URL = services.captureServiceUrl;
+const MEDIAMTX_WHEP_BASE = services.mediamtxWhepBase;
+const MEDIAMTX_API = services.mediamtxApi;
 const VOICE_API_URL = process.env.ENTANGLE_API_URL || `http://${VOICE_HOST}:8000`;
 
 // Service configurations

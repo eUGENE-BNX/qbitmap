@@ -4,6 +4,8 @@
  * Optimized for high-frequency updates (10-15 FPS per camera)
  */
 
+const logger = require('../utils/logger').child({ module: 'stream-cache' });
+
 class StreamCache {
   constructor() {
     // Map<cameraId, { buffer: Buffer, timestamp: Date, size: number }>
@@ -62,7 +64,7 @@ class StreamCache {
     }
 
     if (cleanedFrames > 0 || cleanedClients > 0) {
-      console.log(`[STREAM] Cleanup: ${cleanedFrames} stale frames, ${cleanedClients} disconnected clients`);
+      logger.info({ cleanedFrames, cleanedClients }, 'Cleanup: stale frames and disconnected clients removed');
     }
   }
 
@@ -138,7 +140,7 @@ class StreamCache {
     this.clients.get(cameraId).add(response);
 
     const count = this.clients.get(cameraId).size;
-    console.log(`[STREAM] Client added for camera ${cameraId}, total: ${count}`);
+    logger.info({ cameraId, total: count }, 'Client added for camera');
   }
 
   /**
@@ -151,7 +153,7 @@ class StreamCache {
     if (clients) {
       clients.delete(response);
       const count = clients.size;
-      console.log(`[STREAM] Client removed from camera ${cameraId}, remaining: ${count}`);
+      logger.info({ cameraId, remaining: count }, 'Client removed from camera');
 
       if (count === 0) {
         this.clients.delete(cameraId);

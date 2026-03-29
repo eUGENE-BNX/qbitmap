@@ -194,6 +194,8 @@ class WebSocketService {
           logger.debug('Terminating dead connection');
           // Clean up client from map before terminating
           // (terminate() may not always fire 'close' event)
+          clearRateLimit(ws);
+          decrementIpConnection(ws.clientIp);
           this.removeClient(ws);
           return ws.terminate();
         }

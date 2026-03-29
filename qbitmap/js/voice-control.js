@@ -280,7 +280,7 @@ const VoiceControl = {
 
             // API'den kameraları çek
             Logger.log('[Voice] API çağrılıyor...');
-            const response = await fetch('https://stream.qbitmap.com/api/users/me/cameras', {
+            const response = await fetch(`${QBitmapConfig.api.base}/api/users/me/cameras`, {
               credentials: 'include'
             });
 

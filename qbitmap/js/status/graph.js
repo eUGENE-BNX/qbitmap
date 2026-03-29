@@ -1,3 +1,5 @@
+import { Logger } from '../utils.js';
+
 /**
  * StatusGraph - SVG-based network graph rendering
  * Renders service nodes and connection lines
@@ -31,7 +33,7 @@ const StatusGraph = {
     this.packetsContainer = elements.packetsContainer;
 
     if (!this.svg || !this.nodesContainer) {
-      console.warn('[StatusGraph] Required elements not found');
+      Logger.warn('[StatusGraph] Required elements not found');
       return;
     }
 

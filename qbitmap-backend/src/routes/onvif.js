@@ -6,9 +6,9 @@ const { authHook } = require('../utils/jwt');
 const { validateBody, addOnvifCameraSchema, linkCameraSchema, webhookEventSchema } = require('../utils/validation');
 const logger = require('../utils/logger').child({ module: 'onvif' });
 const { TIMEOUTS } = require('../config/constants');
+const { services } = require('../config');
 
-// Allowed IPs for ONVIF webhook (onvif-events service)
-const WEBHOOK_ALLOWED_IPS = (process.env.ONVIF_WEBHOOK_IPS || '91.98.90.57,127.0.0.1,::1').split(',').map(s => s.trim());
+const WEBHOOK_ALLOWED_IPS = services.webhookAllowedIps;
 
 /**
  * ONVIF Integration API Routes
@@ -55,7 +55,7 @@ async function onvifRoutes(fastify, options) {
    */
   fastify.get('/available-cameras', async (request, reply) => {
     try {
-      const onvifServiceUrl = process.env.ONVIF_SERVICE_URL || 'http://91.98.90.57:3003';
+      const onvifServiceUrl = services.onvifServiceUrl;
 
       const response = await fetchWithTimeout(`${onvifServiceUrl}/cameras`, {}, TIMEOUTS.ONVIF_DEFAULT);
 
@@ -86,7 +86,7 @@ async function onvifRoutes(fastify, options) {
     const { id, name, host, port, username, password } = request.body;
 
     try {
-      const onvifServiceUrl = process.env.ONVIF_SERVICE_URL || 'http://91.98.90.57:3003';
+      const onvifServiceUrl = services.onvifServiceUrl;
 
       const response = await fetchWithTimeout(`${onvifServiceUrl}/cameras`, {
         method: 'POST',
@@ -215,7 +215,7 @@ async function onvifRoutes(fastify, options) {
       }
 
       // Update profile in onvif-events service
-      const onvifServiceUrl = process.env.ONVIF_SERVICE_URL || 'http://91.98.90.57:3003';
+      const onvifServiceUrl = services.onvifServiceUrl;
       const profileSlug = template.model_name.toLowerCase().replace(/\s+/g, '-');
 
       try {

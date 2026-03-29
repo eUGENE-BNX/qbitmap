@@ -1,5 +1,6 @@
 const { notifyH3CameraChange, notifyH3CameraRemove, notifyH3ContentItem, notifyH3ContentItemRemove } = require('../../utils/h3-sync');
 const settingsCache = require('../settings-cache');
+const logger = require('../../utils/logger').child({ module: 'db-cameras' });
 
 module.exports = function(DatabaseService) {
 
@@ -167,7 +168,7 @@ DatabaseService.prototype.createWhepCamera = async function(userId, { name, whep
     const camera = await this.getCameraByDeviceId(deviceId);
     return { success: true, camera };
   } catch (error) {
-    console.error('[Database] Create WHEP camera error:', error);
+    logger.error({ err: error }, 'Create WHEP camera error');
     return { success: false, error: 'Failed to create camera' };
   }
 };
@@ -193,7 +194,7 @@ DatabaseService.prototype.createRtspCamera = async function(userId, { name, whep
     const camera = await this.getCameraByDeviceId(deviceId);
     return { success: true, camera };
   } catch (error) {
-    console.error('[Database] Create RTSP camera error:', error);
+    logger.error({ err: error }, 'Create RTSP camera error');
     return { success: false, error: 'Failed to create camera' };
   }
 };
@@ -225,7 +226,7 @@ DatabaseService.prototype.createCityCamera = async function(adminUserId, { name,
     }
     return { success: true, camera };
   } catch (error) {
-    console.error('[Database] Create city camera error:', error);
+    logger.error({ err: error }, 'Create city camera error');
     return { success: false, error: 'Failed to create city camera' };
   }
 };
@@ -274,7 +275,7 @@ DatabaseService.prototype.createRtmpCamera = async function(userId, { name, whep
     const camera = await this.getCameraByDeviceId(deviceId);
     return { success: true, camera };
   } catch (error) {
-    console.error('[Database] Create RTMP camera error:', error);
+    logger.error({ err: error }, 'Create RTMP camera error');
     return { success: false, error: 'Failed to create camera' };
   }
 };
@@ -297,7 +298,7 @@ DatabaseService.prototype.getPublicCamerasByBbox = async function(bbox, page = 1
     FROM cameras
     WHERE is_public = 1 AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ?
     ORDER BY last_seen DESC
-    LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+    LIMIT ${limit} OFFSET ${offset}
   `, [bbox.west, bbox.east, bbox.south, bbox.north]);
 
   const [countRows] = await this.pool.execute(
@@ -321,7 +322,7 @@ DatabaseService.prototype.getPublicCamerasPaginated = async function(page = 1, l
     FROM cameras
     WHERE is_public = 1
     ORDER BY last_seen DESC
-    LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+    LIMIT ${limit} OFFSET ${offset}
   `);
 
   const [countRows] = await this.pool.execute('SELECT COUNT(*) as count FROM cameras WHERE is_public = 1');
@@ -342,7 +343,7 @@ DatabaseService.prototype.getUserCamerasPaginated = async function(userId, page 
     FROM cameras
     WHERE user_id = ?
     ORDER BY last_seen DESC
-    LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+    LIMIT ${limit} OFFSET ${offset}
   `, [userId]);
 
   const [countRows] = await this.pool.execute('SELECT COUNT(*) as count FROM cameras WHERE user_id = ?', [userId]);
@@ -364,7 +365,7 @@ DatabaseService.prototype.getActiveAlarmsPaginated = async function(page = 1, li
     JOIN cameras c ON c.id = a.camera_id
     WHERE a.cleared_at IS NULL
     ORDER BY a.triggered_at DESC
-    LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+    LIMIT ${limit} OFFSET ${offset}
   `);
 
   const [countRows] = await this.pool.execute('SELECT COUNT(*) as count FROM alarms WHERE cleared_at IS NULL');
@@ -385,7 +386,7 @@ DatabaseService.prototype.getCameraAlarmHistoryPaginated = async function(camera
     FROM alarms
     WHERE camera_id = ?
     ORDER BY triggered_at DESC
-    LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+    LIMIT ${limit} OFFSET ${offset}
   `, [cameraId]);
 
   const [countRows] = await this.pool.execute('SELECT COUNT(*) as count FROM alarms WHERE camera_id = ?', [cameraId]);

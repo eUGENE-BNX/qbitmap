@@ -22,16 +22,16 @@ class CleanupService {
       }, 60 * 1000);
     }, 30 * 1000);
 
-    console.log('Cleanup service started - maintenance every 6 hours, broadcast cleanup every 60s (30s offset)');
+    logger.info('Cleanup service started - maintenance every 6 hours, broadcast cleanup every 60s (30s offset)');
   }
 
   async runMaintenance() {
-    console.log('Starting database maintenance...');
+    logger.info('Starting database maintenance...');
 
     try {
       // Run ANALYZE on frequently queried tables for query optimizer
       await db.pool.query('ANALYZE TABLE cameras, users, alarms, onvif_events, face_detection_log');
-      console.log('Table analysis complete');
+      logger.info('Table analysis complete');
 
       // Get database size info
       const [rows] = await db.pool.query(`
@@ -39,14 +39,14 @@ class CleanupService {
         FROM information_schema.tables WHERE table_schema = ?
       `, [process.env.DB_NAME || 'qbitmap']);
       const dbSizeMB = rows[0]?.size_mb?.toFixed(2) || '0';
-      console.log(`Database size: ${dbSizeMB} MB`);
+      logger.info({ sizeMB: dbSizeMB }, 'Database size');
 
       // Cleanup old onvif_events (90 day retention)
       const [evtResult] = await db.pool.query(
         'DELETE FROM onvif_events WHERE `timestamp` < DATE_SUB(NOW(), INTERVAL 90 DAY)'
       );
       if (evtResult.affectedRows > 0) {
-        console.log(`Cleaned up ${evtResult.affectedRows} old ONVIF events`);
+        logger.info({ count: evtResult.affectedRows }, 'Cleaned up old ONVIF events');
       }
 
       // Cleanup old face_detection_log (90 day retention)
@@ -54,11 +54,11 @@ class CleanupService {
         'DELETE FROM face_detection_log WHERE detected_at < DATE_SUB(NOW(), INTERVAL 90 DAY)'
       );
       if (faceResult.affectedRows > 0) {
-        console.log(`Cleaned up ${faceResult.affectedRows} old face detection logs`);
+        logger.info({ count: faceResult.affectedRows }, 'Cleaned up old face detection logs');
       }
 
     } catch (error) {
-      console.error('Maintenance error:', error);
+      logger.error({ err: error }, 'Maintenance error');
     }
   }
 

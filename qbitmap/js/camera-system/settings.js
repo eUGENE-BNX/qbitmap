@@ -1504,7 +1504,7 @@ const SettingsMixin = {
   pickLocationFromSettings() {
     const cache = this.settingsCache;
     if (!cache) {
-      console.error('[Settings] No cache found');
+      Logger.error('[Settings] No cache found');
       return;
     }
 
@@ -1517,7 +1517,7 @@ const SettingsMixin = {
     // Store cache values before closing
     const deviceId = cache.deviceId;
     const cameraId = cache.cameraId;
-    console.log('[Settings] Starting location pick for:', { deviceId, cameraId });
+    Logger.log('[Settings] Starting location pick for:', { deviceId, cameraId });
 
     // Close settings drawer temporarily
     this.closeSettings();
@@ -1539,35 +1539,35 @@ const SettingsMixin = {
     // Create click handler
     const self = this;
     const handleMapClick = function(e) {
-      console.log('[Settings] Map clicked!', e.lngLat);
+      Logger.log('[Settings] Map clicked!', e.lngLat);
 
       // Prevent if already handled
       if (!self._isPickingLocation) {
-        console.log('[Settings] Already handled, ignoring');
+        Logger.log('[Settings] Already handled, ignoring');
         return;
       }
       self._isPickingLocation = false;
 
       const lat = e.lngLat.lat;
       const lng = e.lngLat.lng;
-      console.log('[Settings] Coordinates:', { lat, lng });
+      Logger.log('[Settings] Coordinates:', { lat, lng });
 
       // Store the picked coordinates
       self._pickedLocation = { lat, lng };
 
       // Clean up immediately
       self.cleanupLocationPick();
-      console.log('[Settings] Cleaned up, reopening settings...');
+      Logger.log('[Settings] Cleaned up, reopening settings...');
 
       // Reopen settings with new coordinates
       setTimeout(() => {
-        console.log('[Settings] Calling openSettings with:', deviceId, cameraId);
+        Logger.log('[Settings] Calling openSettings with:', deviceId, cameraId);
         self.openSettings(deviceId, cameraId);
         // Update the coordinate inputs after form renders
         setTimeout(() => {
           const latInput = document.getElementById('settings-lat');
           const lngInput = document.getElementById('settings-lng');
-          console.log('[Settings] Found inputs:', { latInput: !!latInput, lngInput: !!lngInput });
+          Logger.log('[Settings] Found inputs:', { latInput: !!latInput, lngInput: !!lngInput });
           if (latInput) latInput.value = lat.toFixed(6);
           if (lngInput) lngInput.value = lng.toFixed(6);
         }, 500);
@@ -1579,12 +1579,12 @@ const SettingsMixin = {
 
     // Add click listener - try both methods
     AppState.map.once('click', handleMapClick);
-    console.log('[Settings] Click listener added via map.once');
+    Logger.log('[Settings] Click listener added via map.once');
 
     // Also add via canvas directly as fallback
     const canvas = AppState.map.getCanvas();
     this._canvasClickHandler = (e) => {
-      console.log('[Settings] Canvas clicked directly!');
+      Logger.log('[Settings] Canvas clicked directly!');
       // Get coordinates from map
       const rect = canvas.getBoundingClientRect();
       const point = {
@@ -1592,7 +1592,7 @@ const SettingsMixin = {
         y: e.clientY - rect.top
       };
       const lngLat = AppState.map.unproject(point);
-      console.log('[Settings] Canvas lngLat:', lngLat);
+      Logger.log('[Settings] Canvas lngLat:', lngLat);
 
       // Create fake event for handler
       handleMapClick({ lngLat });
@@ -1601,12 +1601,12 @@ const SettingsMixin = {
       canvas.removeEventListener('click', this._canvasClickHandler);
     };
     canvas.addEventListener('click', this._canvasClickHandler, { once: true, capture: true });
-    console.log('[Settings] Canvas click listener also added (capture phase)');
+    Logger.log('[Settings] Canvas click listener also added (capture phase)');
 
     // Add escape key handler to cancel
     this._escapeHandler = (e) => {
       if (e.key === 'Escape') {
-        console.log('[Settings] Escape pressed, canceling');
+        Logger.log('[Settings] Escape pressed, canceling');
         this._isPickingLocation = false;
         this.cleanupLocationPick();
         // Reopen settings without changes

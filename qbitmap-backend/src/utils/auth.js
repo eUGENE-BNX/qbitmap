@@ -1,14 +1,15 @@
 const crypto = require('crypto');
+const logger = require('./logger').child({ module: 'auth' });
 
 const SHARED_SECRET = process.env.DEVICE_SHARED_SECRET;
 const isProduction = process.env.NODE_ENV === 'production';
 
 if (!SHARED_SECRET) {
   if (isProduction) {
-    console.error('[Auth] FATAL: DEVICE_SHARED_SECRET not set in production');
+    logger.error('FATAL: DEVICE_SHARED_SECRET not set in production');
     process.exit(1);
   }
-  console.warn('[Auth] WARNING: DEVICE_SHARED_SECRET not set, using fallback');
+  logger.warn('DEVICE_SHARED_SECRET not set, using fallback');
 }
 
 function computeHmacSha256(deviceId, secret = SHARED_SECRET) {

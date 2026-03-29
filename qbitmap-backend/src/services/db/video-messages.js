@@ -153,15 +153,20 @@ DatabaseService.prototype.ensureTag = async function(tagName) {
 DatabaseService.prototype.setVideoMessageTags = async function(videoMessageId, tagNames) {
   if (!tagNames || tagNames.length === 0) return;
   const limited = tagNames.slice(0, 5);
-  for (const name of limited) {
-    const tagId = await this.ensureTag(name);
-    if (tagId) {
-      await this.pool.execute(
-        'INSERT IGNORE INTO video_message_tags (video_message_id, tag_id) VALUES (?, ?)',
-        [videoMessageId, tagId]
-      );
-    }
-  }
+
+  // Ensure all tags exist in parallel
+  const tagIds = await Promise.all(limited.map(name => this.ensureTag(name)));
+  const validIds = tagIds.filter(Boolean);
+
+  if (validIds.length === 0) return;
+
+  // Batch insert all tag associations
+  const placeholders = validIds.map(() => '(?, ?)').join(', ');
+  const params = validIds.flatMap(tagId => [videoMessageId, tagId]);
+  await this.pool.execute(
+    `INSERT IGNORE INTO video_message_tags (video_message_id, tag_id) VALUES ${placeholders}`,
+    params
+  );
 };
 
 DatabaseService.prototype.replaceVideoMessageTags = async function(videoMessageId, tagNames) {
@@ -287,7 +292,7 @@ DatabaseService.prototype.getAdminVideoMessages = async function(page = 1, limit
      LEFT JOIN view_counts vc ON vc.entity_type = 'video_message' AND vc.entity_id = vm.message_id
      WHERE ${whereClause}
      ORDER BY vm.created_at DESC
-     LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`,
+     LIMIT ${limit} OFFSET ${offset}`,
     params
   );
 

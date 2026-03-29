@@ -1,4 +1,5 @@
 import { QBitmapConfig } from '../config.js';
+import { Logger } from '../utils.js';
 import { StatusGraph } from './graph.js';
 import { StatusAnimations } from './animations.js';
 
@@ -28,7 +29,7 @@ const StatusSystem = {
    * Initialize the status system
    */
   async init() {
-    console.log('[StatusSystem] Initializing...');
+    Logger.log('[StatusSystem] Initializing...');
 
     // Cache DOM elements
     this.cacheElements();
@@ -45,7 +46,7 @@ const StatusSystem = {
     // Setup visibility change handler
     this.setupVisibilityHandler();
 
-    console.log('[StatusSystem] Initialized successfully');
+    Logger.log('[StatusSystem] Initialized successfully');
   },
 
   /**
@@ -147,7 +148,7 @@ const StatusSystem = {
       this.countdown = 30;
 
     } catch (error) {
-      console.error('[StatusSystem] Fetch error:', error);
+      Logger.error('[StatusSystem] Fetch error:', error);
       this.renderError(error);
     } finally {
       this.isLoading = false;

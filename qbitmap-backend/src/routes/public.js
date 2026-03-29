@@ -5,13 +5,10 @@ const { authHook, optionalAuthHook } = require('../utils/jwt');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const { validateBody, cameraSettingsSchema } = require('../utils/validation');
 const logger = require('../utils/logger').child({ module: 'public' });
+const { services } = require('../config');
 
 // Allowed WHEP server hosts (prevent SSRF attacks)
-// Can be extended via environment variable (comma-separated)
-const ALLOWED_WHEP_HOSTS = (process.env.ALLOWED_WHEP_HOSTS || '91.98.90.57')
-  .split(',')
-  .map(h => h.trim())
-  .filter(Boolean);
+const ALLOWED_WHEP_HOSTS = [...services.allowedWhepHosts];
 
 // Only allow localhost in development mode (SSRF protection)
 if (process.env.NODE_ENV !== 'production') {
@@ -220,7 +217,7 @@ async function publicRoutes(fastify, options) {
       const cameras = await db.getCityCameras();
       // Internal request from clip scheduler (MediaMTX server) — include source URLs
       const isInternal = request.query.internal === '1' &&
-        ['91.98.90.57', '127.0.0.1', '::1'].includes(request.ip);
+        [...services.allowedWhepHosts, '127.0.0.1', '::1'].includes(request.ip);
 
       return {
         cameras: cameras.map(c => {
@@ -657,7 +654,7 @@ async function publicRoutes(fastify, options) {
     const { path } = request.params;
 
     try {
-      const MEDIAMTX_API = process.env.MEDIAMTX_API || 'http://91.98.90.57:9997';
+      const MEDIAMTX_API = services.mediamtxApi;
 
       // Fetch path info and HLS muxer info in parallel
       const [pathRes, hlsRes] = await Promise.all([

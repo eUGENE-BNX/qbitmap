@@ -1,7 +1,7 @@
 import '../css/vehicles.css';
 import { QBitmapConfig } from './config.js';
 import { AuthSystem } from './auth.js';
-import { escapeHtml } from './utils.js';
+import { escapeHtml, Logger } from './utils.js';
 import * as AppState from './state.js';
 const { layers } = AppState;
 
@@ -503,20 +503,20 @@ const VehicleAnimation = {
 
     // Handle incoming tracks
     pc.ontrack = function(event) {
-      console.log('[VehicleWHEP] Got track:', event.track.kind);
+      Logger.log('[VehicleWHEP] Got track:', event.track.kind);
       if (event.streams && event.streams[0]) {
         videoEl.srcObject = event.streams[0];
         videoEl.style.cssText = 'display:block; position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain; background:#000;';
         placeholder.style.display = 'none';
 
         videoEl.play().catch(function(err) {
-          console.error('[VehicleWHEP] Play error:', err);
+          Logger.error('[VehicleWHEP] Play error:', err);
         });
       }
     };
 
     pc.oniceconnectionstatechange = function() {
-      console.log('[VehicleWHEP] ICE state:', pc.iceConnectionState);
+      Logger.log('[VehicleWHEP] ICE state:', pc.iceConnectionState);
       if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
         placeholder.textContent = 'Bağlantı kesildi';
         placeholder.style.display = 'flex';
@@ -554,10 +554,10 @@ const VehicleAnimation = {
         }));
       })
       .then(function() {
-        console.log('[VehicleWHEP] Connected successfully');
+        Logger.log('[VehicleWHEP] Connected successfully');
       })
       .catch(function(error) {
-        console.error('[VehicleWHEP] Error:', error);
+        Logger.error('[VehicleWHEP] Error:', error);
         placeholder.textContent = 'Bağlantı hatası';
         placeholder.style.display = 'flex';
         videoEl.style.display = 'none';
@@ -775,7 +775,7 @@ const VehicleAnimation = {
         container.innerHTML = html;
       })
       .catch(function(error) {
-        console.error('[VehicleEdit] Camera load error:', error);
+        Logger.error('[VehicleEdit] Camera load error:', error);
         container.innerHTML = '<div class="camera-error">Kameralar yüklenemedi</div>';
       });
   },

@@ -305,7 +305,7 @@ DatabaseService.prototype.getAllUsersPaginated = async function(page = 1, limit 
     LEFT JOIN (SELECT user_id, COUNT(*) as camera_count FROM cameras GROUP BY user_id) cc ON cc.user_id = u.id
     WHERE ${whereClause}
     ORDER BY u.created_at DESC
-    LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+    LIMIT ${limit} OFFSET ${offset}
   `, params);
 
   const [countRows] = await this.pool.execute(

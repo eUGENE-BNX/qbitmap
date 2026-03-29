@@ -1,3 +1,5 @@
+const logger = require('../../utils/logger').child({ module: 'db-content' });
+
 module.exports = function(DatabaseService) {
 
 DatabaseService.prototype.createClickableZone = async function(cameraId, userId, { name, points, relayOnUrl, relayOffUrl, relayStatusUrl }) {
@@ -10,7 +12,7 @@ DatabaseService.prototype.createClickableZone = async function(cameraId, userId,
     );
     return { success: true, zoneId };
   } catch (error) {
-    console.error('[Database] Create clickable zone error:', error);
+    logger.error({ err: error }, 'Create clickable zone error');
     return { success: false, error: error.message };
   }
 };

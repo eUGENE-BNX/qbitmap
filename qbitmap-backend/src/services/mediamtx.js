@@ -6,11 +6,11 @@
 const crypto = require('crypto');
 const dns = require('dns').promises;
 const logger = require('../utils/logger').child({ module: 'mediamtx' });
+const { services } = require('../config');
 
-// MediaMTX server configuration
-const MEDIAMTX_API = process.env.MEDIAMTX_API || 'http://91.98.90.57:9997';
-const MEDIAMTX_WHEP_BASE = process.env.MEDIAMTX_WHEP_BASE || 'http://91.98.90.57:8889';
-const MEDIAMTX_HLS_BASE = process.env.MEDIAMTX_HLS_BASE || 'https://hls.qbitmap.com';
+const MEDIAMTX_API = services.mediamtxApi;
+const MEDIAMTX_WHEP_BASE = services.mediamtxWhepBase;
+const MEDIAMTX_HLS_BASE = services.mediamtxHlsBase;
 
 // Private/reserved IP ranges for SSRF protection
 const BLOCKED_IP_PATTERNS = [

@@ -10,9 +10,9 @@ const fs = require('fs');
 const { mkdir, writeFile } = require('fs/promises');
 const crypto = require('crypto');
 const logger = require('../utils/logger').child({ module: 'users' });
+const { services } = require('../config');
 
-// ONVIF Events service configuration
-const ONVIF_SERVICE_URL = process.env.ONVIF_SERVICE_URL || 'http://91.98.90.57:3003';
+const ONVIF_SERVICE_URL = services.onvifServiceUrl;
 
 async function userRoutes(fastify, options) {
 
@@ -721,8 +721,7 @@ async function userRoutes(fastify, options) {
 
   // ==================== DELETE CAMERA (with cleanup) ====================
 
-  // MediaMTX server configuration (use env variable)
-  const MEDIAMTX_SERVER = process.env.MEDIAMTX_SERVER || "91.98.90.57";
+  const MEDIAMTX_SERVER = services.mediamtxServer;
 
   /**
    * Validate path name to prevent command injection

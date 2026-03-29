@@ -4,6 +4,8 @@
  * TTL: 5 minutes, auto-invalidated on update
  */
 
+const logger = require('../utils/logger').child({ module: 'settings-cache' });
+
 class SettingsCache {
   constructor() {
     this.cache = new Map();
@@ -30,7 +32,7 @@ class SettingsCache {
     }
 
     if (cleanedCount > 0) {
-      console.log(`[Settings Cache] Cleaned up ${cleanedCount} expired entries`);
+      logger.info({ cleanedCount }, 'Cleaned up expired entries');
     }
   }
 

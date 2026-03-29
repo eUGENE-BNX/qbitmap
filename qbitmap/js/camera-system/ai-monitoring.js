@@ -818,7 +818,7 @@ const AIMonitoringMixin = {
    */
   handleOnvifEvent(payload) {
     const { deviceId, eventType, eventState } = payload;
-    console.log('[ONVIF] Event received:', deviceId, eventType, eventState);
+    Logger.log('[ONVIF] Event received:', deviceId, eventType, eventState);
 
     if (eventState) {
       switch (eventType) {

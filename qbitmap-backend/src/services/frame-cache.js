@@ -4,6 +4,8 @@
  * [CC-010] Added TTL-based cleanup to prevent memory leaks
  */
 
+const logger = require('../utils/logger').child({ module: 'frame-cache' });
+
 class FrameCache {
   constructor() {
     // Map<cameraId, {frameData: Buffer, capturedAt: Date, size: number, expiresAt: number}>
@@ -88,7 +90,7 @@ class FrameCache {
     }
 
     if (removed > 0) {
-      console.log(`[FrameCache] Cleaned up ${removed} expired frames`);
+      logger.info({ removed }, 'Cleaned up expired frames');
     }
   }
 

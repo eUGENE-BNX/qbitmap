@@ -2,11 +2,11 @@ const db = require('../services/database');
 const { authHook } = require('../utils/jwt');
 const { checkFeatureLimit } = require('../middleware/limits');
 const logger = require('../utils/logger').child({ module: 'recordings' });
+const { services } = require('../config');
 
-// MediaMTX server configuration (use environment variables)
-const MEDIAMTX_API = process.env.MEDIAMTX_API || 'http://91.98.90.57:9997';
-const MEDIAMTX_PLAYBACK = process.env.MEDIAMTX_PLAYBACK || 'http://91.98.90.57:9996';
-const MEDIAMTX_RECORDING_API = process.env.MEDIAMTX_RECORDING_API || 'http://91.98.90.57:9999';
+const MEDIAMTX_API = services.mediamtxApi;
+const MEDIAMTX_PLAYBACK = services.mediamtxPlayback;
+const MEDIAMTX_RECORDING_API = services.mediamtxRecordingApi;
 
 // Recording limits
 const MAX_RECORDING_DURATION_MS = 60 * 60 * 1000; // 60 minutes

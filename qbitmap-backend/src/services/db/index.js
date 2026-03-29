@@ -1,5 +1,6 @@
 const pool = require('../db-pool');
 const settingsCache = require('../settings-cache');
+const logger = require('../../utils/logger').child({ module: 'db' });
 
 // [PERF] Access cache configuration
 const ACCESS_CACHE_TTL = 60000; // 1 minute cache
@@ -34,7 +35,7 @@ class DatabaseService {
     await this.seedOnvifTemplates();
     await this.seedSystemSettings();
     await this.setAdminUser();
-    console.log('Database initialized successfully');
+    logger.info('Database initialized successfully');
   }
 
   // System settings

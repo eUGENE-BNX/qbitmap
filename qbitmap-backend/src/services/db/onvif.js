@@ -1,3 +1,5 @@
+const logger = require('../../utils/logger').child({ module: 'db-onvif' });
+
 module.exports = function(DatabaseService) {
 
 DatabaseService.prototype.seedOnvifTemplates = async function() {
@@ -44,7 +46,7 @@ DatabaseService.prototype.createOnvifTemplate = async function({ modelName, manu
     const template = await this.getOnvifTemplateById(result.insertId);
     return { success: true, template };
   } catch (error) {
-    console.error('[Database] Create ONVIF template error:', error);
+    logger.error({ err: error }, 'Create ONVIF template error');
     return { success: false, error: error.message };
   }
 };
@@ -66,7 +68,7 @@ DatabaseService.prototype.updateOnvifTemplate = async function(templateId, { mod
 
     return { success: true };
   } catch (error) {
-    console.error('[Database] Update ONVIF template error:', error);
+    logger.error({ err: error }, 'Update ONVIF template error');
     return { success: false, error: error.message };
   }
 };
@@ -85,7 +87,7 @@ DatabaseService.prototype.deleteOnvifTemplate = async function(templateId) {
     await this.pool.execute('DELETE FROM onvif_camera_templates WHERE id = ?', [templateId]);
     return { success: true };
   } catch (error) {
-    console.error('[Database] Delete ONVIF template error:', error);
+    logger.error({ err: error }, 'Delete ONVIF template error');
     return { success: false, error: error.message };
   }
 };
@@ -101,7 +103,7 @@ DatabaseService.prototype.createOnvifLink = async function(qbitmapCameraId, onvi
 
     return { success: true };
   } catch (error) {
-    console.error('[Database] Create ONVIF link error:', error);
+    logger.error({ err: error }, 'Create ONVIF link error');
     return { success: false, error: error.message };
   }
 };
@@ -142,7 +144,7 @@ DatabaseService.prototype.deleteOnvifLink = async function(qbitmapCameraId) {
     await this.pool.execute('DELETE FROM camera_onvif_links WHERE qbitmap_camera_id = ?', [qbitmapCameraId]);
     return { success: true };
   } catch (error) {
-    console.error('[Database] Delete ONVIF link error:', error);
+    logger.error({ err: error }, 'Delete ONVIF link error');
     return { success: false, error: error.message };
   }
 };
@@ -160,7 +162,7 @@ DatabaseService.prototype.updateOnvifLinkTemplate = async function(qbitmapCamera
 
     return { success: true };
   } catch (error) {
-    console.error('[Database] Update ONVIF link template error:', error);
+    logger.error({ err: error }, 'Update ONVIF link template error');
     return { success: false, error: error.message };
   }
 };
@@ -173,7 +175,7 @@ DatabaseService.prototype.saveOnvifEvent = async function(cameraId, eventType, e
     );
     return result.insertId;
   } catch (error) {
-    console.error('[Database] Save ONVIF event error:', error);
+    logger.error({ err: error }, 'Save ONVIF event error');
     return null;
   }
 };

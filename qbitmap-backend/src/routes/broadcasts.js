@@ -4,8 +4,9 @@ const wsService = require('../services/websocket');
 const faceApi = require('../services/face-api');
 const { authHook } = require('../utils/jwt');
 const logger = require('../utils/logger').child({ module: 'broadcasts' });
+const { services } = require('../config');
 
-const MEDIAMTX_API = process.env.MEDIAMTX_API || 'http://91.98.90.57:9997';
+const MEDIAMTX_API = services.mediamtxApi;
 const MAX_RECORDING_DURATION_MS = 60 * 60 * 1000; // 60 min
 const broadcastRecordingTimers = new Map();
 

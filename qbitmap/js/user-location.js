@@ -585,7 +585,7 @@ const UserLocationSystem = {
      */
     async saveLocationToBackend(lat, lng, accuracy) {
         try {
-            const response = await fetch('https://stream.qbitmap.com/api/users/me/location', {
+            const response = await fetch(`${QBitmapConfig.api.base}/api/users/me/location`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -607,7 +607,7 @@ const UserLocationSystem = {
      */
     async setLocationVisibility(showOnMap) {
         try {
-            const response = await fetch('https://stream.qbitmap.com/api/users/me/location/visibility', {
+            const response = await fetch(`${QBitmapConfig.api.base}/api/users/me/location/visibility`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',

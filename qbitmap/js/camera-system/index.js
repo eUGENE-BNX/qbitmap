@@ -254,6 +254,13 @@ const CameraSystem = {
     }
     this.recordingCameras.clear();
 
+    // Stop all AI monitoring intervals and clear state
+    for (const [, data] of this.aiMonitoring) {
+      if (data.intervalId) clearInterval(data.intervalId);
+    }
+    this.aiMonitoring.clear();
+    this.activeAlarms.clear();
+
     // Clear settings cache
     this.settingsCache = {};
 

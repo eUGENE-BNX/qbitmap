@@ -53,5 +53,22 @@ module.exports = {
     defaultRadius: 30,
     maxResultCount: 10,
     cacheTTLDays: 30
-  }
+  },
+  services: (() => {
+    const mtxHost = process.env.MEDIAMTX_HOST || '91.98.90.57';
+    return {
+      mediamtxHost: mtxHost,
+      mediamtxApi: process.env.MEDIAMTX_API || `http://${mtxHost}:9997`,
+      mediamtxWhepBase: process.env.MEDIAMTX_WHEP_BASE || `http://${mtxHost}:8889`,
+      mediamtxHlsBase: process.env.MEDIAMTX_HLS_BASE || 'https://hls.qbitmap.com',
+      mediamtxPlayback: process.env.MEDIAMTX_PLAYBACK || `http://${mtxHost}:9996`,
+      mediamtxRecordingApi: process.env.MEDIAMTX_RECORDING_API || `http://${mtxHost}:9999`,
+      mediamtxServer: process.env.MEDIAMTX_SERVER || mtxHost,
+      onvifServiceUrl: process.env.ONVIF_SERVICE_URL || `http://${mtxHost}:3003`,
+      captureServiceUrl: process.env.CAPTURE_SERVICE_URL || `http://${mtxHost}:3002`,
+      qbitmapHost: process.env.QBITMAP_HOST || '91.99.219.248',
+      allowedWhepHosts: (process.env.ALLOWED_WHEP_HOSTS || mtxHost).split(',').map(s => s.trim()),
+      webhookAllowedIps: (process.env.ONVIF_WEBHOOK_IPS || `${mtxHost},127.0.0.1,::1`).split(',').map(s => s.trim()),
+    };
+  })()
 };
