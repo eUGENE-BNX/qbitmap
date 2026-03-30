@@ -1054,6 +1054,8 @@ const AdminPanel = {
       document.getElementById('ai-search-prompt').value = getSetting('ai_search_prompt') || 'bu resimde ne görüyorsun maksimum birkaç cümle ile açıkla ve sadece emin olduklarını yaz';
       document.getElementById('ai-max-tokens').value = getSetting('ai_max_tokens') || '1024';
       document.getElementById('ai-temperature').value = getSetting('ai_temperature') || '0.7';
+      document.getElementById('ai-broadcast-interval').value = getSetting('ai_broadcast_interval') || '3000';
+      document.getElementById('ai-broadcast-prompt').value = getSetting('ai_broadcast_prompt') || '';
 
     } catch (error) {
       console.error('[Admin] Failed to load AI settings:', error);
@@ -1104,6 +1106,8 @@ const AdminPanel = {
     const aiSearchPrompt = document.getElementById('ai-search-prompt').value.trim();
     const aiMaxTokens = document.getElementById('ai-max-tokens').value.trim();
     const aiTemperature = document.getElementById('ai-temperature').value.trim();
+    const aiBroadcastInterval = document.getElementById('ai-broadcast-interval').value.trim();
+    const aiBroadcastPrompt = document.getElementById('ai-broadcast-prompt').value.trim();
     const statusEl = document.getElementById('ai-save-status');
 
     if (!aiServiceUrl || !aiVisionModel) {
@@ -1125,7 +1129,9 @@ const AdminPanel = {
           ai_monitoring_prompt: aiMonitoringPrompt,
           ai_search_prompt: aiSearchPrompt,
           ai_max_tokens: aiMaxTokens,
-          ai_temperature: aiTemperature
+          ai_temperature: aiTemperature,
+          ai_broadcast_interval: aiBroadcastInterval,
+          ai_broadcast_prompt: aiBroadcastPrompt
         })
       });
 

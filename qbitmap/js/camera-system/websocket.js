@@ -1,6 +1,6 @@
 import { QBitmapConfig } from '../config.js';
 import { Logger } from '../utils.js';
-import { LiveBroadcast } from '../live-broadcast.js';
+import { LiveBroadcast } from '../live-broadcast/index.js';
 import { VideoMessage } from '../video-message/index.js';
 import { CommentWidget } from '../comments.js';
 

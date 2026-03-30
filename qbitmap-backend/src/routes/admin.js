@@ -720,6 +720,8 @@ async function adminRoutes(fastify, options) {
       'ai_search_prompt',
       'ai_max_tokens',
       'ai_temperature',
+      'ai_broadcast_interval',
+      'ai_broadcast_prompt',
       // Voice call settings
       'voice_api_url',
       'voice_room_id',

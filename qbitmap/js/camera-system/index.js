@@ -425,7 +425,9 @@ const CameraSystem = {
         searchPrompt: data.ai_search_prompt || 'bu resimde ne görüyorsun maksimum birkaç cümle ile açıkla ve sadece emin olduklarını yaz',
         maxTokens: parseInt(data.ai_max_tokens) || 1024,
         temperature: parseFloat(data.ai_temperature) || 0.7,
-        model: data.ai_vision_model || 'qwen3-vl:32b-instruct'
+        model: data.ai_vision_model || 'qwen3-vl:32b-instruct',
+        broadcastInterval: parseInt(data.ai_broadcast_interval) || 3000,
+        broadcastPrompt: data.ai_broadcast_prompt || null
       };
       Logger.log('[AI] Settings loaded from admin panel');
     } catch (e) {
@@ -435,7 +437,9 @@ const CameraSystem = {
         searchPrompt: 'bu resimde ne görüyorsun maksimum birkaç cümle ile açıkla ve sadece emin olduklarını yaz',
         maxTokens: 1024,
         temperature: 0.7,
-        model: 'qwen3-vl:32b-instruct'
+        model: 'qwen3-vl:32b-instruct',
+        broadcastInterval: 3000,
+        broadcastPrompt: null
       };
       Logger.log('[AI] Using default settings (admin settings not available)');
     }

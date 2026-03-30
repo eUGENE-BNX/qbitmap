@@ -3,7 +3,7 @@ import { Logger, escapeHtml } from './utils.js';
 import { AuthSystem } from './auth.js';
 import { CameraSystem } from './camera-system/index.js';
 import * as AppState from './state.js';
-import { LiveBroadcast } from './live-broadcast.js';
+import { LiveBroadcast } from './live-broadcast/index.js';
 
 /**
  * UserLocationSystem - Display user's location on map

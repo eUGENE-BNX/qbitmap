@@ -730,7 +730,9 @@ async function publicRoutes(fastify, options) {
         ai_search_prompt: getSetting('ai_search_prompt'),
         ai_max_tokens: getSetting('ai_max_tokens') || '1024',
         ai_temperature: getSetting('ai_temperature') || '0.7',
-        ai_vision_model: getSetting('ai_vision_model') || 'qwen3-vl:32b-instruct'
+        ai_vision_model: getSetting('ai_vision_model') || 'qwen3-vl:32b-instruct',
+        ai_broadcast_interval: getSetting('ai_broadcast_interval') || '3000',
+        ai_broadcast_prompt: getSetting('ai_broadcast_prompt')
       };
     } catch (error) {
       logger.error({ err: error }, 'AI settings fetch error');

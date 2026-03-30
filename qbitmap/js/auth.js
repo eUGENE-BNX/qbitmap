@@ -220,7 +220,7 @@ const AuthSystem = {
       container.querySelector('.user-button')?.addEventListener('click', () => AuthSystem.toggleDropdown());
       document.getElementById('profile-menu-btn')?.addEventListener('click', () => AuthSystem._openProfile());
       document.getElementById('mycameras-menu-btn')?.addEventListener('click', () => AuthSystem._openMyCameras());
-      document.getElementById('broadcast-dropdown-item')?.addEventListener('click', () => { LiveBroadcast.toggleBroadcast(); AuthSystem.toggleDropdown(); });
+      document.getElementById('broadcast-dropdown-item')?.addEventListener('click', () => { import('/js/live-broadcast/index.js').then(m => { if (m.LiveBroadcast) m.LiveBroadcast.toggleBroadcast(); }); AuthSystem.toggleDropdown(); });
       document.getElementById('logout-menu-btn')?.addEventListener('click', () => AuthSystem.logout());
     } else {
       container.innerHTML = `
@@ -259,7 +259,7 @@ const AuthSystem = {
     }).catch(err => console.error('[Auth] comments load failed:', err));
     // Broadcast only for logged-in users
     if (this.isLoggedIn()) {
-      import('/js/live-broadcast.js').then(m => {
+      import('/js/live-broadcast/index.js').then(m => {
         if (m.LiveBroadcast) { m.LiveBroadcast.init(); m.LiveBroadcast.bindButton(); }
       }).catch(err => console.error('[Auth] broadcast load failed:', err));
     }

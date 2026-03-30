@@ -18,6 +18,9 @@ async function transformRequest(body) {
   const maxTokens = Math.min(Math.max(parseInt(options?.num_predict) || 1024, 256), 4096);
   const temperature = parseFloat(options?.temperature) || undefined;
 
+  // Prepend /no_think to disable Qwen3 thinking mode for faster responses
+  const finalPrompt = `/no_think\n${prompt || ''}`;
+
   const req = {
     model,
     messages: [{
@@ -27,7 +30,7 @@ async function transformRequest(body) {
           type: 'image_url',
           image_url: { url: `data:image/jpeg;base64,${img}` }
         })),
-        { type: 'text', text: prompt || '' }
+        { type: 'text', text: finalPrompt }
       ]
     }],
     max_tokens: maxTokens

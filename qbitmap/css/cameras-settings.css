@@ -267,6 +267,23 @@
   aspect-ratio: 16 / 9;
 }
 
+/* Portrait video (9:16) - swap dimensions */
+.camera-frame-container.portrait.zoom-0 {
+  width: 180px;
+  height: 320px;
+}
+
+.camera-frame-container.portrait.zoom-1 {
+  width: 360px;
+  height: 640px;
+}
+
+.camera-frame-container.portrait.zoom-2 {
+  width: 720px;
+  height: auto;
+  aspect-ratio: 9 / 16;
+}
+
 /* Resolution-based Zoom Levels */
 /* 720p (default) */
 .camera-frame-container.res-720.zoom-0 { width: 320px; height: 180px; }
@@ -883,6 +900,31 @@
     max-width: 100vw;
     height: auto;
     aspect-ratio: 16/9;
+  }
+
+  /* Portrait mobile overrides */
+  .camera-frame-container.portrait,
+  .camera-frame-container.portrait.zoom-0 {
+    width: auto;
+    max-width: calc(100vw - 24px);
+    height: 60vh;
+    max-height: 500px;
+    aspect-ratio: 9 / 16;
+  }
+
+  .camera-frame-container.portrait.camera-frame-container.zoom-1 {
+    width: auto;
+    max-width: 100vw;
+    height: 80vh;
+    max-height: 700px;
+    aspect-ratio: 9 / 16;
+  }
+
+  .camera-frame-container.portrait.camera-frame-container.zoom-2 {
+    width: auto;
+    max-width: 100vw;
+    height: 90vh;
+    aspect-ratio: 9 / 16;
   }
 
   .camera-popup-buttons .draw-zone-btn,

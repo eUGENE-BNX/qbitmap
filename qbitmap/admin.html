@@ -199,6 +199,24 @@
             </div>
           </div>
 
+          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:24px 0;">
+          <h3>Canli Yayin AI Ayarlari</h3>
+          <p class="hint">Canli yayin sirasinda kullanilan AI analiz ayarlari.</p>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Broadcast AI Interval (ms)</label>
+              <input type="number" id="ai-broadcast-interval" class="form-input" min="1000" max="60000" step="1000" value="3000">
+              <p class="hint">Kare yakalama araligi (ms). Varsayilan: 3000 (3 saniye)</p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Broadcast AI Prompt</label>
+            <textarea id="ai-broadcast-prompt" class="form-input" rows="3" placeholder="Bu goruntuyu analiz et ve onemli olan her seyi bildir."></textarea>
+            <p class="hint">Canli yayin AI analizi icin kullanilacak prompt. Bos birakilirsa monitoring prompt kullanilir.</p>
+          </div>
+
           <div class="form-actions">
             <button class="btn btn-primary" id="save-ai-settings-btn">Save AI Settings</button>
             <span class="save-status" id="ai-save-status"></span>
