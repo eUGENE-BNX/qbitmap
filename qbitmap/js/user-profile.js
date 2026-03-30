@@ -583,7 +583,7 @@ const UserProfileSystem = {
         </h4>
         <div class="profile-face-loading">
           <div class="spinner"></div>
-          <p>${message}</p>
+          <p>${escapeHtml(message)}</p>
         </div>
       `;
     }

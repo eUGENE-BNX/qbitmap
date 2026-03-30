@@ -229,6 +229,25 @@ class StreamCache {
   }
 
   /**
+   * Shutdown: clear interval, close all clients, free memory
+   */
+  shutdown() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    // Close all client connections
+    for (const [cameraId, clientSet] of this.clients.entries()) {
+      for (const response of clientSet) {
+        try { response.raw.end(); } catch (err) { /* ignore */ }
+      }
+    }
+    this.clients.clear();
+    this.frames.clear();
+    logger.info('Stream cache shut down');
+  }
+
+  /**
    * Get statistics
    * @returns {{ activeCameras: number, totalClients: number }}
    */

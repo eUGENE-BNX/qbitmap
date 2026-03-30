@@ -5,8 +5,23 @@ const dbPool = require('./src/services/db-pool');
 const photoAiQueue = require('./src/services/photo-ai-queue');
 const videoAiQueue = require('./src/services/video-ai-queue');
 const wsService = require('./src/services/websocket');
+const streamCache = require('./src/services/stream-cache');
+const frameCache = require('./src/services/frame-cache');
+const cleanupService = require('./src/services/cleanup');
+const voiceCallService = require('./src/services/voice-call');
+const logger = require('./src/utils/logger').child({ module: 'main' });
 
 let fastify;
+
+// Catch unhandled errors to prevent silent crashes
+process.on('unhandledRejection', (reason, promise) => {
+  logger.fatal({ reason, promise }, 'Unhandled promise rejection');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'Uncaught exception — shutting down');
+  process.exit(1);
+});
 
 async function start() {
   try {
@@ -45,16 +60,25 @@ async function start() {
 
 // Graceful shutdown handler
 async function shutdown(signal) {
-  console.log(`\n${signal} received, shutting down gracefully...`);
+  logger.info(`${signal} received, shutting down gracefully...`);
 
   // Stop AI queues
   photoAiQueue.stop();
   videoAiQueue.stop();
 
-  // Cleanup token cache
-  cleanupTokenCache();
+  // Stop periodic services
+  cleanupService.stop();
+  voiceCallService.shutdown();
 
-  // Close Fastify server
+  // Cleanup caches and timers
+  cleanupTokenCache();
+  frameCache.shutdown();
+  streamCache.shutdown();
+
+  // Close WebSocket connections
+  wsService.shutdown();
+
+  // Close Fastify server (also triggers onClose hook for mediamtx interval)
   if (fastify) {
     await fastify.close();
   }
@@ -62,12 +86,12 @@ async function shutdown(signal) {
   // Close MySQL connection pool
   try {
     await dbPool.end();
-    console.log('Database pool closed');
+    logger.info('Database pool closed');
   } catch (err) {
-    console.error('Error closing database pool:', err);
+    logger.error({ err }, 'Error closing database pool');
   }
 
-  console.log('Server closed');
+  logger.info('Server closed');
   process.exit(0);
 }
 

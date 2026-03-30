@@ -38,19 +38,25 @@ async function createServer() {
 
   // ==================== CAPTURE ROUTES ====================
 
+  // Shared schema fragments
+  const streamIdSchema = { type: 'string', minLength: 1, maxLength: 100, pattern: '^[A-Za-z0-9_-]+$' };
+
   // Start capture
-  fastify.post('/capture/start', { preHandler: serviceKeyHook }, async (request, reply) => {
-    const { streamId, rtspUrl: providedUrl, interval } = request.body || {};
-
-    if (!streamId) {
-      return reply.code(400).send({
-        error: 'Missing required field: streamId',
+  fastify.post('/capture/start', {
+    preHandler: serviceKeyHook,
+    schema: {
+      body: {
+        type: 'object',
         required: ['streamId'],
-        optional: ['rtspUrl', 'interval']
-      });
+        properties: {
+          streamId: streamIdSchema,
+          rtspUrl: { type: 'string', maxLength: 500, pattern: '^rtsp://' },
+          interval: { type: 'integer', minimum: 1000, maximum: 300000 }
+        }
+      }
     }
-
-    // Use provided URL or construct from streamId
+  }, async (request, reply) => {
+    const { streamId, rtspUrl: providedUrl, interval } = request.body;
     const rtspUrl = providedUrl || `${config.capture.rtspBase}/${streamId}`;
 
     try {
@@ -62,15 +68,17 @@ async function createServer() {
   });
 
   // Stop capture
-  fastify.post('/capture/stop', { preHandler: serviceKeyHook }, async (request, reply) => {
-    const { streamId } = request.body || {};
-
-    if (!streamId) {
-      return reply.code(400).send({
-        error: 'Missing required field: streamId'
-      });
+  fastify.post('/capture/stop', {
+    preHandler: serviceKeyHook,
+    schema: {
+      body: {
+        type: 'object',
+        required: ['streamId'],
+        properties: { streamId: streamIdSchema }
+      }
     }
-
+  }, async (request, reply) => {
+    const { streamId } = request.body;
     const result = captureManager.stop(streamId);
 
     if (result.status === 'not_found') {
@@ -81,16 +89,20 @@ async function createServer() {
   });
 
   // Update interval
-  fastify.put('/capture/interval', { preHandler: serviceKeyHook }, async (request, reply) => {
-    const { streamId, interval } = request.body || {};
-
-    if (!streamId || !interval) {
-      return reply.code(400).send({
-        error: 'Missing required fields',
-        required: ['streamId', 'interval']
-      });
+  fastify.put('/capture/interval', {
+    preHandler: serviceKeyHook,
+    schema: {
+      body: {
+        type: 'object',
+        required: ['streamId', 'interval'],
+        properties: {
+          streamId: streamIdSchema,
+          interval: { type: 'integer', minimum: 1000, maximum: 300000 }
+        }
+      }
     }
-
+  }, async (request, reply) => {
+    const { streamId, interval } = request.body;
     const result = captureManager.setInterval(streamId, interval);
 
     if (result.status === 'not_found') {

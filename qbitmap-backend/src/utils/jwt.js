@@ -104,10 +104,23 @@ async function authHook(request, reply) {
     return reply.code(401).send({ error: 'Invalid or expired token' });
   }
 
-  // Cache the result (with size limit)
-  if (tokenCache.size < TOKEN_CACHE_MAX_SIZE) {
-    tokenCache.set(token, { data: decoded, time: Date.now() });
+  // Cache the result (with size limit and eviction)
+  const now = Date.now();
+  if (tokenCache.size >= TOKEN_CACHE_MAX_SIZE) {
+    // Evict expired entries first
+    for (const [key, entry] of tokenCache.entries()) {
+      if (now - entry.time > TOKEN_CACHE_TTL) tokenCache.delete(key);
+    }
+    // If still full, evict the oldest entry
+    if (tokenCache.size >= TOKEN_CACHE_MAX_SIZE) {
+      let oldestKey = null, oldestTime = Infinity;
+      for (const [key, entry] of tokenCache.entries()) {
+        if (entry.time < oldestTime) { oldestTime = entry.time; oldestKey = key; }
+      }
+      if (oldestKey) tokenCache.delete(oldestKey);
+    }
   }
+  tokenCache.set(token, { data: decoded, time: now });
 
   request.user = decoded;
 }

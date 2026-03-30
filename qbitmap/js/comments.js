@@ -1,6 +1,6 @@
 import '../css/comments.css';
 import { QBitmapConfig } from './config.js';
-import { Logger } from './utils.js';
+import { Logger, escapeHtml } from './utils.js';
 import { AuthSystem } from './auth.js';
 import { Analytics } from './analytics.js';
 
@@ -204,17 +204,15 @@ const CommentWidget = {
     div.className = 'comment-item';
     div.dataset.commentId = comment.id;
 
-    const esc = (t) => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
-
     div.innerHTML = `
-      <img class="comment-avatar" src="${esc(comment.user_avatar || '')}" alt="" onerror="this.style.display='none'" />
+      <img class="comment-avatar" src="${escapeHtml(comment.user_avatar || '')}" alt="" onerror="this.style.display='none'" />
       <div class="comment-body">
         <div class="comment-meta">
-          <span class="comment-author">${esc(comment.user_name || 'Kullanici')}</span>
-          <span class="comment-time">${esc(this.formatTimeAgo(comment.created_at))}</span>
+          <span class="comment-author">${escapeHtml(comment.user_name || 'Kullanici')}</span>
+          <span class="comment-time">${escapeHtml(this.formatTimeAgo(comment.created_at))}</span>
           ${isOwn ? '<button class="comment-delete" title="Sil">&times;</button>' : ''}
         </div>
-        <div class="comment-text">${esc(comment.content)}</div>
+        <div class="comment-text">${escapeHtml(comment.content)}</div>
       </div>
     `;
 

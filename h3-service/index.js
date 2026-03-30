@@ -2,6 +2,16 @@ const buildServer = require('./src/server');
 
 let fastify;
 
+// Catch unhandled errors to prevent silent crashes
+process.on('unhandledRejection', (reason) => {
+  console.error('[H3-SERVICE] FATAL: Unhandled promise rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[H3-SERVICE] FATAL: Uncaught exception:', err);
+  process.exit(1);
+});
+
 async function start() {
   try {
     fastify = await buildServer();

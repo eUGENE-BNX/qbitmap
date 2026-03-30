@@ -50,7 +50,7 @@ const SearchInboxMixin = {
       }
     } catch {}
 
-    const esc = (t) => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+    const esc = escapeHtml;
 
     // Create overlay
     const overlay = document.createElement('div');
@@ -305,7 +305,7 @@ const SearchInboxMixin = {
         return;
       }
 
-      const esc = (t) => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+      const esc = escapeHtml;
 
       resultsEl.innerHTML = messages.map(m => {
         const tags = (m.tags || []).map(t => `<span class="vmsg-search-tag">${esc(t)}</span>`).join('');

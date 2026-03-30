@@ -24,7 +24,7 @@ const PopupMixin = {
     const isOwn = AuthSystem.isLoggedIn() && AuthSystem.getCurrentUser()?.id === parseInt(props.senderId);
     const isPrivateMsg = recipientId !== null;
 
-    const esc = (t) => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+    const esc = escapeHtml;
 
     const videoUrl = `${this.apiBase}/${encodeURIComponent(messageId)}/video`;
 
@@ -571,7 +571,7 @@ const PopupMixin = {
       // Re-render tags in popup
       const container = popupEl.querySelector('[data-tags-container]');
       if (container) {
-        const esc = (t) => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+        const esc = escapeHtml;
         container.innerHTML = currentTags.map(t =>
           `<span class="video-msg-popup-tag">${esc(t)}<button class="video-msg-tag-remove" data-tag="${esc(t)}">&times;</button></span>`
         ).join('') + `<button class="video-msg-tag-add" data-action="add-tag" title="Etiket ekle">+</button>`;

@@ -3,6 +3,7 @@ const faceApi = require("../services/face-api");
 const voiceCallService = require("../services/voice-call");
 const { authHook } = require("../utils/jwt");
 const { checkFaceLimitMiddleware } = require("../middleware/limits");
+const { validateMagicBytes } = require("../utils/file-validation");
 const logger = require("../utils/logger").child({ module: "face-detection" });
 const path = require("path");
 const fs = require("fs");
@@ -155,6 +156,11 @@ async function faceDetectionRoutes(fastify, options) {
       return reply.code(400).send({ error: "File size must be less than 2MB" });
     }
 
+    // Validate actual file content matches declared MIME type
+    if (!validateMagicBytes(buffer, data.mimetype)) {
+      return reply.code(400).send({ error: "File content does not match declared type" });
+    }
+
     try {
       // Create person in Face API
       const tag = "camera_" + camera.id + "_" + Date.now();
@@ -180,13 +186,11 @@ async function faceDetectionRoutes(fastify, options) {
 
       // Save face image locally
       const uploadsDir = path.join(__dirname, "../../uploads/camera-faces");
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
+      await fs.promises.mkdir(uploadsDir, { recursive: true });
       const ext = data.mimetype === "image/png" ? "png" : "jpg";
       const filename = camera.id + "_" + personId + "_" + crypto.randomUUID() + "." + ext;
       const filePath = path.join(uploadsDir, filename);
-      fs.writeFileSync(filePath, buffer);
+      await fs.promises.writeFile(filePath, buffer);
 
       // Save to database
       const faceImageUrl = "/uploads/camera-faces/" + filename;

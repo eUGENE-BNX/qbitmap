@@ -113,6 +113,35 @@ async function buildServer() {
     return body;
   });
 
+  // Global error handler — consistent error format, no stack trace leak in production
+  fastify.setErrorHandler((error, request, reply) => {
+    // Fastify validation errors (from JSON Schema)
+    if (error.validation) {
+      return reply.code(400).send({
+        error: { code: 'VALIDATION_ERROR', message: error.message }
+      });
+    }
+
+    // Rate limit errors
+    if (error.statusCode === 429) {
+      return reply.code(429).send({
+        error: { code: 'RATE_LIMIT', message: 'Too many requests' }
+      });
+    }
+
+    const statusCode = error.statusCode || 500;
+    if (statusCode >= 500) {
+      request.log.error({ err: error }, 'Unhandled route error');
+    }
+
+    reply.code(statusCode).send({
+      error: {
+        code: statusCode >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR',
+        message: statusCode >= 500 && isProduction ? 'Internal server error' : error.message
+      }
+    });
+  });
+
   // Wait for MySQL connection pool and seed data
   await db.ensureReady();
 
@@ -186,7 +215,15 @@ async function buildServer() {
     );
 
     // Periodic sync every 2 minutes (in case MediaMTX restarts)
-    setInterval(syncRtspCamerasWithMediamtx, 2 * 60 * 1000);
+    fastify.mediamtxSyncInterval = setInterval(syncRtspCamerasWithMediamtx, 2 * 60 * 1000);
+  });
+
+  // Cleanup interval on server close
+  fastify.addHook('onClose', () => {
+    if (fastify.mediamtxSyncInterval) {
+      clearInterval(fastify.mediamtxSyncInterval);
+      fastify.mediamtxSyncInterval = null;
+    }
   });
 
   return fastify;

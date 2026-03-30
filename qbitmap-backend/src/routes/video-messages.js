@@ -8,6 +8,7 @@ const logger = require('../utils/logger').child({ module: 'video-messages' });
 const videoAiQueue = require('../services/video-ai-queue');
 const photoAiQueue = require('../services/photo-ai-queue');
 const { safePath } = require('../utils/validation');
+const { validateMagicBytes } = require('../utils/file-validation');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads/video-messages');
 const ALLOWED_MIME_TYPES = ['video/mp4', 'video/webm', 'image/jpeg', 'image/png', 'image/webp'];
@@ -125,6 +126,15 @@ async function videoMessageRoutes(fastify, options) {
 
       const stats = fs.statSync(filePath);
       const fileSize = stats.size;
+
+      // Validate actual file content matches declared MIME type
+      const headBuf = Buffer.alloc(12);
+      const fd = fs.openSync(filePath, 'r');
+      try { fs.readSync(fd, headBuf, 0, 12, 0); } finally { fs.closeSync(fd); }
+      if (!validateMagicBytes(headBuf, mimeType)) {
+        fs.unlinkSync(filePath);
+        return reply.code(400).send({ error: 'File content does not match declared type' });
+      }
 
       // Generate thumbnail (fire-and-forget, don't block upload response)
       const thumbFileName = `${messageId}_thumb.webp`;

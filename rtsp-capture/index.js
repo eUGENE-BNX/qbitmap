@@ -16,6 +16,16 @@
 
 const { startServer } = require('./src/server');
 
+// Catch unhandled errors to prevent silent crashes
+process.on('unhandledRejection', (reason) => {
+  console.error('[CAPTURE] FATAL: Unhandled promise rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[CAPTURE] FATAL: Uncaught exception:', err);
+  process.exit(1);
+});
+
 console.log('==========================================');
 console.log('  QBitmap RTSP Frame Capture v1.0.0');
 console.log('==========================================');

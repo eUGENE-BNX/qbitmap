@@ -134,6 +134,17 @@ class CleanupService {
     logger.info({ broadcastId: broadcast.broadcast_id, userId: broadcast.user_id }, 'Stale broadcast cleaned up');
   }
 
+  /**
+   * Stop cleanup service: clear intervals and cron jobs
+   */
+  stop() {
+    if (this.broadcastCleanupInterval) {
+      clearInterval(this.broadcastCleanupInterval);
+      this.broadcastCleanupInterval = null;
+    }
+    logger.info('Cleanup service stopped');
+  }
+
   // Manual trigger
   async manualCleanup() {
     await this.runMaintenance();

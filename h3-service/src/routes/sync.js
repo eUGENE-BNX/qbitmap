@@ -7,23 +7,45 @@ async function syncRoutes(fastify) {
   fastify.addHook('preHandler', serviceKeyHook);
 
   // Full sync
-  fastify.post('/cameras', async (request, reply) => {
-    const { cameras } = request.body;
-    if (!Array.isArray(cameras)) {
-      return reply.code(400).send({ error: 'cameras must be an array' });
+  fastify.post('/cameras', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['cameras'],
+        properties: { cameras: { type: 'array', maxItems: 10000 } }
+      }
     }
-    const result = await cameraSync.fullSync(cameras);
-    return result;
+  }, async (request) => {
+    return cameraSync.fullSync(request.body.cameras);
   });
 
   // Single camera upsert (webhook)
-  fastify.post('/camera', async (request) => {
+  fastify.post('/camera', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['device_id'],
+        properties: {
+          device_id: { type: 'string', minLength: 1, maxLength: 100 },
+          lat: { type: 'number' },
+          lng: { type: 'number' }
+        }
+      }
+    }
+  }, async (request) => {
     await cameraSync.upsertCamera(request.body);
     return { ok: true };
   });
 
   // Remove camera
-  fastify.delete('/camera/:deviceId', async (request) => {
+  fastify.delete('/camera/:deviceId', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: { deviceId: { type: 'string', minLength: 1, maxLength: 100 } }
+      }
+    }
+  }, async (request) => {
     await cameraSync.removeCamera(request.params.deviceId);
     return { ok: true };
   });
@@ -31,12 +53,23 @@ async function syncRoutes(fastify) {
   // === Content item sync (ownership system) ===
 
   // Single content item upsert
-  fastify.post('/content', async (request, reply) => {
-    const { itemType, itemId, userId, lat, lng, points } = request.body;
-    if (!itemType || !itemId || !userId || !lat || !lng || !points) {
-      return reply.code(400).send({ error: 'Missing fields: itemType, itemId, userId, lat, lng, points' });
+  fastify.post('/content', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['itemType', 'itemId', 'userId', 'lat', 'lng', 'points'],
+        properties: {
+          itemType: { type: 'string', minLength: 1, maxLength: 50 },
+          itemId: { type: ['string', 'integer'] },
+          userId: { type: 'integer', minimum: 1 },
+          lat: { type: 'number', minimum: -90, maximum: 90 },
+          lng: { type: 'number', minimum: -180, maximum: 180 },
+          points: { type: 'number', minimum: 0 }
+        }
+      }
     }
-    await contentSync.upsertContentItem({ itemType, itemId, userId, lat, lng, points });
+  }, async (request) => {
+    await contentSync.upsertContentItem(request.body);
     return { ok: true };
   });
 
@@ -47,42 +80,63 @@ async function syncRoutes(fastify) {
   });
 
   // Bulk content items sync (initial migration)
-  fastify.post('/full-content', async (request, reply) => {
-    const { items } = request.body;
-    if (!Array.isArray(items)) {
-      return reply.code(400).send({ error: 'items must be an array' });
+  fastify.post('/full-content', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['items'],
+        properties: { items: { type: 'array', maxItems: 50000 } }
+      }
     }
-    const result = await contentSync.bulkUpsertContentItems(items);
-    return result;
+  }, async (request) => {
+    return contentSync.bulkUpsertContentItems(request.body.items);
   });
 
   // User profile upsert
-  fastify.post('/user-profile', async (request, reply) => {
-    const { id, displayName, avatarUrl } = request.body;
-    if (!id || !displayName) {
-      return reply.code(400).send({ error: 'Missing fields: id, displayName' });
+  fastify.post('/user-profile', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['id', 'displayName'],
+        properties: {
+          id: { type: 'integer', minimum: 1 },
+          displayName: { type: 'string', minLength: 1, maxLength: 200 },
+          avatarUrl: { type: 'string', maxLength: 500 }
+        }
+      }
     }
-    await contentSync.upsertUserProfile({ id, displayName, avatarUrl });
+  }, async (request) => {
+    await contentSync.upsertUserProfile(request.body);
     return { ok: true };
   });
 
   // Bulk user profiles sync
-  fastify.post('/user-profiles', async (request, reply) => {
-    const { profiles } = request.body;
-    if (!Array.isArray(profiles)) {
-      return reply.code(400).send({ error: 'profiles must be an array' });
+  fastify.post('/user-profiles', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['profiles'],
+        properties: { profiles: { type: 'array', maxItems: 10000 } }
+      }
     }
-    const result = await contentSync.bulkUpsertUserProfiles(profiles);
-    return result;
+  }, async (request) => {
+    return contentSync.bulkUpsertUserProfiles(request.body.profiles);
   });
 
   // Item view count sync
-  fastify.post('/item-views', async (request, reply) => {
-    const { itemId, viewCount } = request.body;
-    if (!itemId || viewCount == null) {
-      return reply.code(400).send({ error: 'Missing fields: itemId, viewCount' });
+  fastify.post('/item-views', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['itemId', 'viewCount'],
+        properties: {
+          itemId: { type: ['string', 'integer'] },
+          viewCount: { type: 'integer', minimum: 0 }
+        }
+      }
     }
-    await contentSync.syncItemViewCount({ itemId, viewCount });
+  }, async (request) => {
+    await contentSync.syncItemViewCount(request.body);
     return { ok: true };
   });
 
