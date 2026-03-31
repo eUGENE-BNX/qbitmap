@@ -1938,8 +1938,8 @@
   overflow-wrap: break-word;
   white-space: normal;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  max-height: 4.2em;
-  overflow: hidden;
+  max-height: 40vh;
+  overflow-y: auto;
 }
 
 .aac-response .aac-cursor {
