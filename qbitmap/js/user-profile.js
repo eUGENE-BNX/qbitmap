@@ -129,28 +129,10 @@ const UserProfileSystem = {
     const content = document.querySelector('.profile-panel-content');
     const { cameraStats, recentMessages, landStats } = extras;
 
-    const faceSection = `
-      <div class="profile-face-section">
-        <h4>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
-          Yüz Tanıma
-        </h4>
-        ${user.hasFaceRegistered ? this.renderRegisteredFace() : this.renderUploadArea()}
-      </div>
-    `;
-
     content.innerHTML = `
-      ${this.renderUserInfo(user)}
-      ${this.renderRankBar(landStats)}
-      ${this.renderStatsGrid(cameraStats, landStats)}
+      ${this.renderHeaderCard(user, cameraStats, landStats)}
+      ${this.renderInfoRow(user.location, user.hasFaceRegistered)}
       ${this.renderRecentMessages(recentMessages)}
-      <div class="profile-bottom-row">
-        ${this.renderLocationSection(user.location)}
-        ${faceSection}
-      </div>
     `;
 
     this.setupEventListeners();
@@ -162,54 +144,91 @@ const UserProfileSystem = {
     });
   },
 
-  renderUserInfo(user) {
+  renderHeaderCard(user, cameraStats, landStats) {
     const memberSince = this.formatMemberSince(user.createdAt);
-    return `
-      <div class="profile-user-info">
-        <img src="${escapeHtml(user.avatarUrl || '/default-avatar.png')}" alt="" class="profile-user-avatar">
-        <div class="profile-user-details">
-          <h3>${escapeHtml(user.displayName || 'Kullanıcı')}</h3>
-          <p>${escapeHtml(user.email)}</p>
-          ${memberSince ? `<span class="profile-member-since">Üye: ${memberSince}</span>` : ''}
-        </div>
-      </div>
-    `;
-  },
-
-  renderStatsGrid(cameraStats, landStats) {
     const camTotal = cameraStats?.owned?.total ?? '--';
     const camShared = cameraStats?.sharedWithMe ?? '--';
     const areaM2 = landStats?.totalAreaM2 != null ? this.formatArea(landStats.totalAreaM2) : '--';
     const points = landStats?.totalPoints != null ? landStats.totalPoints.toLocaleString('tr-TR') : '--';
+    const rank = landStats?.rank ? `#${landStats.rank}` : null;
 
     return `
-      <div class="profile-stats-grid">
-        <div class="profile-stat-card">
-          <span class="stat-value">${camTotal}</span>
-          <span class="stat-label">Kameralarım</span>
+      <div class="profile-header-card">
+        <div class="profile-header-left">
+          <img src="${escapeHtml(user.avatarUrl || '/default-avatar.png')}" alt="" class="profile-user-avatar">
+          <div class="profile-user-details">
+            <h3>${escapeHtml(user.displayName || 'Kullanıcı')}</h3>
+            <p>${escapeHtml(user.email)}</p>
+            ${memberSince ? `<span class="profile-member-since">Üye: ${memberSince}</span>` : ''}
+            <span class="profile-qbits">Qbits: ${points}</span>
+          </div>
         </div>
-        <div class="profile-stat-card">
-          <span class="stat-value">${camShared}</span>
-          <span class="stat-label">Paylaşılan</span>
-        </div>
-        <div class="profile-stat-card">
-          <span class="stat-value">${areaM2}</span>
-          <span class="stat-label">Dijital Arazi</span>
-        </div>
-        <div class="profile-stat-card">
-          <span class="stat-value">${points}</span>
-          <span class="stat-label">Qbit Puan</span>
+        <div class="profile-header-stats">
+          ${rank ? `<div class="profile-stat-mini profile-stat-rank"><span class="stat-value">${rank}</span><span class="stat-label">Sıralama</span></div>` : ''}
+          <div class="profile-stat-mini"><span class="stat-value">${camTotal}</span><span class="stat-label">Kamera</span></div>
+          <div class="profile-stat-mini"><span class="stat-value">${camShared}</span><span class="stat-label">Paylaşılan</span></div>
+          <div class="profile-stat-mini"><span class="stat-value">${areaM2}</span><span class="stat-label">Arazi</span></div>
         </div>
       </div>
     `;
   },
 
-  renderRankBar(landStats) {
-    if (!landStats || !landStats.rank) return '';
+  renderInfoRow(location, hasFaceRegistered) {
+    const hasLocation = location && location.lat && location.lng;
+    const showOnMap = location?.showOnMap || false;
+
+    // Location chip
+    const locationChip = hasLocation ? `
+      <div class="profile-info-chip">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+        </svg>
+        <span class="chip-text">${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}</span>
+        ${location.accuracy ? `<span class="chip-meta">±${Math.round(location.accuracy)}m</span>` : ''}
+        <label class="toggle-switch-sm">
+          <input type="checkbox" id="location-visibility-toggle" ${showOnMap ? 'checked' : ''}>
+          <span class="toggle-slider-sm"></span>
+        </label>
+        <button class="chip-action-btn" data-action="find-location" title="Konumu güncelle">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+        </button>
+      </div>
+    ` : `
+      <div class="profile-info-chip profile-info-chip--empty">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+        </svg>
+        <span class="chip-text">Konum yok</span>
+        <button class="chip-action-btn chip-action-btn--primary" data-action="find-location">Bul</button>
+      </div>
+    `;
+
+    // Face chip
+    const faceChip = hasFaceRegistered ? `
+      <div class="profile-info-chip profile-info-chip--success">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <span class="chip-text">Yüz kayıtlı</span>
+        <button class="profile-face-delete-btn chip-action-btn chip-action-btn--danger">Sil</button>
+      </div>
+    ` : `
+      <div class="profile-info-chip profile-info-chip--upload" id="face-upload-area">
+        <input type="file" id="face-file-input" accept="image/jpeg,image/png">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span class="chip-text">Yüz tanıma</span>
+        <span class="chip-action-btn chip-action-btn--primary">Yükle</span>
+      </div>
+    `;
+
     return `
-      <div class="profile-rank-bar">
-        <span>🏆</span>
-        <span>Sıralama: <span class="rank-position">#${landStats.rank}</span></span>
+      <div class="profile-info-row">
+        ${locationChip}
+        ${faceChip}
       </div>
     `;
   },
@@ -298,74 +317,7 @@ const UserProfileSystem = {
     }
   },
 
-  renderLocationSection(location) {
-    const hasLocation = location && location.lat && location.lng;
-    const showOnMap = location?.showOnMap || false;
-
-    return `
-      <div class="profile-location-section">
-        <h4>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-            <circle cx="12" cy="10" r="3"/>
-          </svg>
-          Konum
-        </h4>
-
-        ${hasLocation ? `
-          <div class="profile-location-info">
-            <div class="profile-location-coords">
-              <span class="location-label">Son konum:</span>
-              <span class="location-value">${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}</span>
-              ${location.accuracy ? `<span class="location-accuracy">(±${Math.round(location.accuracy)}m)</span>` : ''}
-            </div>
-            ${location.updatedAt ? `
-              <div class="profile-location-time">
-                <span class="location-label">Güncelleme:</span>
-                <span class="location-value">${this.formatDate(location.updatedAt)}</span>
-              </div>
-            ` : ''}
-            <div class="profile-location-actions">
-              <div class="profile-location-toggle">
-                <label class="toggle-switch">
-                  <input type="checkbox" id="location-visibility-toggle" ${showOnMap ? 'checked' : ''}>
-                  <span class="toggle-slider"></span>
-                </label>
-                <span class="toggle-label">Haritada göster</span>
-              </div>
-              <button class="profile-location-find-btn" data-action="find-location">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="3"/>
-                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
-                  <circle cx="12" cy="12" r="8" fill="none"/>
-                </svg>
-                Güncelle
-              </button>
-            </div>
-          </div>
-        ` : `
-          <div class="profile-location-empty">
-            <p>Konum bilgisi yok</p>
-            <button class="profile-location-find-btn" data-action="find-location">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
-                <circle cx="12" cy="12" r="8" fill="none"/>
-              </svg>
-              Konumumu Bul
-            </button>
-          </div>
-          <div class="profile-location-toggle">
-            <label class="toggle-switch">
-              <input type="checkbox" id="location-visibility-toggle" disabled>
-              <span class="toggle-slider"></span>
-            </label>
-            <span class="toggle-label">Haritada göster</span>
-          </div>
-        `}
-      </div>
-    `;
-  },
+  // Location rendering is now handled by renderInfoRow
 
   setupLocationListeners(location) {
     const toggle = document.getElementById('location-visibility-toggle');
@@ -440,45 +392,7 @@ const UserProfileSystem = {
     return m2.toLocaleString('tr-TR') + ' m²';
   },
 
-  renderUploadArea() {
-    return `
-      <div class="profile-face-tips">
-        <p>İyi bir tanıma için:</p>
-        <ul>
-          <li>Yüzünüz net görünmeli</li>
-          <li>Cepheden çekilmiş olmalı</li>
-          <li>İyi aydınlatılmış olmalı</li>
-        </ul>
-      </div>
-      <div class="profile-face-upload" id="face-upload-area">
-        <input type="file" id="face-file-input" accept="image/jpeg,image/png">
-        <svg class="profile-face-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
-        <p>Fotoğraf Seç</p>
-        <span>veya sürükleyip bırakın (Max: 2MB, 1920x1080)</span>
-      </div>
-    `;
-  },
-
-  renderRegisteredFace() {
-    return `
-      <div class="profile-face-registered">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-          <polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-        <div class="profile-face-registered-info">
-          <p>Yüzünüz kayıtlı</p>
-          <button class="profile-face-delete-btn">
-            Kaydı Sil
-          </button>
-        </div>
-      </div>
-    `;
-  },
+  // Face upload/registered rendering is now handled by renderInfoRow
 
   setupEventListeners() {
     const uploadArea = document.getElementById('face-upload-area');
@@ -571,20 +485,11 @@ const UserProfileSystem = {
   },
 
   showLoading(message) {
-    const faceSection = document.querySelector('.profile-face-section');
-    if (faceSection) {
-      faceSection.innerHTML = `
-        <h4>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
-          Yüz Tanıma
-        </h4>
-        <div class="profile-face-loading">
-          <div class="spinner"></div>
-          <p>${escapeHtml(message)}</p>
-        </div>
+    const faceChip = document.querySelector('.profile-info-chip--success, .profile-info-chip--upload');
+    if (faceChip) {
+      faceChip.innerHTML = `
+        <div class="spinner spinner-sm"></div>
+        <span class="chip-text">${escapeHtml(message)}</span>
       `;
     }
   }
