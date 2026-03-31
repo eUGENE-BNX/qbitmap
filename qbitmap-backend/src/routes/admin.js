@@ -860,6 +860,86 @@ async function adminRoutes(fastify, options) {
     return { success: true };
   });
 
+  // ==================== CONTENT REPORTS ====================
+
+  /**
+   * GET /api/admin/reports
+   * List all content reports with pagination and filtering
+   */
+  fastify.get('/reports', async (request, reply) => {
+    const { page = 1, limit = 20, status, entity_type, search } = request.query;
+
+    const filters = {};
+    if (status) filters.status = status;
+    if (entity_type) filters.entityType = entity_type;
+    if (search) filters.search = search;
+
+    return await db.getAdminReports(parseInt(page), parseInt(limit), filters);
+  });
+
+  /**
+   * PUT /api/admin/reports/:reportId
+   * Resolve or dismiss a report
+   */
+  fastify.put('/reports/:reportId', async (request, reply) => {
+    const reportId = parseInt(request.params.reportId);
+    const { action } = request.body || {};
+
+    if (!action || !['resolve', 'dismiss'].includes(action)) {
+      return reply.status(400).send({ error: 'Invalid action. Use resolve or dismiss.' });
+    }
+
+    const updated = await db.resolveReport(reportId, request.user.userId, action);
+    if (!updated) {
+      return reply.status(404).send({ error: 'Report not found or already processed' });
+    }
+
+    fastify.log.info({ reportId, action, admin: request.user.email }, 'Admin processed report');
+    return { success: true };
+  });
+
+  /**
+   * DELETE /api/admin/reports/:reportId/content
+   * Delete the reported content and resolve the report
+   */
+  fastify.delete('/reports/:reportId/content', async (request, reply) => {
+    const reportId = parseInt(request.params.reportId);
+
+    const report = await db.getReportById(reportId);
+    if (!report) {
+      return reply.status(404).send({ error: 'Report not found' });
+    }
+
+    const { entity_type, entity_id } = report;
+
+    try {
+      if (entity_type === 'video_message') {
+        const deleted = await db.adminDeleteVideoMessage(entity_id);
+        if (deleted) {
+          const filePath = safePath(deleted.file_path, 'uploads');
+          if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
+          if (deleted.thumbnail_path) {
+            const thumbPath = safePath(deleted.thumbnail_path, 'uploads');
+            if (thumbPath) { try { fs.unlinkSync(thumbPath); } catch {} }
+          }
+        }
+      } else if (entity_type === 'comment') {
+        await db.pool.execute('DELETE FROM comments WHERE id = ?', [entity_id]);
+      }
+      // camera and broadcast reports: admin reviews but content stays (cameras are infrastructure)
+      // Admin can manually remove cameras from their respective tabs
+
+      // Resolve all pending reports for this entity
+      await db.resolveReportsByEntity(entity_type, entity_id, request.user.userId);
+
+      fastify.log.info({ reportId, entity_type, entity_id, admin: request.user.email }, 'Admin deleted reported content');
+      return { success: true };
+    } catch (error) {
+      fastify.log.error({ err: error, reportId }, 'Delete reported content failed');
+      return reply.status(500).send({ error: 'Failed to delete content' });
+    }
+  });
+
   // ==================== H3 OWNERSHIP MIGRATION ====================
 
   /**

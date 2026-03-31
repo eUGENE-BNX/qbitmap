@@ -2,6 +2,7 @@ import { QBitmapConfig } from "../config.js";
 import { Logger, escapeHtml, sanitize } from "../utils.js";
 import { AuthSystem } from "../auth.js";
 import { Analytics } from "../analytics.js";
+import { ReportSystem } from "../report.js";
 import { CommentWidget } from "../comments.js";
 import * as AppState from '../state.js';
 
@@ -81,6 +82,7 @@ const PopupMixin = {
             <span data-like-count-num>${likeCount}</span>
           </span>
           ` : '')}
+          ${isLoggedIn && !isOwn ? ReportSystem.getMsgBtnHtml() : ''}
           <button class="video-msg-popup-close" title="Kapat">&times;</button>
         </div>
         <div class="video-msg-popup-body">
@@ -181,6 +183,10 @@ const PopupMixin = {
         this.viewedMessages.add(messageId);
         this.incrementViewCount(messageId, popupEl);
       }
+
+      // Report button
+      const reportBtn = popupEl.querySelector('[data-action="report-content"]');
+      if (reportBtn) reportBtn.onclick = () => ReportSystem.showReportDialog('video_message', messageId);
 
       // Like button
       const likeBtn = popupEl.querySelector('[data-action="toggle-like"]');

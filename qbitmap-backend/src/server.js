@@ -192,6 +192,9 @@ async function buildServer() {
   // Register like routes (generic, used by video messages, etc.)
   await fastify.register(require('./routes/likes'), { prefix: '/api/likes' });
 
+  // Register content report routes
+  await fastify.register(require('./routes/reports'), { prefix: '/api/reports' });
+
   // Register live broadcast routes
   await fastify.register(require('./routes/broadcasts'), { prefix: '/api/broadcasts' });
 

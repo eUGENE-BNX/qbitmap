@@ -546,4 +546,35 @@ CREATE INDEX IF NOT EXISTS idx_comments_entity_user ON comments(entity_type, ent
 CREATE INDEX IF NOT EXISTS idx_alarms_user ON alarms(user_id);
 CREATE INDEX IF NOT EXISTS idx_cameras_public_type ON cameras(is_public, camera_type);
 
+-- =================================================================
+-- 31. reports (generic content reporting/flagging)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS reports (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  entity_type VARCHAR(50) NOT NULL,
+  entity_id VARCHAR(64) NOT NULL,
+  user_id INT UNSIGNED NOT NULL,
+  reason VARCHAR(50) NOT NULL,
+  detail VARCHAR(500) DEFAULT NULL,
+  status ENUM('pending', 'resolved', 'dismissed') NOT NULL DEFAULT 'pending',
+  resolved_by INT UNSIGNED DEFAULT NULL,
+  resolved_at DATETIME DEFAULT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_reports_user_entity (entity_type, entity_id, user_id),
+  INDEX idx_reports_status (status, created_at DESC),
+  INDEX idx_reports_entity (entity_type, entity_id),
+  INDEX idx_reports_user (user_id),
+  CONSTRAINT fk_reports_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================
+-- 32. report_counts (denormalized counter for fast reads)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS report_counts (
+  entity_type VARCHAR(50) NOT NULL,
+  entity_id VARCHAR(64) NOT NULL,
+  report_count INT UNSIGNED DEFAULT 0,
+  PRIMARY KEY (entity_type, entity_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

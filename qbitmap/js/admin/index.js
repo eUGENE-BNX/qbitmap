@@ -7,6 +7,7 @@ import { AiVoiceMixin } from './modules/ai-voice.js';
 import { MessagesMixin } from './modules/messages.js';
 import { PlacesMixin } from './modules/places.js';
 import { CityCamerasMixin } from './modules/city-cameras.js';
+import { ReportsMixin } from './modules/reports.js';
 
 const AdminPanel = {
   currentUser: null,
@@ -22,6 +23,8 @@ const AdminPanel = {
   messagesPagination: { page: 1, limit: 20, total: 0 },
   cityCameras: [],
   editingCityCameraId: null,
+  reports: [],
+  reportsPagination: { page: 1, limit: 20, total: 0 },
 
   async init() {
     const authed = await this.checkAuth();
@@ -87,6 +90,11 @@ const AdminPanel = {
     document.getElementById('msg-search').addEventListener('input', this.debounce(() => { this.messagesPagination.page = 1; this.loadMessages(); }, 300));
     document.getElementById('msg-type-filter').addEventListener('change', () => { this.messagesPagination.page = 1; this.loadMessages(); });
 
+    // Reports
+    document.getElementById('report-search').addEventListener('input', this.debounce(() => { this.reportsPagination.page = 1; this.loadReports(); }, 300));
+    document.getElementById('report-status-filter').addEventListener('change', () => { this.reportsPagination.page = 1; this.loadReports(); });
+    document.getElementById('report-type-filter').addEventListener('change', () => { this.reportsPagination.page = 1; this.loadReports(); });
+
     // Close modals on overlay click
     document.getElementById('user-modal').addEventListener('click', (e) => { if (e.target.id === 'user-modal') this.closeUserModal(); });
     document.getElementById('plan-modal').addEventListener('click', (e) => { if (e.target.id === 'plan-modal') this.closePlanModal(); });
@@ -106,6 +114,17 @@ const AdminPanel = {
     });
     document.getElementById('places-pagination').addEventListener('click', (e) => { const btn = e.target.closest('button[data-page]'); if (btn && !btn.disabled) this.goToPlacesPage(Number(btn.dataset.page)); });
     document.getElementById('city-cameras-tbody').addEventListener('click', (e) => { const btn = e.target.closest('[data-action="edit-city-camera"]'); if (btn) this.openCityCameraModal(Number(btn.dataset.id)); });
+    document.getElementById('reports-tbody').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action]'); if (!btn) return;
+      if (btn.dataset.action === 'goto-content') {
+        this.gotoReportedContent(btn.dataset.lat, btn.dataset.lng, btn.dataset.entityId, btn.dataset.entityType);
+      } else {
+        const id = Number(btn.dataset.id);
+        if (btn.dataset.action === 'delete-reported-content') this.deleteReportedContent(id);
+        else if (btn.dataset.action === 'dismiss-report') this.dismissReport(id);
+      }
+    });
+    document.getElementById('reports-pagination').addEventListener('click', (e) => { const btn = e.target.closest('button[data-page]'); if (btn && !btn.disabled) this.goToReportsPage(Number(btn.dataset.page)); });
   },
 
   async loadStats() {
@@ -135,6 +154,7 @@ const AdminPanel = {
     if (tabName === 'messages') this.loadMessages();
     if (tabName === 'places') this.loadPlacesTab();
     if (tabName === 'city-cameras') this.loadCityCameras();
+    if (tabName === 'reports') this.loadReports();
   },
 
   async logout() {
@@ -144,7 +164,7 @@ const AdminPanel = {
 };
 
 // Apply all mixins
-Object.assign(AdminPanel, UtilsMixin, PlansMixin, UsersMixin, OnvifMixin, AiVoiceMixin, MessagesMixin, PlacesMixin, CityCamerasMixin);
+Object.assign(AdminPanel, UtilsMixin, PlansMixin, UsersMixin, OnvifMixin, AiVoiceMixin, MessagesMixin, PlacesMixin, CityCamerasMixin, ReportsMixin);
 
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {

@@ -28,8 +28,15 @@ const AuthSystem = {
     }
 
     // Clean URL if redirected from OAuth (token is now in cookie)
+    // Preserve deep link params like ?vmsg=
     if (window.location.search) {
-      window.history.replaceState({}, document.title, window.location.pathname);
+      const keep = new URLSearchParams();
+      const current = new URLSearchParams(window.location.search);
+      for (const key of ['vmsg']) {
+        if (current.has(key)) keep.set(key, current.get(key));
+      }
+      const qs = keep.toString();
+      window.history.replaceState({}, document.title, window.location.pathname + (qs ? '?' + qs : ''));
     }
 
     // Check if logged in via cookie by calling /auth/me

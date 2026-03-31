@@ -2,6 +2,7 @@ import { QBitmapConfig } from '../config.js';
 import { Logger, escapeHtml } from '../utils.js';
 import { AuthSystem } from '../auth.js';
 import { Analytics } from '../analytics.js';
+import { ReportSystem } from '../report.js';
 import * as AppState from '../state.js';
 
 const PopupMixin = {
@@ -70,6 +71,7 @@ const PopupMixin = {
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
               </svg>
             </button>
+            ${isLoggedIn && !isOwnBroadcast ? ReportSystem.getCamBtnHtml() : ''}
             <button class="cam-btn close-btn" title="Kapat" aria-label="Yayını kapat">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -111,6 +113,9 @@ const PopupMixin = {
 
       const closeBtn = popupEl.querySelector('.close-btn');
       if (closeBtn) closeBtn.onclick = () => this.closeBroadcastPopupElement();
+
+      const reportBtn = popupEl.querySelector('.report-btn');
+      if (reportBtn) reportBtn.onclick = () => ReportSystem.showReportDialog('broadcast', broadcastId);
 
       const audioBtn = popupEl.querySelector('.audio-btn');
       const videoEl = popupEl.querySelector('.camera-video');

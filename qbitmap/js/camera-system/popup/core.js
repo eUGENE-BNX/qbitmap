@@ -2,6 +2,7 @@ import { QBitmapConfig } from "../../config.js";
 import { Logger, escapeHtml, sanitize, fetchWithTimeout, TimerManager, showNotification } from "../../utils.js";
 import { AuthSystem } from "../../auth.js";
 import { Analytics } from "../../analytics.js";
+import { ReportSystem } from "../../report.js";
 
 const PopupCoreMixin = {
   // Maximum concurrent popups
@@ -122,6 +123,7 @@ const PopupCoreMixin = {
                   <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                 </svg>
               </button>${recordButton}
+              ${AuthSystem.isLoggedIn() ? ReportSystem.getCamBtnHtml() : ''}
               <button class="cam-btn close-btn" title="Kapat">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -168,6 +170,7 @@ const PopupCoreMixin = {
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
               </svg>
             </button>
+            ${AuthSystem.isLoggedIn() ? ReportSystem.getCamBtnHtml() : ''}
             <button class="cam-btn close-btn" title="Kapat">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -312,6 +315,8 @@ const PopupCoreMixin = {
     const frameContainer = popupEl.querySelector('.camera-frame-container');
 
     if (closeBtn) closeBtn.onclick = () => this.closeCameraPopup(deviceId);
+    const reportBtn = popupEl.querySelector('.report-btn');
+    if (reportBtn) reportBtn.onclick = () => ReportSystem.showReportDialog('camera', deviceId);
     if (protocolToggleBtn) protocolToggleBtn.onclick = () => this.toggleStreamProtocol(deviceId);
     if (settingsBtn) settingsBtn.onclick = () => this.openSettings(deviceId);
     if (recordBtn) recordBtn.onclick = () => this.toggleRecording(deviceId);
@@ -468,6 +473,8 @@ const PopupCoreMixin = {
       const frameContainer = popupEl.querySelector('.camera-frame-container');
       const header = popupEl.querySelector('.camera-popup-header');
 
+      const reportBtn = popupEl.querySelector('.report-btn');
+      if (reportBtn) reportBtn.onclick = null;
       if (closeBtn) closeBtn.onclick = null;
       if (settingsBtn) settingsBtn.onclick = null;
       if (recordBtn) recordBtn.onclick = null;

@@ -108,5 +108,6 @@ require('./admin')(DatabaseService);
 require('./sharing')(DatabaseService);
 require('./content')(DatabaseService);
 require('./ai-jobs')(DatabaseService);
+require('./reports')(DatabaseService);
 
 module.exports = new DatabaseService();

@@ -81,6 +81,7 @@
         <button class="tab" data-tab="messages">Messages</button>
         <button class="tab" data-tab="places">Places</button>
         <button class="tab" data-tab="city-cameras">Şehir Kameraları</button>
+        <button class="tab" data-tab="reports">Reports</button>
       </div>
 
       <!-- Users Tab -->
@@ -399,6 +400,47 @@
             <tbody id="city-cameras-tbody"></tbody>
           </table>
         </div>
+      </section>
+
+      <!-- Reports Tab -->
+      <section class="tab-content" id="tab-reports">
+        <div class="toolbar">
+          <input type="text" class="search-input" id="report-search" placeholder="Search reports...">
+          <select class="filter-select" id="report-status-filter">
+            <option value="">All Status</option>
+            <option value="pending" selected>Pending</option>
+            <option value="resolved">Resolved</option>
+            <option value="dismissed">Dismissed</option>
+          </select>
+          <select class="filter-select" id="report-type-filter">
+            <option value="">All Types</option>
+            <option value="camera">Camera</option>
+            <option value="video_message">Video/Photo</option>
+            <option value="broadcast">Broadcast</option>
+            <option value="comment">Comment</option>
+          </select>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="reports-table">
+            <thead>
+              <tr>
+                <th style="width:70px">Thumb</th>
+                <th>Content</th>
+                <th>Type</th>
+                <th>Reason</th>
+                <th>Detail</th>
+                <th>Reporter</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th style="width:160px">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="reports-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination" id="reports-pagination"></div>
       </section>
     </main>
   </div>

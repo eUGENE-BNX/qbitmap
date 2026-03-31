@@ -3,6 +3,7 @@ import { QBitmapConfig } from './config.js';
 import { Logger, escapeHtml } from './utils.js';
 import { AuthSystem } from './auth.js';
 import { Analytics } from './analytics.js';
+import { ReportSystem } from './report.js';
 
 /**
  * QBitmap Comment Widget
@@ -197,8 +198,8 @@ const CommentWidget = {
   },
 
   _createCommentEl(comment) {
-    const isOwn = typeof AuthSystem !== 'undefined' && AuthSystem.isLoggedIn() &&
-                  AuthSystem.getCurrentUser()?.id === comment.user_id;
+    const isLoggedIn = typeof AuthSystem !== 'undefined' && AuthSystem.isLoggedIn();
+    const isOwn = isLoggedIn && AuthSystem.getCurrentUser()?.id === comment.user_id;
 
     const div = document.createElement('div');
     div.className = 'comment-item';
@@ -211,6 +212,7 @@ const CommentWidget = {
           <span class="comment-author">${escapeHtml(comment.user_name || 'Kullanici')}</span>
           <span class="comment-time">${escapeHtml(this.formatTimeAgo(comment.created_at))}</span>
           ${isOwn ? '<button class="comment-delete" title="Sil">&times;</button>' : ''}
+          ${isLoggedIn && !isOwn ? ReportSystem.getCommentBtnHtml(comment.id) : ''}
         </div>
         <div class="comment-text">${escapeHtml(comment.content)}</div>
       </div>
@@ -223,6 +225,17 @@ const CommentWidget = {
         deleteBtn.onclick = (e) => {
           e.stopPropagation();
           this._deleteComment(comment.id);
+        };
+      }
+    }
+
+    // Wire report button
+    if (isLoggedIn && !isOwn) {
+      const reportBtn = div.querySelector('.comment-report-btn');
+      if (reportBtn) {
+        reportBtn.onclick = (e) => {
+          e.stopPropagation();
+          ReportSystem.showReportDialog('comment', String(comment.id));
         };
       }
     }
