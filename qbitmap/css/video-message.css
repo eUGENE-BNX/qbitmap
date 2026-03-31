@@ -85,7 +85,7 @@
 
 /* Portrait video (mobile dikey çekim) */
 .video-msg-video-container.vmsg-portrait {
-  max-width: min(360px, calc((100vh - 120px) * 9 / 16));
+  max-width: min(252px, calc((100vh - 120px) * 9 / 16));
   aspect-ratio: 9 / 16;
 }
 
@@ -1703,22 +1703,38 @@
 /* Mobile landscape adjustments for photo */
 @media (orientation: landscape) and (max-height: 500px) {
   .photo-settings-bar {
-    flex-direction: column;
+    flex-direction: row;
     max-width: none;
-    width: auto;
-    margin-top: 0;
-    margin-left: 8px;
-    padding: 8px;
-    gap: 8px;
+    width: 100%;
+    order: 2;
+    margin-top: 6px;
+    margin-left: 0;
+    padding: 6px 12px;
+    gap: 10px;
   }
 
   .photo-zoom-control {
-    flex-direction: column;
-    gap: 4px;
+    flex-direction: row;
+    gap: 6px;
   }
 
   .photo-zoom-control input[type="range"] {
-    width: 60px;
+    width: auto;
+    flex: 1;
+  }
+
+  /* In landscape photo mode: stack video + settings vertically, controls beside */
+  .video-msg-modal-content:has(.photo-settings-bar) {
+    flex-wrap: wrap;
+  }
+
+  .video-msg-modal-content:has(.photo-settings-bar) .video-msg-video-container {
+    height: 45vh;
+    max-height: calc(100vh - 100px);
+  }
+
+  .video-msg-modal-content:has(.photo-settings-bar) .video-msg-controls {
+    order: 1;
   }
 }
 
@@ -1920,4 +1936,62 @@
 @keyframes vmsg-shimmer-pulse {
   0%, 100% { transform: scale(1); opacity: 0.6; }
   50% { transform: scale(1.08); opacity: 1; }
+}
+
+/* ============================================
+   Desktop Warning Modal
+   ============================================ */
+.vmsg-desktop-warning-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  animation: vmsg-modal-in 0.2s ease;
+}
+
+.vmsg-desktop-warning-box {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 360px;
+  text-align: center;
+  color: #fff;
+}
+
+.vmsg-desktop-warning-box svg {
+  margin-bottom: 16px;
+}
+
+.vmsg-desktop-warning-box h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.vmsg-desktop-warning-box p {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+}
+
+.vmsg-desktop-warning-close {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 32px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vmsg-desktop-warning-close:hover {
+  background: rgba(255, 255, 255, 0.2);
 }

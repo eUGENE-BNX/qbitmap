@@ -32,7 +32,7 @@ const VideoMessage = {
   _locationClickHandler: null,
 
   // Camera
-  currentFacingMode: 'user',
+  currentFacingMode: 'environment',
 
   // Map layer
   videoMessages: new Map(),
@@ -107,6 +107,36 @@ const VideoMessage = {
     Logger.log('[VideoMessage] System initialized');
   },
 
+  // ==================== DEVICE DETECTION ====================
+
+  _isMobileDevice() {
+    const hasTouch = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    const smallScreen = window.matchMedia('(max-width: 1024px)').matches;
+    const mobileUA = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    return hasTouch && (smallScreen || mobileUA);
+  },
+
+  _showDesktopWarning() {
+    document.getElementById('vmsg-desktop-warning')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'vmsg-desktop-warning';
+    overlay.className = 'vmsg-desktop-warning-overlay';
+    overlay.innerHTML = `
+      <div class="vmsg-desktop-warning-box">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e67e22" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+        </svg>
+        <h3>Mobil Cihaz Gerekli</h3>
+        <p>Video ve foto mesaj özellikleri yalnızca cep telefonlarında kullanılabilir.</p>
+        <button class="vmsg-desktop-warning-close">Tamam</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.vmsg-desktop-warning-close').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  },
+
   // ==================== BUTTON BINDING ====================
 
   bindButton() {
@@ -115,6 +145,10 @@ const VideoMessage = {
       btn._vmsgBound = true;
       btn.addEventListener('click', () => {
         AuthSystem.toggleDropdown();
+        if (!this._isMobileDevice()) {
+          this._showDesktopWarning();
+          return;
+        }
         this.startFlow();
       });
     }
@@ -126,6 +160,10 @@ const VideoMessage = {
       btn._pmsgBound = true;
       btn.addEventListener('click', () => {
         AuthSystem.toggleDropdown();
+        if (!this._isMobileDevice()) {
+          this._showDesktopWarning();
+          return;
+        }
         this.startPhotoFlow();
       });
     }

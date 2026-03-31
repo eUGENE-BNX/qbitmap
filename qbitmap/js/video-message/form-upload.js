@@ -49,6 +49,7 @@ const FormUploadMixin = {
           </div>
           <div class="video-msg-progress-text" id="vmsg-progress-text" style="display:none;"></div>
           <div class="video-msg-actions">
+            <button class="video-msg-action-btn danger" id="vmsg-cancel-send">Vazgeç</button>
             <button class="video-msg-action-btn secondary" id="vmsg-rerecord">Tekrar Kaydet</button>
             <button class="video-msg-action-btn primary" id="vmsg-select-location" disabled>Konum alınıyor...</button>
           </div>
@@ -128,6 +129,12 @@ const FormUploadMixin = {
       clearTimeout(this._searchDebounce);
       this._searchDebounce = setTimeout(() => this.searchUsers(input.value), 300);
     };
+
+    // Cancel / exit entirely
+    const cancelBtn = this._modalEl.querySelector('#vmsg-cancel-send');
+    if (cancelBtn) {
+      cancelBtn.onclick = () => this.cleanupAndClose();
+    }
 
     // Re-record / re-capture
     this._modalEl.querySelector('#vmsg-rerecord').onclick = () => {
@@ -573,9 +580,10 @@ const FormUploadMixin = {
       }
 
       _haptic('success');
+      const mediaType = this.isPhotoMode ? 'photo' : 'video';
+      Analytics.event('video_message_create', { type: mediaType, has_location: !!this.selectedLocation, is_private: !!this.isPrivate });
+      AuthSystem.showNotification(mediaType === 'photo' ? 'Foto mesaj gönderildi' : 'Video mesaj gönderildi', 'success');
       this.cleanupAndClose();
-      Analytics.event('video_message_create', { type: this.isPhotoMode ? 'photo' : 'video', has_location: !!this.selectedLocation, is_private: !!this.isPrivate });
-      AuthSystem.showNotification(this.isPhotoMode ? 'Foto mesaj gönderildi' : 'Video mesaj gönderildi', 'success');
 
       // Fly to location
       if (AppState.map && this.selectedLocation) {

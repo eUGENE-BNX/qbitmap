@@ -335,6 +335,7 @@ const PhotoCaptureMixin = {
           </div>
           <div class="video-msg-progress-text" id="vmsg-progress-text" style="display:none;"></div>
           <div class="video-msg-actions">
+            <button class="video-msg-action-btn danger" id="vmsg-cancel-send">Vazgeç</button>
             <button class="video-msg-action-btn secondary" id="vmsg-rerecord">Tekrar Çek</button>
             <button class="video-msg-action-btn primary" id="vmsg-select-location" disabled>Konum alınıyor...</button>
           </div>

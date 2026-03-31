@@ -41,7 +41,7 @@ const MediaMixin = {
         container.style.height = '';
         container.style.width = '';
         if (isPortrait) {
-          container.style.maxWidth = `min(360px, calc((100vh - 120px) * ${w} / ${h}))`;
+          container.style.maxWidth = `min(252px, calc((100vh - 120px) * ${w} / ${h}))`;
         } else {
           container.style.maxWidth = `min(640px, calc((100vh - 120px) * ${w} / ${h}))`;
         }
