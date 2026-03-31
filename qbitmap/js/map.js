@@ -251,7 +251,7 @@ class LayersDropdownControl {
                     if (window.VehicleAnimation) {
                         VehicleAnimation.start();
                     } else {
-                        import('/js/vehicle-animation.js').then(() => {
+                        import('/js/vehicle-animation/index.js').then(() => {
                             if (window.VehicleAnimation) VehicleAnimation.start();
                         });
                     }

@@ -1,0 +1,471 @@
+/* Drawing overlay */
+.zone-drawing-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  cursor: crosshair;
+  z-index: 100;
+}
+
+.zone-drawing-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Drawing toolbar */
+.zone-drawing-toolbar {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 6px 12px;
+  border-radius: 20px;
+  z-index: 101;
+}
+
+.zone-toolbar-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.zone-toolbar-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.zone-toolbar-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.zone-save-btn:not(:disabled) {
+  color: #4ade80;
+}
+
+.zone-cancel-btn {
+  color: #f87171;
+}
+
+.zone-point-count {
+  color: #888;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+/* Zones overlay */
+.zones-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.zones-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.zone-polygon {
+  pointer-events: all;
+  cursor: pointer;
+  transition: fill 0.2s, stroke 0.2s;
+}
+
+.zone-polygon:hover {
+  fill: rgba(0, 255, 0, 0.2);
+  stroke: rgba(0, 255, 0, 0.5);
+}
+
+.zone-polygon.zone-pending {
+  fill: rgba(255, 255, 0, 0.3);
+  stroke: rgba(255, 255, 0, 0.6);
+}
+
+.zone-polygon.zone-success {
+  fill: rgba(0, 255, 0, 0.4);
+  stroke: rgba(0, 255, 0, 0.8);
+}
+
+.zone-polygon.zone-error {
+  fill: rgba(118, 185, 0, 0.4);
+  stroke: rgba(118, 185, 0, 0.8);
+}
+
+/* Save modal */
+.zone-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+
+.zone-modal {
+  background: #1a1a2e;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.zone-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #333;
+}
+
+.zone-modal-header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 16px;
+}
+
+.zone-modal-close {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.zone-modal-close:hover {
+  color: #fff;
+}
+
+.zone-modal-body {
+  padding: 20px;
+}
+
+.zone-form-group {
+  margin-bottom: 16px;
+}
+
+.zone-form-group:last-child {
+  margin-bottom: 0;
+}
+
+.zone-form-group label {
+  display: block;
+  color: #888;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.zone-form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  background: #0d0d1a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.zone-form-group input:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.zone-form-group input.error {
+  border-color: #f87171;
+  animation: shake 0.3s;
+}
+
+.zone-modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #333;
+}
+
+.zone-modal-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.zone-modal-cancel {
+  background: #333;
+  color: #ccc;
+}
+
+.zone-modal-cancel:hover {
+  background: #444;
+}
+
+.zone-modal-save {
+  background: #4a9eff;
+  color: white;
+}
+
+.zone-modal-save:hover {
+  background: #3a8eef;
+}
+
+/* Context menu */
+.zone-context-menu {
+  position: fixed;
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  min-width: 150px;
+  z-index: 10001;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.zone-context-header {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #888;
+  border-bottom: 1px solid #333;
+}
+
+.zone-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.zone-context-item:hover {
+  background: #333;
+}
+
+.zone-context-delete {
+  color: #f87171;
+}
+
+/* Draw button active state */
+.draw-zone-btn.active {
+  background: #4a9eff !important;
+  color: white !important;
+}
+
+/* Toggle zones button */
+.toggle-zones-btn.zones-hidden-state {
+  opacity: 0.5;
+}
+
+/* Hidden zones - invisible but still clickable */
+.zones-overlay.zones-hidden .zone-polygon {
+  fill: transparent !important;
+  stroke: transparent !important;
+}
+
+.zones-overlay.zones-hidden .zone-polygon:hover {
+  fill: transparent !important;
+  stroke: transparent !important;
+}
+
+/* But show feedback even when hidden */
+.zones-overlay.zones-hidden .zone-polygon.zone-pending {
+  fill: rgba(255, 255, 0, 0.3) !important;
+  stroke: rgba(255, 255, 0, 0.6) !important;
+}
+
+.zones-overlay.zones-hidden .zone-polygon.zone-success {
+  fill: rgba(0, 255, 0, 0.4) !important;
+  stroke: rgba(0, 255, 0, 0.8) !important;
+}
+
+.zones-overlay.zones-hidden .zone-polygon.zone-error {
+  fill: rgba(118, 185, 0, 0.4) !important;
+  stroke: rgba(118, 185, 0, 0.8) !important;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Relay Info Card */
+.relay-info-card {
+  position: absolute;
+  z-index: 200;
+  background: rgba(26, 26, 46, 0.75);
+  backdrop-filter: blur(4px);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-width: 160px;
+  max-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  animation: ricFadeIn 0.2s ease;
+}
+
+@keyframes ricFadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ric-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ric-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ric-metrics.ric-loading {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.ric-metrics.ric-loading span {
+  color: #888;
+  font-size: 11px;
+}
+
+.ric-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #4a9eff;
+  border-radius: 50%;
+  animation: ricSpin 0.8s linear infinite;
+}
+
+@keyframes ricSpin {
+  to { transform: rotate(360deg); }
+}
+
+.ric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.ric-label {
+  font-size: 10px;
+  color: #888;
+}
+
+.ric-value {
+  font-size: 11px;
+  font-weight: 500;
+  color: #fff;
+  font-family: monospace;
+}
+
+.ric-row.ric-total {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ric-row.ric-total .ric-label {
+  color: #4ade80;
+}
+
+.ric-row.ric-total .ric-value {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.ric-error {
+  color: #f87171;
+  font-size: 11px;
+  text-align: center;
+  padding: 8px 0;
+}
+
+/* Mobile: compact relay info card (~30% smaller) */
+@media (max-width: 700px) {
+  .relay-info-card {
+    padding: 4px 6px;
+    min-width: 90px;
+    max-width: 120px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .ric-header {
+    font-size: 8px;
+    margin-bottom: 3px;
+    padding-bottom: 3px;
+  }
+
+  .ric-row {
+    gap: 4px;
+  }
+
+  .ric-label {
+    font-size: 7px;
+  }
+
+  .ric-value {
+    font-size: 7px;
+  }
+
+  .ric-row.ric-total {
+    margin-top: 3px;
+    padding-top: 3px;
+  }
+
+  .ric-error {
+    font-size: 7px;
+    padding: 3px 0;
+  }
+
+  .ric-metrics.ric-loading {
+    padding: 4px 0;
+    gap: 4px;
+  }
+
+  .ric-metrics.ric-loading span {
+    font-size: 7px;
+  }
+
+  .ric-spinner {
+    width: 10px;
+    height: 10px;
+  }
+}
