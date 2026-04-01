@@ -4,6 +4,11 @@ import { AuthSystem } from "../../auth.js";
 
 const AiMixin = {
   toggleAiSearchMode(deviceId) {
+    if (!AuthSystem.isLoggedIn()) {
+      AuthSystem.showNotification('AI Arama için giriş yapmanız gerekiyor.', 'info');
+      return;
+    }
+
     const popupData = this.popups.get(deviceId);
     if (!popupData) return;
 
@@ -437,6 +442,11 @@ const AiMixin = {
    * Toggle AI analyze on/off (periodic analysis while active)
    */
   async toggleAiAnalyze(deviceId) {
+    if (!AuthSystem.isLoggedIn()) {
+      AuthSystem.showNotification('AI Analiz için giriş yapmanız gerekiyor.', 'info');
+      return;
+    }
+
     const popupData = this.popups.get(deviceId);
     if (!popupData) return;
 
