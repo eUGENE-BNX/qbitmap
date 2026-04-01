@@ -1,5 +1,6 @@
 import { Logger } from "../utils.js";
 import { AuthSystem } from "../auth.js";
+import { applyAutofocus, getSavedCameraId, saveCameraId } from "./media.js";
 
 function _haptic(style) {
   if (!navigator.vibrate) return;
@@ -19,17 +20,32 @@ const PhotoCaptureMixin = {
 
     try {
       const res = this.PHOTO_RESOLUTIONS[this._photoResolution];
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: res.width },
-          height: { ideal: res.height },
-          aspectRatio: { ideal: 16 / 9 },
-          facingMode: { ideal: this.currentFacingMode }
-        },
-        audio: false
-      });
+      const savedId = getSavedCameraId();
+      const videoConstraints = {
+        width: { ideal: res.width },
+        height: { ideal: res.height },
+        aspectRatio: { ideal: 16 / 9 },
+        focusMode: { ideal: 'continuous' }
+      };
+      if (savedId) {
+        videoConstraints.deviceId = { exact: savedId };
+      } else {
+        videoConstraints.facingMode = { ideal: this.currentFacingMode };
+      }
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+      } catch (e) {
+        if (savedId) {
+          delete videoConstraints.deviceId;
+          videoConstraints.facingMode = { ideal: this.currentFacingMode };
+          stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+        } else { throw e; }
+      }
       this.mediaStream = stream;
+      applyAutofocus(stream);
       this._selectedCameraId = stream.getVideoTracks()[0]?.getSettings()?.deviceId || null;
+      saveCameraId(this._selectedCameraId);
       await this._enumerateCameras();
       this.showPhotoCaptureModal();
     } catch (error) {
@@ -404,12 +420,14 @@ const PhotoCaptureMixin = {
             width: { ideal: res.width },
             height: { ideal: res.height },
             aspectRatio: { ideal: 16 / 9 },
-            facingMode: !this._selectedCameraId ? { ideal: this.currentFacingMode } : undefined
+            facingMode: !this._selectedCameraId ? { ideal: this.currentFacingMode } : undefined,
+            focusMode: { ideal: 'continuous' }
           },
           audio: false
         });
         this.mediaStream.getTracks().forEach(t => t.stop());
         this.mediaStream = newStream;
+        applyAutofocus(newStream);
         this._selectedCameraId = newStream.getVideoTracks()[0]?.getSettings()?.deviceId || null;
         const video = modal.querySelector('#vmsg-preview-video');
         if (video) video.srcObject = newStream;

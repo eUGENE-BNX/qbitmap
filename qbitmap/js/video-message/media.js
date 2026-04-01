@@ -1,5 +1,24 @@
 import { Logger } from "../utils.js";
 
+const CAMERA_PREF_KEY = 'qbitmap_preferred_camera';
+
+function getSavedCameraId() {
+  try { return localStorage.getItem(CAMERA_PREF_KEY); } catch { return null; }
+}
+
+function saveCameraId(deviceId) {
+  try { if (deviceId) localStorage.setItem(CAMERA_PREF_KEY, deviceId); } catch {}
+}
+
+function applyAutofocus(stream) {
+  const track = stream?.getVideoTracks()[0];
+  if (!track) return;
+  const caps = track.getCapabilities?.();
+  if (caps?.focusMode?.includes('continuous')) {
+    track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+  }
+}
+
 const MediaMixin = {
   _applyVideoOrientation(container, stream, videoEl) {
     if (!container) return;
@@ -74,26 +93,38 @@ const MediaMixin = {
   async switchCamera() {
     if (!this.mediaStream || this.isRecording) return;
 
+    const newMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+    const videoBase = {
+      width: { ideal: this.RESOLUTION.width },
+      height: { ideal: this.RESOLUTION.height },
+      aspectRatio: { ideal: 16 / 9 },
+      frameRate: { ideal: 25, max: 25 },
+      focusMode: { ideal: 'continuous' }
+    };
+
+    // Stop old stream first — some devices can't open two cameras at once
+    this.mediaStream.getTracks().forEach(t => t.stop());
+    if (this._rawAudioTrack) { this._rawAudioTrack.stop(); this._rawAudioTrack = null; }
+    if (this._audioCtx) { this._audioCtx.close().catch(() => {}); this._audioCtx = null; }
+
     try {
-      const newMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+      let rawStream;
+      try {
+        rawStream = await navigator.mediaDevices.getUserMedia({
+          video: { ...videoBase, facingMode: { exact: newMode } }, audio: true
+        });
+      } catch {
+        // exact failed, try ideal
+        rawStream = await navigator.mediaDevices.getUserMedia({
+          video: { ...videoBase, facingMode: { ideal: newMode } }, audio: true
+        });
+      }
 
-      const rawStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: this.RESOLUTION.width },
-          height: { ideal: this.RESOLUTION.height },
-          aspectRatio: { ideal: 16 / 9 },
-          frameRate: { ideal: 25, max: 25 },
-          facingMode: { exact: newMode }
-        },
-        audio: true
-      });
-
-      // Stop old stream, raw audio track and audio context
-      this.mediaStream.getTracks().forEach(t => t.stop());
-      if (this._rawAudioTrack) { this._rawAudioTrack.stop(); this._rawAudioTrack = null; }
-      if (this._audioCtx) { this._audioCtx.close().catch(() => {}); this._audioCtx = null; }
       this.mediaStream = this._processAudio(rawStream);
+      applyAutofocus(rawStream);
       this.currentFacingMode = newMode;
+      this._selectedCameraId = rawStream.getVideoTracks()[0]?.getSettings()?.deviceId || null;
+      saveCameraId(this._selectedCameraId);
 
       // Update video preview
       const video = this._modalEl?.querySelector('#vmsg-preview-video');
@@ -106,6 +137,17 @@ const MediaMixin = {
       Logger.log('[VideoMessage] Camera switched to', newMode);
     } catch (error) {
       Logger.error('[VideoMessage] Camera switch failed:', error);
+      // Try to recover old camera
+      try {
+        const fallback = await navigator.mediaDevices.getUserMedia({
+          video: { ...videoBase, facingMode: { ideal: this.currentFacingMode } }, audio: true
+        });
+        this.mediaStream = this._processAudio(fallback);
+        const video = this._modalEl?.querySelector('#vmsg-preview-video');
+        if (video) video.srcObject = this.mediaStream;
+      } catch {
+        // Complete failure
+      }
       AuthSystem.showNotification('Kamera değiştirilemedi', 'error');
     }
   },
@@ -136,7 +178,7 @@ const MediaMixin = {
       }
 
       this._cameras = cameras;
-      Logger.log('[VideoMessage] Found', this._cameras.length, 'cameras');
+      cameras.forEach((c, i) => Logger.log(`[Camera ${i}] ${c.label || 'no-label'} id=${c.deviceId.slice(0, 12)}`));
     } catch (e) {
       Logger.warn('[VideoMessage] enumerateDevices failed:', e);
       this._cameras = [];
@@ -145,11 +187,14 @@ const MediaMixin = {
 
   _getCameraLabel(device, index) {
     const label = (device.label || '').toLowerCase();
-    if (label.includes('front') || label.includes('user') || label.includes('facing front')) return 'Ön Kamera';
-    if (label.includes('wide') || label.includes('ultra')) return 'Geniş Açı';
+    // Check specific lens types first (before generic back/front)
+    if (label.includes('macro')) return 'Macro';
+    if (label.includes('ultrawide') || label.includes('ultra wide') || label.includes('ultra-wide')) return 'Ultra Geniş';
+    if (label.includes('wide') && !label.includes('ultra')) return 'Geniş Açı';
     if (label.includes('tele')) return 'Telefoto';
+    if (label.includes('front') || label.includes('user') || label.includes('facing front')) return 'Ön Kamera';
     if (label.includes('back') || label.includes('environment') || label.includes('facing back') || label.includes('rear')) return 'Arka Kamera';
-    if (device.label) return device.label.substring(0, 20);
+    if (device.label) return device.label.substring(0, 25);
     return `Kamera ${index + 1}`;
   },
 
@@ -165,6 +210,13 @@ const MediaMixin = {
 
     const dropdown = document.createElement('div');
     dropdown.className = 'vmsg-camera-dropdown';
+
+    // Header showing camera count
+    const header = document.createElement('div');
+    header.className = 'vmsg-camera-option';
+    header.style.cssText = 'font-size:11px;opacity:0.6;pointer-events:none;padding:4px 10px';
+    header.textContent = `${this._cameras.length} kamera bulundu`;
+    dropdown.appendChild(header);
 
     this._cameras.forEach((cam, i) => {
       const opt = document.createElement('div');
@@ -199,24 +251,29 @@ const MediaMixin = {
   async _switchToCamera(deviceId) {
     if (!this.mediaStream) return;
 
+    const videoBase = {
+      width: { ideal: this.RESOLUTION.width },
+      height: { ideal: this.RESOLUTION.height },
+      aspectRatio: { ideal: 16 / 9 },
+      frameRate: { ideal: 25, max: 25 },
+      focusMode: { ideal: 'continuous' }
+    };
+
+    // Stop old stream first — some devices can't open two cameras at once
+    const oldFacingMode = this.currentFacingMode;
+    this.mediaStream.getTracks().forEach(t => t.stop());
+    if (this._rawAudioTrack) { this._rawAudioTrack.stop(); this._rawAudioTrack = null; }
+    if (this._audioCtx) { this._audioCtx.close().catch(() => {}); this._audioCtx = null; }
+
     try {
       const rawStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          deviceId: { exact: deviceId },
-          width: { ideal: this.RESOLUTION.width },
-          height: { ideal: this.RESOLUTION.height },
-          aspectRatio: { ideal: 16 / 9 },
-          frameRate: { ideal: 25, max: 25 }
-        },
-        audio: true
+        video: { ...videoBase, deviceId: { exact: deviceId } }, audio: true
       });
 
-      // Stop old stream and audio context
-      this.mediaStream.getTracks().forEach(t => t.stop());
-      if (this._rawAudioTrack) { this._rawAudioTrack.stop(); this._rawAudioTrack = null; }
-      if (this._audioCtx) { this._audioCtx.close().catch(() => {}); this._audioCtx = null; }
       this.mediaStream = this._processAudio(rawStream);
+      applyAutofocus(rawStream);
       this._selectedCameraId = deviceId;
+      saveCameraId(deviceId);
 
       // Update facing mode from new track
       const settings = this.mediaStream.getVideoTracks()[0]?.getSettings();
@@ -232,6 +289,17 @@ const MediaMixin = {
       Logger.log('[VideoMessage] Switched to camera:', deviceId);
     } catch (error) {
       Logger.error('[VideoMessage] Camera switch failed:', error);
+      // Try to recover old camera
+      try {
+        const fallback = await navigator.mediaDevices.getUserMedia({
+          video: { ...videoBase, facingMode: { ideal: oldFacingMode } }, audio: true
+        });
+        this.mediaStream = this._processAudio(fallback);
+        const video = this._modalEl?.querySelector('#vmsg-preview-video');
+        if (video) video.srcObject = this.mediaStream;
+      } catch {
+        // Complete failure
+      }
       AuthSystem.showNotification('Kamera değiştirilemedi', 'error');
     }
   },
@@ -297,4 +365,4 @@ const MediaMixin = {
   },
 };
 
-export { MediaMixin };
+export { MediaMixin, applyAutofocus, getSavedCameraId, saveCameraId };

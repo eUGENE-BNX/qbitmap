@@ -9,7 +9,7 @@ const FormUploadMixin = {
   showPreview() {
     if (!this._modalEl || !this.recordedBlob) return;
 
-    const durationMs = Math.min(Date.now() - this.recordingStartTime, this.MAX_DURATION_MS);
+    const durationMs = this._durationMs || Math.min(Date.now() - (this.recordingStartTime || Date.now()), this.MAX_DURATION_MS);
     const objectUrl = URL.createObjectURL(this.recordedBlob);
 
     this._modalEl.innerHTML = `
@@ -147,7 +147,9 @@ const FormUploadMixin = {
       this._nearbyPlaces = [];
       this._selectedPlace = null;
       this.closeModal();
-      if (this.isPhotoMode) {
+      if (this._isGalleryMode && this.isPhotoMode) {
+        this.startGalleryPhotoFlow();
+      } else if (this.isPhotoMode) {
         this.startPhotoFlow();
       } else {
         this.startFlow();

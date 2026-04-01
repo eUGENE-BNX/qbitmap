@@ -352,9 +352,10 @@ const CleanupMixin = {
     this._cameras = [];
     this._selectedCameraId = null;
 
-    // Reset photo state
+    // Reset photo/gallery state
     this.capturedPhotoBlob = null;
     this.isPhotoMode = false;
+    this._isGalleryMode = false;
     this._photoZoomLevel = 1;
     this._photoResolution = 'high';
     this._flashEnabled = false;

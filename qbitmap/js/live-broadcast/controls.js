@@ -1,5 +1,6 @@
 import { Logger } from '../utils.js';
 import { AuthSystem } from '../auth.js';
+import { applyAutofocus, saveCameraId } from '../video-message/media.js';
 
 const ControlsMixin = {
   // ==================== Camera Switch ====================
@@ -16,16 +17,31 @@ const ControlsMixin = {
 
     try {
       const newMode = this.currentFacingMode === 'environment' ? 'user' : 'environment';
+      const videoBase = {
+        width: { ideal: this.currentResolution.width },
+        height: { ideal: this.currentResolution.height },
+        frameRate: { ideal: 24 },
+        focusMode: { ideal: 'continuous' }
+      };
 
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: this.currentResolution.width },
-          height: { ideal: this.currentResolution.height },
-          frameRate: { ideal: 24 },
-          facingMode: { exact: newMode }
-        },
-        audio: false
-      });
+      // Stop old video track first — some devices can't open two cameras at once
+      const oldVideoTrack = this.mediaStream.getVideoTracks()[0];
+      if (oldVideoTrack) {
+        oldVideoTrack.stop();
+        this.mediaStream.removeTrack(oldVideoTrack);
+      }
+
+      let newStream;
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: { ...videoBase, facingMode: { exact: newMode } }, audio: false
+        });
+      } catch {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: { ...videoBase, facingMode: { ideal: newMode } }, audio: false
+        });
+      }
+      applyAutofocus(newStream);
 
       const newVideoTrack = newStream.getVideoTracks()[0];
 
@@ -34,14 +50,10 @@ const ControlsMixin = {
         await sender.replaceTrack(newVideoTrack);
       }
 
-      const oldVideoTrack = this.mediaStream.getVideoTracks()[0];
-      if (oldVideoTrack) {
-        oldVideoTrack.stop();
-        this.mediaStream.removeTrack(oldVideoTrack);
-      }
       this.mediaStream.addTrack(newVideoTrack);
 
       this.currentFacingMode = newMode;
+      saveCameraId(newVideoTrack.getSettings()?.deviceId);
       Logger.log('[LiveBroadcast] Camera switched to', newMode);
 
     } catch (error) {
@@ -258,10 +270,12 @@ const ControlsMixin = {
           width: { ideal: res.width },
           height: { ideal: res.height },
           frameRate: { ideal: 24 },
-          facingMode: { ideal: this.currentFacingMode }
+          facingMode: { ideal: this.currentFacingMode },
+          focusMode: { ideal: 'continuous' }
         },
         audio: false
       });
+      applyAutofocus(newStream);
 
       const newVideoTrack = newStream.getVideoTracks()[0];
 

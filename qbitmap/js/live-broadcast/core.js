@@ -4,6 +4,7 @@ import { Logger, escapeHtml, showNotification } from '../utils.js';
 import { AuthSystem } from '../auth.js';
 import { Analytics } from '../analytics.js';
 import * as AppState from '../state.js';
+import { applyAutofocus, getSavedCameraId, saveCameraId } from '../video-message/media.js';
 
 function _hapticBroadcast(style) {
   if (!navigator.vibrate) return;
@@ -132,15 +133,29 @@ const CoreMixin = {
 
     try {
       // 1. Request camera + mic permissions (use currentResolution, back camera preferred)
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: this.currentResolution.width },
-          height: { ideal: this.currentResolution.height },
-          frameRate: { ideal: 24 },
-          facingMode: { ideal: this.currentFacingMode }
-        },
-        audio: true
-      });
+      const savedId = getSavedCameraId();
+      const videoConstraints = {
+        width: { ideal: this.currentResolution.width },
+        height: { ideal: this.currentResolution.height },
+        frameRate: { ideal: 24 },
+        focusMode: { ideal: 'continuous' }
+      };
+      if (savedId) {
+        videoConstraints.deviceId = { exact: savedId };
+      } else {
+        videoConstraints.facingMode = { ideal: this.currentFacingMode };
+      }
+      try {
+        this.mediaStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: true });
+      } catch (e) {
+        if (savedId) {
+          delete videoConstraints.deviceId;
+          videoConstraints.facingMode = { ideal: this.currentFacingMode };
+          this.mediaStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: true });
+        } else { throw e; }
+      }
+      applyAutofocus(this.mediaStream);
+      saveCameraId(this.mediaStream.getVideoTracks()[0]?.getSettings()?.deviceId);
 
       // 2. Get accurate geolocation
       let lng, lat;

@@ -5,7 +5,7 @@ import { AuthSystem } from '../auth.js';
 import { PhotoCaptureMixin } from './photo-capture.js';
 import { RecordingMixin } from './recording.js';
 import { FormUploadMixin } from './form-upload.js';
-import { MediaMixin } from './media.js';
+import { MediaMixin, applyAutofocus, getSavedCameraId, saveCameraId } from './media.js';
 import { MapLayerMixin } from './map-layer.js';
 import { PopupMixin } from './popup.js';
 import { SearchInboxMixin } from './search-inbox.js';
@@ -164,9 +164,86 @@ const VideoMessage = {
           this._showDesktopWarning();
           return;
         }
-        this.startPhotoFlow();
+        this._showSourcePicker();
       });
     }
+  },
+
+  _showSourcePicker() {
+    document.getElementById('vmsg-source-picker')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'vmsg-source-picker';
+    overlay.className = 'vmsg-source-picker-overlay';
+    overlay.innerHTML = `
+      <div class="vmsg-source-picker-box">
+        <h3>Foto Mesaj</h3>
+        <button class="vmsg-source-btn" data-source="camera">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          Kamera ile Çek
+        </button>
+        <button class="vmsg-source-btn" data-source="gallery">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+          Galeriden Seç
+        </button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.onclick = (e) => {
+      if (e.target === overlay) overlay.remove();
+    };
+    overlay.querySelector('[data-source="camera"]').onclick = () => {
+      overlay.remove();
+      this.startPhotoFlow();
+    };
+    overlay.querySelector('[data-source="gallery"]').onclick = () => {
+      overlay.remove();
+      this.startGalleryPhotoFlow();
+    };
+  },
+
+  // ==================== GALLERY PHOTO FLOW ====================
+
+  startGalleryPhotoFlow() {
+    if (!AuthSystem.isLoggedIn()) {
+      AuthSystem.showNotification('Foto mesaj için giriş yapın', 'error');
+      return;
+    }
+    if (this._modalEl) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      const MAX_SIZE = 20 * 1024 * 1024;
+      if (file.size > MAX_SIZE) {
+        AuthSystem.showNotification('Fotoğraf 20MB\'dan küçük olmalı', 'error');
+        return;
+      }
+
+      this.isPhotoMode = true;
+      this._isGalleryMode = true;
+      this.capturedPhotoBlob = file;
+
+      const modal = document.createElement('div');
+      modal.className = 'video-msg-modal';
+      document.body.appendChild(modal);
+      this._modalEl = modal;
+
+      this.showPhotoPreview();
+    };
+    input.click();
   },
 
   // ==================== MAIN FLOW ====================
@@ -180,19 +257,35 @@ const VideoMessage = {
     if (this.isRecording || this._modalEl) return;
 
     try {
-      const rawStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: this.RESOLUTION.width },
-          height: { ideal: this.RESOLUTION.height },
-          aspectRatio: { ideal: 16 / 9 },
-          frameRate: { ideal: 25, max: 25 },
-          facingMode: { ideal: this.currentFacingMode }
-        },
-        audio: true
-      });
+      const savedId = getSavedCameraId();
+      const videoConstraints = {
+        width: { ideal: this.RESOLUTION.width },
+        height: { ideal: this.RESOLUTION.height },
+        aspectRatio: { ideal: 16 / 9 },
+        frameRate: { ideal: 25, max: 25 },
+        focusMode: { ideal: 'continuous' }
+      };
+      if (savedId) {
+        videoConstraints.deviceId = { exact: savedId };
+      } else {
+        videoConstraints.facingMode = { ideal: this.currentFacingMode };
+      }
+      let rawStream;
+      try {
+        rawStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: true });
+      } catch (e) {
+        // Saved camera might be unavailable, fallback to facingMode
+        if (savedId) {
+          delete videoConstraints.deviceId;
+          videoConstraints.facingMode = { ideal: this.currentFacingMode };
+          rawStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: true });
+        } else { throw e; }
+      }
       this.mediaStream = this._processAudio(rawStream);
+      applyAutofocus(rawStream);
 
       this._selectedCameraId = rawStream.getVideoTracks()[0]?.getSettings()?.deviceId || null;
+      saveCameraId(this._selectedCameraId);
       await this._enumerateCameras();
 
       this.showRecordingModal();

@@ -18,6 +18,13 @@ const RecordingMixin = {
             <span class="video-msg-rec-label">REC</span>
           </div>
         </div>
+        <div class="photo-settings-bar video-zoom-bar" id="video-zoom-bar" style="display:none;">
+          <div class="photo-zoom-control" id="video-zoom-ctrl">
+            <span>1x</span>
+            <input type="range" id="video-zoom" min="1" max="5" step="0.1" value="1">
+            <span id="video-zoom-label">1.0x</span>
+          </div>
+        </div>
         <div class="video-msg-controls" id="vmsg-controls">
           <button class="video-msg-btn video-msg-btn-cancel" id="vmsg-cancel" title="İptal" aria-label="İptal">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -67,6 +74,35 @@ const RecordingMixin = {
 
     // Flash/torch toggle for video recording
     this._bindVideoFlash(modal);
+    this._bindVideoZoom(modal);
+  },
+
+  _bindVideoZoom(modal) {
+    const bar = modal.querySelector('#video-zoom-bar');
+    const slider = modal.querySelector('#video-zoom');
+    const label = modal.querySelector('#video-zoom-label');
+    if (!bar || !slider) return;
+
+    const track = this.mediaStream?.getVideoTracks()[0];
+    const capabilities = track?.getCapabilities?.();
+
+    if (!capabilities?.zoom) {
+      bar.style.display = 'none';
+      return;
+    }
+
+    bar.style.display = '';
+    slider.min = capabilities.zoom.min;
+    slider.max = capabilities.zoom.max;
+    slider.step = capabilities.zoom.step || 0.1;
+    slider.value = capabilities.zoom.min;
+    if (label) label.textContent = parseFloat(capabilities.zoom.min).toFixed(1) + 'x';
+
+    slider.oninput = () => {
+      const zoom = parseFloat(slider.value);
+      if (label) label.textContent = zoom.toFixed(1) + 'x';
+      track.applyConstraints({ advanced: [{ zoom }] });
+    };
   },
 
   _bindVideoFlash(modal) {
