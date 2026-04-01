@@ -39,7 +39,7 @@
     }
 
     const { PMTiles, Protocol } = window.pmtiles;
-    const pmtilesUrl = `${location.origin}/maps/tr.pmtiles`;
+    const pmtilesUrl = `${location.origin}/maps/20260331.pmtiles`;
     const protocol = new Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
     const pmtilesSource = new PMTiles(pmtilesUrl);
