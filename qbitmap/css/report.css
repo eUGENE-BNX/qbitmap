@@ -173,11 +173,13 @@
 
 /* Camera/broadcast popup report button */
 .cam-btn.report-btn {
-  color: #bbb;
+  color: #e74c3c;
+  transition: transform 0.15s, color 0.15s, background 0.15s;
 }
 .cam-btn.report-btn:hover {
-  color: #e74c3c;
+  color: #c0392b;
   background: #ffeaea;
+  transform: scale(1.2);
 }
 
 /* Video message popup report button */
@@ -189,12 +191,13 @@
   border: none;
   padding: 2px 4px;
   cursor: pointer;
-  color: #bbb;
-  transition: color 0.15s;
+  color: #e74c3c;
+  transition: color 0.15s, transform 0.15s;
   flex-shrink: 0;
 }
 .video-msg-report-btn:hover {
-  color: #e74c3c;
+  color: #c0392b;
+  transform: scale(1.25);
 }
 
 /* Comment report button */
@@ -203,9 +206,9 @@
   border: none;
   padding: 2px;
   cursor: pointer;
-  color: #ccc;
+  color: #e74c3c;
   opacity: 0;
-  transition: opacity 0.15s, color 0.15s;
+  transition: opacity 0.15s, color 0.15s, transform 0.15s;
   flex-shrink: 0;
   line-height: 1;
 }
@@ -213,5 +216,6 @@
   opacity: 1;
 }
 .comment-report-btn:hover {
-  color: #e74c3c;
+  color: #c0392b;
+  transform: scale(1.25);
 }
