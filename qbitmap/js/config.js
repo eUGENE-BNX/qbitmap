@@ -69,7 +69,7 @@ const QBitmapConfig = {
     defaultZoom: 14.5,
     turkeyCenter: [35.157, 39.167],      // Türkiye merkezi (zoom out için)
     maxZoom: 22,
-    minZoom: 2
+    minZoom: 4
   },
 
   // AI Settings
