@@ -63,11 +63,11 @@ const HlsPlayerMixin = {
         maxBufferLength: 30,
       } : {
         enableWorker: true,
-        lowLatencyMode: false,
+        lowLatencyMode: true,
         backBufferLength: 30,
-        maxBufferLength: 30,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 10,
+        maxBufferLength: 60,
+        liveSyncDurationCount: 4,
+        liveMaxLatencyDurationCount: 8,
         liveDurationInfinity: true,
       };
 

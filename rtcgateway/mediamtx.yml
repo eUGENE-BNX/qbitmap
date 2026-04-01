@@ -57,12 +57,13 @@ hlsAddress: :8888
 hlsEncryption: no
 hlsAllowOrigins: ['*']
 hlsTrustedProxies: []
-hlsVariant: fmp4
-hlsSegmentCount: 7
+hlsVariant: lowLatency
+hlsSegmentCount: 10
 hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
 hlsSegmentMaxSize: 50M
-hlsMuxerCloseAfter: 60s
-hlsAlwaysRemux: false
+hlsMuxerCloseAfter: 30s
+hlsAlwaysRemux: true
 
 ###############################################
 # RTMP - Enabled for GoPro, OBS, etc.

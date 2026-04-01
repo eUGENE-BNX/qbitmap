@@ -97,16 +97,22 @@ const StreamingMixin = {
 
       pc.oniceconnectionstatechange = () => {
         Logger.log('[WHEP] ICE state:', pc.iceConnectionState);
-        if (pc.iceConnectionState === 'failed') {
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          // Reset backoff on successful connection
+          popupData.whepReconnectAttempts = 0;
+        } else if (pc.iceConnectionState === 'failed') {
           frameContainer.classList.remove('loading', 'loaded');
           frameContainer.classList.add('error');
-          // Auto-reconnect after 3 seconds on ICE failure
+          // Exponential backoff: 3s, 6s, 12s, 24s, max 30s
+          const attempts = popupData.whepReconnectAttempts || 0;
+          const delay = Math.min(3000 * Math.pow(2, attempts), 30000);
+          popupData.whepReconnectAttempts = attempts + 1;
+          Logger.log(`[WHEP] Reconnecting in ${delay}ms (attempt ${attempts + 1})...`);
           setTimeout(() => {
             if (this.popups.has(deviceId)) {
-              Logger.log('[WHEP] Auto-reconnecting after ICE failure...');
               this.reconnectWhepStream(deviceId);
             }
-          }, 3000);
+          }, delay);
         } else if (pc.iceConnectionState === 'disconnected') {
           // Disconnected state - might recover, wait before showing error
           setTimeout(() => {
