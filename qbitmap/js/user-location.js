@@ -166,6 +166,16 @@ const UserLocationSystem = {
                 this.publicMarkers.push(marker);
             }
 
+            // Show/hide markers based on zoom level
+            const updateMarkerVisibility = () => {
+                const visible = map.getZoom() >= 13;
+                for (const m of this.publicMarkers) {
+                    m.getElement().style.display = visible ? '' : 'none';
+                }
+            };
+            map.on('zoomend', updateMarkerVisibility);
+            updateMarkerVisibility();
+
             this.publicUsersLoaded = true;
             Logger.log(`[UserLocation] Loaded ${geojson.features.length} public user locations`);
 
@@ -342,6 +352,7 @@ const UserLocationSystem = {
                 id: 'user-location-accuracy',
                 type: 'circle',
                 source: 'user-location',
+                minzoom: 13,
                 paint: {
                     'circle-radius': [
                         'interpolate',
@@ -362,6 +373,7 @@ const UserLocationSystem = {
                 id: 'user-location-marker',
                 type: 'symbol',
                 source: 'user-location',
+                minzoom: 13,
                 layout: {
                     'icon-image': 'user-location-avatar',
                     'icon-size': [

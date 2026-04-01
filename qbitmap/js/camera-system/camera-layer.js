@@ -80,7 +80,12 @@ const CameraLayerMixin = {
         filter: ['has', 'point_count'],
         paint: {
           'circle-color': ['step', ['get', 'point_count'], '#51bbd6', 10, '#f1f075', 30, '#f28cb1'],
-          'circle-radius': ['step', ['get', 'point_count'], 18, 10, 24, 30, 30],
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            2, ['step', ['get', 'point_count'], 6, 10, 8, 30, 10],
+            5, ['step', ['get', 'point_count'], 10, 10, 14, 30, 18],
+            8, ['step', ['get', 'point_count'], 18, 10, 24, 30, 30]
+          ],
           'circle-opacity': 0.75,
           'circle-stroke-width': 2,
           'circle-stroke-color': '#fff',
@@ -97,7 +102,7 @@ const CameraLayerMixin = {
         layout: {
           'text-field': '{point_count_abbreviated}',
           'text-font': ['Noto Sans Medium'],
-          'text-size': 13
+          'text-size': ['interpolate', ['linear'], ['zoom'], 2, 8, 5, 10, 8, 13]
         }
       });
 

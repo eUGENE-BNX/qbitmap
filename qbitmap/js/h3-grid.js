@@ -222,8 +222,15 @@ const H3Grid = {
     }
 
     // Fetch ownership data (fog rings + owned cells rendered after fetch)
-    // No initial render needed — nothing to show until ownership arrives
-    this._fetchOwnership(sw.lat - latPad, sw.lng - lngPad, ne.lat + latPad, ne.lng + lngPad, zoom);
+    // Skip at low zoom — too large an area, backend rejects and data is meaningless
+    if (zoom >= 6) {
+      this._fetchOwnership(sw.lat - latPad, sw.lng - lngPad, ne.lat + latPad, ne.lng + lngPad, zoom);
+    } else {
+      this._ownershipData = [];
+      this._ownershipMap = null;
+      this._fogRingData = [];
+      this._renderLayer();
+    }
   },
 
   async _fetchOwnership(swLat, swLng, neLat, neLng, zoom) {

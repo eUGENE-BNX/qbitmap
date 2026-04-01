@@ -43,7 +43,12 @@ const MapLayerMixin = {
           filter: ['has', 'point_count'],
           paint: {
             'circle-color': ['step', ['get', 'point_count'], '#e8a87c', 10, '#d4946a', 30, '#c07f58'],
-            'circle-radius': ['step', ['get', 'point_count'], 14, 10, 18, 30, 22],
+            'circle-radius': [
+              'interpolate', ['linear'], ['zoom'],
+              2, ['step', ['get', 'point_count'], 5, 10, 7, 30, 9],
+              5, ['step', ['get', 'point_count'], 8, 10, 12, 30, 16],
+              8, ['step', ['get', 'point_count'], 14, 10, 18, 30, 22]
+            ],
             'circle-opacity': 0.75,
             'circle-stroke-width': 2,
             'circle-stroke-color': '#fff',
@@ -59,7 +64,7 @@ const MapLayerMixin = {
           layout: {
             'text-field': '{point_count_abbreviated}',
             'text-font': ['Noto Sans Medium'],
-            'text-size': 12
+            'text-size': ['interpolate', ['linear'], ['zoom'], 2, 7, 5, 9, 8, 12]
           }
         });
 
@@ -91,7 +96,12 @@ const MapLayerMixin = {
           filter: ['has', 'point_count'],
           paint: {
             'circle-color': ['step', ['get', 'point_count'], '#7cb3e8', 10, '#5a9ad4', 30, '#3d7ebf'],
-            'circle-radius': ['step', ['get', 'point_count'], 14, 10, 18, 30, 22],
+            'circle-radius': [
+              'interpolate', ['linear'], ['zoom'],
+              2, ['step', ['get', 'point_count'], 5, 10, 7, 30, 9],
+              5, ['step', ['get', 'point_count'], 8, 10, 12, 30, 16],
+              8, ['step', ['get', 'point_count'], 14, 10, 18, 30, 22]
+            ],
             'circle-opacity': 0.75,
             'circle-stroke-width': 2,
             'circle-stroke-color': '#fff',
@@ -107,7 +117,7 @@ const MapLayerMixin = {
           layout: {
             'text-field': '{point_count_abbreviated}',
             'text-font': ['Noto Sans Medium'],
-            'text-size': 12
+            'text-size': ['interpolate', ['linear'], ['zoom'], 2, 7, 5, 9, 8, 12]
           }
         });
 
