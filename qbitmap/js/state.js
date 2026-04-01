@@ -11,7 +11,7 @@ export function setMap(m) { map = m; }
 export const layers = {
   videoLayerVisible: false,
   buildings3DVisible: false,
-  h3GridVisible: localStorage.getItem('qbitmap_h3grid') === 'true',
+  h3GridVisible: localStorage.getItem('qbitmap_h3grid') !== 'false',
   h3TrailsVisible: false,
   vehiclesVisible: false,
   videoMessagesVisible: true,
