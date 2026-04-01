@@ -53,11 +53,28 @@ const style = {
     layers: sanitizedLayers
 };
 
+// Determine initial center/zoom: localStorage > default
+// Note: hash:true means MapLibre persists position in URL hash between sessions.
+// If user has a saved geolocation, clear stale hash so our center takes effect.
+function getInitialView() {
+    const saved = localStorage.getItem('qbitmap_user_location');
+    if (saved) {
+        try {
+            const { lng, lat } = JSON.parse(saved);
+            history.replaceState(null, '', location.pathname);
+            return { center: [lng, lat], zoom: 12 };
+        } catch {}
+    }
+    return { center: QBitmapConfig.map.defaultCenter, zoom: QBitmapConfig.map.defaultZoom };
+}
+
+const initialView = getInitialView();
+
 const map = new maplibregl.Map({
     container: "map",
     style,
-    center: QBitmapConfig.map.defaultCenter,
-    zoom: QBitmapConfig.map.defaultZoom,
+    center: initialView.center,
+    zoom: initialView.zoom,
     minZoom: QBitmapConfig.map.minZoom,
     maxZoom: QBitmapConfig.map.maxZoom,
     pitch: 0,
@@ -76,16 +93,21 @@ let updateSatelliteVisibility;
 let videoBounds;
 Logger.log("[Map] Map instance created");
 
-// Minimum zoom'da Türkiye'yi ortala
-map.on('zoomend', () => {
-    const currentZoom = map.getZoom();
-    if (currentZoom <= QBitmapConfig.map.minZoom + 0.1) {
-        map.easeTo({
-            center: QBitmapConfig.map.turkeyCenter,
-            duration: 500
-        });
-    }
-});
+// Request geolocation, save to localStorage, fly on first visit
+if (navigator.geolocation) {
+    const hadLocation = localStorage.getItem('qbitmap_user_location');
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const loc = { lng: pos.coords.longitude, lat: pos.coords.latitude };
+            localStorage.setItem('qbitmap_user_location', JSON.stringify(loc));
+            if (!hadLocation) {
+                map.flyTo({ center: [loc.lng, loc.lat], zoom: 12 });
+            }
+        },
+        () => {},
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+}
 
 map.on("error", (e) => Logger.error("[Map] Error:", e.error));
 
