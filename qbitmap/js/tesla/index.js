@@ -82,6 +82,12 @@ export const TeslaSystem = {
         if (first) {
           map.flyTo({ center: [first.lng, first.lat], zoom: 14 });
         }
+
+        // Check for vehicles without Fleet Telemetry
+        const noTelemetry = data.vehicles.filter(v => !v.telemetryEnabled);
+        if (noTelemetry.length > 0) {
+          this._showTelemetryPrompt(noTelemetry);
+        }
       } else {
         showNotification('Henüz Tesla aracı bulunamadı', 'info');
       }
@@ -96,6 +102,31 @@ export const TeslaSystem = {
   hide() {
     TeslaLayer.hide();
     TeslaWebSocket.unsubscribe();
+  },
+
+  async _showTelemetryPrompt(vehicles) {
+    for (const v of vehicles) {
+      showNotification(
+        `${v.displayName}: Fleet Telemetry aktif degil. Tesla uygulamanizdan virtual key onaylayin.`,
+        'warning'
+      );
+
+      // Auto-enable telemetry config after showing prompt
+      try {
+        const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${v.vehicleId}/enable-telemetry`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        const data = await res.json();
+        if (data.telemetryEnabled) {
+          showNotification(`${v.displayName}: Fleet Telemetry basariyla etkinlestirildi!`, 'success');
+        } else if (data.error) {
+          console.warn('Telemetry enable failed:', data.error, data.detail);
+        }
+      } catch (err) {
+        console.warn('Telemetry enable error:', err);
+      }
+    }
   }
 };
 

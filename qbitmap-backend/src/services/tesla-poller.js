@@ -59,6 +59,9 @@ async function pollAccount(row) {
 }
 
 async function pollVehicle(vehicle, accessToken, userId) {
+  // Skip vehicles with Fleet Telemetry enabled
+  if (vehicle.telemetry_enabled) return;
+
   const vin = vehicle.vin;
   const now = Date.now();
 

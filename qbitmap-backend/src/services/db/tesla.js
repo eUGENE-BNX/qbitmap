@@ -134,4 +134,18 @@ DatabaseService.prototype.setTeslaVehicleOffline = async function(vin) {
   await this.pool.execute('UPDATE tesla_vehicles SET is_online = 0, updated_at = NOW() WHERE vin = ?', [vin]);
 };
 
+DatabaseService.prototype.setTeslaVehicleTelemetryEnabled = async function(vehicleId, enabled) {
+  await this.pool.execute('UPDATE tesla_vehicles SET telemetry_enabled = ?, updated_at = NOW() WHERE vehicle_id = ?', [enabled ? 1 : 0, vehicleId]);
+};
+
+DatabaseService.prototype.getTeslaVehicleByVehicleId = async function(vehicleId) {
+  const [rows] = await this.pool.execute(
+    `SELECT v.*, a.user_id FROM tesla_vehicles v
+     JOIN tesla_accounts a ON a.id = v.tesla_account_id
+     WHERE v.vehicle_id = ?`,
+    [vehicleId]
+  );
+  return rows[0] || null;
+};
+
 };

@@ -630,6 +630,7 @@ CREATE TABLE IF NOT EXISTS tesla_vehicles (
   last_speed DOUBLE DEFAULT 0,
   last_telemetry_at DATETIME DEFAULT NULL,
   is_online TINYINT(1) DEFAULT 0,
+  telemetry_enabled TINYINT(1) DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE INDEX idx_tesla_vehicles_vid (vehicle_id),

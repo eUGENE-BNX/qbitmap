@@ -233,6 +233,7 @@ async function teslaApiRoutes(fastify) {
         bearing: v.last_bearing,
         speed: v.last_speed,
         isOnline: !!v.is_online,
+        telemetryEnabled: !!v.telemetry_enabled,
         lastTelemetryAt: v.last_telemetry_at,
         ownerName: v.display_name,
         ownerAvatar: v.avatar_url,
@@ -263,6 +264,103 @@ async function teslaApiRoutes(fastify) {
     await syncTeslaVehicles(account.id, accessToken);
     const vehicles = await db.getTeslaVehiclesByUserId(request.user.userId);
     return { status: 'ok', count: vehicles.length };
+  });
+
+  // Virtual key pairing URL — user opens this in Tesla app to approve
+  fastify.get('/virtual-key-url', async () => {
+    return {
+      url: 'https://tesla.com/_ak/telemetry.qbitmap.com',
+      instructions: 'Bu linki Tesla uygulamanızda açarak virtual key onayını verin.',
+    };
+  });
+
+  // Enable Fleet Telemetry for a specific vehicle
+  fastify.post('/vehicles/:vehicleId/enable-telemetry', async (request, reply) => {
+    const { vehicleId } = request.params;
+    const vehicle = await db.getTeslaVehicleByVehicleId(vehicleId);
+    if (!vehicle || vehicle.user_id !== request.user.userId) {
+      return reply.code(404).send({ error: 'Vehicle not found' });
+    }
+
+    const account = await db.getTeslaAccountByUserId(request.user.userId);
+    const tokens = await db.getTeslaTokensByAccountId(account.id);
+    if (!tokens) {
+      return reply.code(400).send({ error: 'No Tesla tokens' });
+    }
+
+    const accessToken = decrypt(tokens.access_token);
+
+    // Read public key PEM for CA field
+    let caPem = '';
+    try {
+      const fs = require('fs');
+      const keyPath = process.env.TESLA_PUBLIC_KEY_PATH || '/opt/tesla/public-key.pem';
+      caPem = fs.readFileSync(keyPath, 'utf8');
+    } catch (err) {
+      logger.error({ err }, 'Failed to read Tesla public key');
+      return reply.code(500).send({ error: 'Public key not found' });
+    }
+
+    // Discover regional API base
+    let apiBase = config.tesla.apiBase;
+    try {
+      const regionRes = await fetchWithTimeout('https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/users/region', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }, 10000);
+      if (regionRes.ok) {
+        const regionData = await regionRes.json();
+        if (regionData.response?.fleet_api_base_url) {
+          apiBase = regionData.response.fleet_api_base_url;
+        }
+      }
+    } catch { /* use default */ }
+
+    // Send fleet telemetry config to Tesla
+    const telemetryConfig = {
+      vins: [vehicle.vin],
+      config: {
+        hostname: 'telemetry.qbitmap.com',
+        port: 443,
+        ca: caPem,
+        fields: {
+          Location: { interval_seconds: 15, minimum_delta: 25 },
+          BatteryLevel: { interval_seconds: 600 },
+        },
+        alert_types: ['service'],
+      },
+    };
+
+    const res = await fetchWithTimeout(`${apiBase}/api/1/vehicles/${vehicleId}/fleet_telemetry_config`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(telemetryConfig),
+    }, 15000);
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      logger.error({ status: res.status, body: errBody, vehicleId }, 'Fleet telemetry config failed');
+      return reply.code(res.status).send({ error: 'Fleet telemetry config failed', detail: errBody });
+    }
+
+    await db.setTeslaVehicleTelemetryEnabled(vehicleId, true);
+    logger.info({ vehicleId, vin: vehicle.vin }, 'Fleet Telemetry enabled for vehicle');
+    return { status: 'ok', telemetryEnabled: true };
+  });
+
+  // Disable Fleet Telemetry for a specific vehicle
+  fastify.post('/vehicles/:vehicleId/disable-telemetry', async (request, reply) => {
+    const { vehicleId } = request.params;
+    const vehicle = await db.getTeslaVehicleByVehicleId(vehicleId);
+    if (!vehicle || vehicle.user_id !== request.user.userId) {
+      return reply.code(404).send({ error: 'Vehicle not found' });
+    }
+
+    await db.setTeslaVehicleTelemetryEnabled(vehicleId, false);
+    logger.info({ vehicleId }, 'Fleet Telemetry disabled for vehicle');
+    return { status: 'ok', telemetryEnabled: false };
   });
 }
 
