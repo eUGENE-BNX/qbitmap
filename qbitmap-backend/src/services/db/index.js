@@ -109,5 +109,6 @@ require('./sharing')(DatabaseService);
 require('./content')(DatabaseService);
 require('./ai-jobs')(DatabaseService);
 require('./reports')(DatabaseService);
+require('./tesla')(DatabaseService);
 
 module.exports = new DatabaseService();

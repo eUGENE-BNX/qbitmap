@@ -240,6 +240,19 @@ class WebSocketService {
         }));
         break;
 
+      case 'subscribe_tesla':
+        if (!ws.userId) {
+          ws.send(JSON.stringify({ type: 'error', payload: { error: 'Authentication required' } }));
+          break;
+        }
+        ws.subscribedTesla = true;
+        this.sendTeslaVehicles(ws);
+        break;
+
+      case 'unsubscribe_tesla':
+        ws.subscribedTesla = false;
+        break;
+
       case 'ping':
         // Manual ping from client
         ws.send(JSON.stringify({ type: 'pong', payload: { timestamp: Date.now() } }));
@@ -544,6 +557,50 @@ class WebSocketService {
         type: 'onvif_event',
         payload: eventData
       });
+    }
+  }
+
+  /**
+   * Send current Tesla vehicles to a client
+   */
+  async sendTeslaVehicles(ws) {
+    try {
+      if (!ws.userId) return;
+      const vehicles = await db.getTeslaVehiclesByUserId(ws.userId);
+      ws.send(JSON.stringify({
+        type: 'tesla_vehicles',
+        payload: vehicles.map(v => ({
+          vin: v.vin,
+          vehicleId: v.vehicle_id,
+          displayName: v.display_name,
+          model: v.model,
+          lat: v.last_lat,
+          lng: v.last_lng,
+          soc: v.last_soc,
+          gear: v.last_gear,
+          bearing: v.last_bearing,
+          speed: v.last_speed,
+          isOnline: !!v.is_online,
+          ownerName: v.display_name,
+          ownerAvatar: v.avatar_url,
+        }))
+      }));
+    } catch (err) {
+      logger.error({ err }, 'Error sending Tesla vehicles');
+    }
+  }
+
+  /**
+   * Broadcast Tesla vehicle update to the owning user's connections
+   */
+  broadcastTeslaUpdate(userId, vehicleData) {
+    const userClients = this.clients.get(userId);
+    if (!userClients) return;
+    const payload = JSON.stringify({ type: 'tesla_vehicle_update', payload: vehicleData });
+    for (const ws of userClients) {
+      if (ws.readyState === WebSocket.OPEN && ws.subscribedTesla) {
+        ws.send(payload);
+      }
     }
   }
 

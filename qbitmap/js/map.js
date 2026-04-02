@@ -143,7 +143,8 @@ class LayersDropdownControl {
             { id: 'satellite', label: 'Uydu Görüntüleri' },
             { id: 'video', label: 'Canlı Uydu Görüntüleri' },
             { id: '3d-buildings', label: '3D Binalar' },
-            { id: 'vehicles', label: 'Online Araçlar' }
+            { id: 'vehicles', label: 'Online Araçlar' },
+            { id: 'tesla-vehicles', label: 'Tesla Araçları' }
         ];
 
         this._toggles = {};
@@ -291,6 +292,22 @@ class LayersDropdownControl {
                     if (window.VehicleAnimation) VehicleAnimation.stop();
                 }
                 break;
+            case 'tesla-vehicles':
+                layers.teslaVehiclesVisible = !layers.teslaVehiclesVisible;
+                toggle.classList.toggle('active', layers.teslaVehiclesVisible);
+                if (layers.teslaVehiclesVisible) {
+                    import('/js/tesla/index.js').then(m => {
+                        m.TeslaSystem.show();
+                    });
+                } else {
+                    import('/js/tesla/index.js').then(m => {
+                        m.TeslaSystem.hide();
+                    });
+                }
+                // Sync Tesla button state
+                const teslaBtn = document.getElementById('tesla-button');
+                if (teslaBtn) teslaBtn.classList.toggle('active', layers.teslaVehiclesVisible);
+                break;
             case 'city-cameras':
                 layers.cityCamerasVisible = !layers.cityCamerasVisible;
                 toggle.classList.toggle('active', layers.cityCamerasVisible);
@@ -348,7 +365,7 @@ class LayersDropdownControl {
     }
 
     _updateButtonState() {
-        const anyActive = _satelliteMode || _videoLayerVisible || _buildings3DVisible || layers.h3GridVisible || layers.vehiclesVisible || _videoMessagesVisible || _photoMessagesVisible;
+        const anyActive = _satelliteMode || _videoLayerVisible || _buildings3DVisible || layers.h3GridVisible || layers.vehiclesVisible || layers.teslaVehiclesVisible || _videoMessagesVisible || _photoMessagesVisible;
         this._button.style.backgroundColor = anyActive ? '#a0a0a0' : '';
         this._button.style.color = anyActive ? '#fff' : '';
     }

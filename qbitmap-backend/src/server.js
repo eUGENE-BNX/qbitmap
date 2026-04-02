@@ -10,6 +10,8 @@ const config = require('./config');
 const logger = require('./utils/logger');
 const db = require('./services/database');
 const cleanupService = require('./services/cleanup');
+const teslaTokenService = require('./services/tesla-token');
+const teslaPoller = require('./services/tesla-poller');
 const wsService = require('./services/websocket');
 const mediamtx = require('./services/mediamtx');
 
@@ -53,7 +55,7 @@ async function buildServer() {
         imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         connectSrc: ["'self'", "wss:", "ws:", "https:", "http:"],
-        frameSrc: ["'self'", "https://accounts.google.com"],
+        frameSrc: ["'self'", "https://accounts.google.com", "https://auth.tesla.com"],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'", "blob:"],
         workerSrc: ["'self'", "blob:"],
@@ -201,8 +203,20 @@ async function buildServer() {
   // Register admin routes (admin panel)
   await fastify.register(require('./routes/admin'), { prefix: '/api/admin' });
 
+  // Register Tesla routes
+  const { teslaRoutes, teslaApiRoutes, teslaTelemetryRoutes } = require('./routes/tesla');
+  await fastify.register(teslaRoutes, { prefix: '/auth' });
+  await fastify.register(teslaApiRoutes, { prefix: '/api/tesla' });
+  await fastify.register(teslaTelemetryRoutes, { prefix: '/api/tesla' });
+
   // Start cleanup service
   cleanupService.start();
+
+  // Start Tesla token refresh service
+  teslaTokenService.start();
+
+  // Start Tesla vehicle data poller
+  teslaPoller.start();
 
   // Initialize WebSocket server after server is ready
   fastify.ready((err) => {

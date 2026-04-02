@@ -1,0 +1,142 @@
+/* Tesla Button active state */
+#tesla-button.active {
+  background: #e31937 !important;
+  color: #fff !important;
+}
+
+/* Tesla Popup */
+.tesla-popup {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding: 4px 0;
+  min-width: 180px;
+}
+
+.tesla-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.tesla-popup-logo {
+  flex-shrink: 0;
+}
+
+.tesla-popup-logo-t {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: #e31937;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.tesla-popup-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1a1a1a;
+}
+
+.tesla-popup-model {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+/* Battery bar */
+.tesla-popup-battery {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tesla-popup-battery-bar {
+  flex: 1;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tesla-popup-battery-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  background: #22c55e;
+}
+
+.tesla-popup-battery-fill.red {
+  background: #ef4444;
+}
+
+.tesla-popup-battery-fill.amber {
+  background: #f59e0b;
+}
+
+.tesla-popup-battery-fill.green {
+  background: #22c55e;
+}
+
+.tesla-popup-battery-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Info row */
+.tesla-popup-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.tesla-popup-gear {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.tesla-popup-gear.driving {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.tesla-popup-gear.reverse {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.tesla-popup-speed {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Owner */
+.tesla-popup-owner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.tesla-popup-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}

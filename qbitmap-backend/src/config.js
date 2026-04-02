@@ -54,6 +54,18 @@ module.exports = {
     maxResultCount: 10,
     cacheTTLDays: 30
   },
+  tesla: {
+    clientId: requireEnv('TESLA_CLIENT_ID', 'dev-tesla-client-id'),
+    clientSecret: requireEnv('TESLA_CLIENT_SECRET', 'dev-tesla-client-secret'),
+    callbackUri: isProduction
+      ? 'https://stream.qbitmap.com/auth/tesla/callback'
+      : 'http://localhost:3000/auth/tesla/callback',
+    scopes: 'openid vehicle_device_data vehicle_location offline_access',
+    authUrl: 'https://auth.tesla.com/oauth2/v3/authorize',
+    tokenUrl: 'https://auth.tesla.com/oauth2/v3/token',
+    apiBase: 'https://fleet-api.prd.eu.vn.cloud.tesla.com',
+    telemetryWebhookSecret: requireEnv('TESLA_TELEMETRY_WEBHOOK_SECRET', 'dev-telemetry-secret'),
+  },
   services: (() => {
     const mtxHost = process.env.MEDIAMTX_HOST || '91.98.90.57';
     return {

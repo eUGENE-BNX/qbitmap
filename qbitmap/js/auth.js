@@ -1,5 +1,5 @@
 import { QBitmapConfig } from './config.js';
-import { Logger, escapeHtml } from './utils.js';
+import { Logger, escapeHtml, showNotification } from './utils.js';
 import { Analytics } from './analytics.js';
 
 /**
@@ -388,6 +388,27 @@ const AuthSystem = {
     });
     panel.appendChild(locateBtn);
 
+    // Tesla button
+    const teslaBtn = document.createElement('button');
+    teslaBtn.id = 'tesla-button';
+    teslaBtn.className = 'mic-button-right';
+    teslaBtn.title = 'Tesla';
+    teslaBtn.setAttribute('aria-label', 'Tesla araçları');
+    teslaBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 1.5C6.75 1.5 2.25 3 2.25 3L3.5 6.5C3.5 6.5 7.5 5 12 5s8.5 1.5 8.5 1.5L21.75 3S17.25 1.5 12 1.5zM12 7c-3.5 0-6.5.8-8.2 1.5L5 22.5h2.5l.5-4h8l.5 4H19L20.2 8.5C18.5 7.8 15.5 7 12 7zm0 2c2.2 0 4.2.4 5.5.8L16 16H8l-1.5-6.2C7.8 9.4 9.8 9 12 9z"/>
+      </svg>
+    `;
+    teslaBtn.addEventListener('click', async () => {
+      try {
+        const { TeslaSystem } = await import('/js/tesla/index.js');
+        TeslaSystem.handleButtonClick();
+      } catch (err) {
+        console.error('Tesla module load error:', err);
+      }
+    });
+    panel.appendChild(teslaBtn);
+
     // Toggle behavior
     toggle.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -476,6 +497,23 @@ AuthSystem._openMyCameras = function() {
   import('./my-cameras/index.js').then(m => m.MyCamerasSystem.open());
   AuthSystem.toggleDropdown();
 };
+
+// Handle Tesla OAuth callback query params
+(function handleTeslaCallback() {
+  const teslaParam = new URLSearchParams(window.location.search).get('tesla');
+  if (!teslaParam) return;
+  const url = new URL(window.location);
+  url.searchParams.delete('tesla');
+  history.replaceState(null, '', url.toString());
+  const messages = {
+    connected: ['Tesla hesabi basariyla baglandi!', 'success'],
+    denied: ['Tesla yetkilendirmesi reddedildi', 'warning'],
+    already_connected: ['Tesla hesabi zaten bagli', 'info'],
+    expired: ['Tesla oturum suresi doldu, tekrar deneyin', 'warning'],
+  };
+  const [msg, type] = messages[teslaParam] || ['Tesla baglantisinda bir hata olustu', 'error'];
+  showNotification(msg, type);
+})();
 
 // ES module export + backward compat
 export { AuthSystem };

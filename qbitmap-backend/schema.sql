@@ -577,4 +577,65 @@ CREATE TABLE IF NOT EXISTS report_counts (
   PRIMARY KEY (entity_type, entity_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- =================================================================
+-- 33. tesla_accounts (links qbitmap user to Tesla account)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS tesla_accounts (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  tesla_user_id VARCHAR(255) NOT NULL,
+  email VARCHAR(255),
+  full_name VARCHAR(255),
+  profile_image_url TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE INDEX idx_tesla_accounts_user (user_id),
+  UNIQUE INDEX idx_tesla_accounts_tesla (tesla_user_id),
+  CONSTRAINT fk_tesla_accounts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================
+-- 34. tesla_tokens (OAuth2 access/refresh tokens, encrypted)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS tesla_tokens (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  tesla_account_id INT UNSIGNED NOT NULL,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT NOT NULL,
+  token_type VARCHAR(50) DEFAULT 'Bearer',
+  expires_at DATETIME NOT NULL,
+  scopes VARCHAR(500),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE INDEX idx_tesla_tokens_account (tesla_account_id),
+  CONSTRAINT fk_tesla_tokens_account FOREIGN KEY (tesla_account_id) REFERENCES tesla_accounts(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================
+-- 35. tesla_vehicles (vehicle info + latest telemetry snapshot)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS tesla_vehicles (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  tesla_account_id INT UNSIGNED NOT NULL,
+  vehicle_id VARCHAR(255) NOT NULL,
+  vin VARCHAR(17) NOT NULL,
+  display_name VARCHAR(255),
+  model VARCHAR(50),
+  color VARCHAR(50),
+  last_lat DOUBLE DEFAULT NULL,
+  last_lng DOUBLE DEFAULT NULL,
+  last_soc TINYINT UNSIGNED DEFAULT NULL,
+  last_gear VARCHAR(10) DEFAULT 'P',
+  last_bearing DOUBLE DEFAULT 0,
+  last_speed DOUBLE DEFAULT 0,
+  last_telemetry_at DATETIME DEFAULT NULL,
+  is_online TINYINT(1) DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE INDEX idx_tesla_vehicles_vid (vehicle_id),
+  INDEX idx_tesla_vehicles_account (tesla_account_id),
+  INDEX idx_tesla_vehicles_vin (vin),
+  CONSTRAINT fk_tesla_vehicles_account FOREIGN KEY (tesla_account_id) REFERENCES tesla_accounts(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
