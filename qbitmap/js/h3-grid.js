@@ -542,7 +542,7 @@ const H3Grid = {
 
   async _fetchLeaderboard() {
     try {
-      const res = await fetch(`${QBitmapConfig.api.h3}/hexagons/leaderboard?limit=10`);
+      const res = await fetch(`${QBitmapConfig.api.h3}/hexagons/leaderboard?limit=5`);
       if (!res.ok) return;
       const data = await res.json();
       this._renderLeaderboard(data.users || []);

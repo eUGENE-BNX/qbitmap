@@ -211,13 +211,6 @@ const MediaMixin = {
     const dropdown = document.createElement('div');
     dropdown.className = 'vmsg-camera-dropdown';
 
-    // Header showing camera count
-    const header = document.createElement('div');
-    header.className = 'vmsg-camera-option';
-    header.style.cssText = 'font-size:11px;opacity:0.6;pointer-events:none;padding:4px 10px';
-    header.textContent = `${this._cameras.length} kamera bulundu`;
-    dropdown.appendChild(header);
-
     this._cameras.forEach((cam, i) => {
       const opt = document.createElement('div');
       opt.className = 'vmsg-camera-option';
