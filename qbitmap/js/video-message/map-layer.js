@@ -27,6 +27,8 @@ const MapLayerMixin = {
           return;
         }
 
+        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
         // ---- Video messages source & layers ----
         map.addSource('video-messages', {
           type: 'geojson',
@@ -75,7 +77,13 @@ const MapLayerMixin = {
           filter: ['!', ['has', 'point_count']],
           layout: {
             'icon-image': 'video-message-icon',
-            'icon-size': /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 0.35 : 0.4,
+            'icon-size': ['interpolate', ['linear'], ['zoom'],
+              0, isMobile ? 0.35 : 0.4,
+              19, isMobile ? 0.35 : 0.4,
+              20, isMobile ? 0.3 : 0.35,
+              21, isMobile ? 0.25 : 0.3,
+              22, isMobile ? 0.24 : 0.3
+            ],
             'icon-allow-overlap': true
           }
         });
@@ -128,7 +136,13 @@ const MapLayerMixin = {
           filter: ['!', ['has', 'point_count']],
           layout: {
             'icon-image': 'photo-message-icon',
-            'icon-size': /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 0.35 : 0.4,
+            'icon-size': ['interpolate', ['linear'], ['zoom'],
+              0, isMobile ? 0.35 : 0.4,
+              19, isMobile ? 0.35 : 0.4,
+              20, isMobile ? 0.3 : 0.35,
+              21, isMobile ? 0.25 : 0.3,
+              22, isMobile ? 0.24 : 0.3
+            ],
             'icon-allow-overlap': true
           }
         });
@@ -234,93 +248,12 @@ const MapLayerMixin = {
   _handleMessageClick(e, map) {
     if (!e.features || !e.features.length) return;
 
-    // Query both layers for nearby features within a tap-friendly radius
-    const bbox = [[e.point.x - 20, e.point.y - 20], [e.point.x + 20, e.point.y + 20]];
-    const nearby = map.queryRenderedFeatures(bbox, {
-      layers: ['video-messages', 'photo-messages']
-    });
-
-    // Deduplicate by messageId
-    const seen = new Set();
-    const unique = nearby.filter(f => {
-      const id = f.properties.messageId;
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-
-    if (unique.length <= 1) {
-      // Single message — open directly
-      const feature = e.features[0];
-      const coords = feature.geometry.coordinates.slice();
-      while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
-        coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
-      }
-      this.openMessagePopup(feature.properties, coords);
-    } else {
-      // Multiple messages — show list picker
-      this._showMessageListPicker(unique, e.lngLat);
+    const feature = e.features[0];
+    const coords = feature.geometry.coordinates.slice();
+    while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
+      coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
     }
-  },
-
-  _showMessageListPicker(features, lngLat) {
-    // Close existing popup
-    if (this.currentPopup) {
-      this.currentPopup.remove();
-      this.currentPopup = null;
-    }
-
-    const items = features.map(f => {
-      const p = f.properties;
-      const isPhoto = p.mediaType === 'photo';
-      const icon = isPhoto ? '📷' : '🎬';
-      const name = p.senderName || 'Anonim';
-      const desc = p.description || p.aiDescription || '';
-      const time = p.createdAt ? new Date(p.createdAt).toLocaleString('tr-TR', {
-        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-      }) : '';
-      return `<div class="vmsg-list-item" data-msg-id="${p.messageId}">
-        <span class="vmsg-list-icon">${icon}</span>
-        <div class="vmsg-list-info">
-          <span class="vmsg-list-name">${name}</span>
-          <span class="vmsg-list-desc">${desc ? desc.substring(0, 40) : time}</span>
-        </div>
-      </div>`;
-    }).join('');
-
-    const html = `<div class="vmsg-list-picker">
-      <div class="vmsg-list-header">${features.length} mesaj</div>
-      ${items}
-    </div>`;
-
-    const map = AppState.map;
-    const popup = new maplibregl.Popup({
-      closeButton: true,
-      closeOnClick: true,
-      maxWidth: '260px',
-      anchor: 'bottom',
-      className: 'vmsg-list-popup'
-    })
-    .setLngLat(lngLat)
-    .setHTML(html)
-    .addTo(map);
-
-    this.currentPopup = popup;
-
-    // Bind click on each item
-    const el = popup.getElement();
-    el.querySelectorAll('.vmsg-list-item').forEach(item => {
-      item.onclick = () => {
-        const msgId = item.dataset.msgId;
-        const feature = features.find(f => f.properties.messageId === msgId);
-        if (feature) {
-          popup.remove();
-          this.currentPopup = null;
-          const coords = feature.geometry.coordinates.slice();
-          this.openMessagePopup(feature.properties, coords);
-        }
-      };
-    });
+    this.openMessagePopup(feature.properties, coords);
   },
 
   updateMapLayer() {

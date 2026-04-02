@@ -241,6 +241,9 @@ const PopupCoreMixin = {
     .setHTML(this.getPopupHTML(camera))
     .addTo(this.map);
 
+    // Center map on camera
+    this.map.easeTo({ center: coordinates, duration: 300 });
+
     // Store popup info
     this.popups.set(deviceId, { popup, refreshInterval: null, camera, isWhep: isWhep || isCity, isCity, _openedAt: performance.now() });
 

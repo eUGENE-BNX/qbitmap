@@ -25,16 +25,29 @@ const CameraGridMixin = {
     overlay.id = 'camera-grid-overlay';
     overlay.className = 'camera-grid-overlay';
 
-    // Drag handle
-    const handle = document.createElement('div');
-    handle.className = 'camera-grid-drag-handle';
-    overlay.appendChild(handle);
+    // Header with drag + close
+    const header = document.createElement('div');
+    header.className = 'camera-grid-header';
+    header.innerHTML = `
+      <div class="camera-grid-drag-handle"></div>
+      <span class="camera-grid-title">Kamera Izgarası</span>
+      <button class="camera-grid-close" title="Kapat">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    `;
+    overlay.appendChild(header);
+
+    header.querySelector('.camera-grid-close').addEventListener('click', () => this.toggleGrid());
 
     const grid = document.createElement('div');
     grid.className = 'camera-grid';
 
-    // Create 9 empty cells (3x3)
-    for (let i = 0; i < this.maxGridCells; i++) {
+    // Mobile: 8 cells (2x4), Desktop: 9 cells (3x3)
+    const isMobile = window.innerWidth <= 500;
+    const cellCount = isMobile ? 8 : this.maxGridCells;
+    for (let i = 0; i < cellCount; i++) {
       const cell = this.createGridCell(i);
       grid.appendChild(cell);
     }
@@ -43,7 +56,7 @@ const CameraGridMixin = {
     document.body.appendChild(overlay);
 
     // Setup drag functionality
-    this.setupDragHandlers(overlay, handle);
+    this.setupDragHandlers(overlay, header);
   },
 
   /**

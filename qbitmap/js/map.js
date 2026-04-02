@@ -53,15 +53,17 @@ const style = {
     layers: sanitizedLayers
 };
 
-// Determine initial center/zoom: localStorage > default
-// Note: hash:true means MapLibre persists position in URL hash between sessions.
-// If user has a saved geolocation, clear stale hash so our center takes effect.
+// Determine initial center/zoom:
+// If URL has a hash (e.g. #5/41/29) MapLibre restores position from it — use defaults and let hash win.
+// Only use saved geolocation on very first visit (no hash, no prior session).
 function getInitialView() {
+    if (location.hash && location.hash.length > 1) {
+        return { center: QBitmapConfig.map.defaultCenter, zoom: QBitmapConfig.map.defaultZoom };
+    }
     const saved = localStorage.getItem('qbitmap_user_location');
     if (saved) {
         try {
             const { lng, lat } = JSON.parse(saved);
-            history.replaceState(null, '', location.pathname);
             return { center: [lng, lat], zoom: 12 };
         } catch {}
     }
@@ -374,17 +376,19 @@ let _buildings3DVisible = false;
 let _videoMessagesVisible = true;
 let _photoMessagesVisible = true;
 
-// Logo click → toggle H3 Grid (Qbitmap layer)
+// Logo click → fly to user's home location
 document.addEventListener('DOMContentLoaded', () => {
     const logo = document.querySelector('.qbitmap-logo-control');
     if (logo) {
         logo.style.cursor = 'pointer';
         logo.addEventListener('click', () => {
-            layers.h3GridVisible = !layers.h3GridVisible;
-            localStorage.setItem('qbitmap_h3grid', layers.h3GridVisible);
-            H3Grid.setEnabled(layers.h3GridVisible);
-            if (layersControl) layersControl.syncToggleState('h3-grid', layers.h3GridVisible);
-            Analytics.event('map_layer_change', { layer_name: 'h3-grid' });
+            const saved = localStorage.getItem('qbitmap_user_location');
+            if (saved) {
+                try {
+                    const { lng, lat } = JSON.parse(saved);
+                    map.flyTo({ center: [lng, lat], zoom: 12, duration: 1500 });
+                } catch {}
+            }
         });
     }
 });
@@ -442,6 +446,19 @@ map.addControl(new GridCameraControl(), 'top-right');
 
 map.on("load", async () => {
     Logger.log("[Map] loaded");
+    // Constrain panning to landmass bounds (setMaxBounds crashes this MapLibre version)
+    const MAX_LAT = 62, MIN_LAT = -38;
+    let _constraining = false;
+    const constrainLat = () => {
+        if (_constraining) return;
+        const center = map.getCenter();
+        if (center.lat > MAX_LAT || center.lat < MIN_LAT) {
+            _constraining = true;
+            map.jumpTo({ center: [center.lng, Math.max(MIN_LAT, Math.min(MAX_LAT, center.lat))] });
+            _constraining = false;
+        }
+    };
+    map.on('move', constrainLat);
 
     // Initialize H3 Grid layer
     await H3Grid.init(map);
