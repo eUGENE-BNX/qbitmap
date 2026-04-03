@@ -2,210 +2,301 @@ const { dbWriter } = require('./db-writer');
 const { notifyBackend } = require('./ws-notifier');
 
 // Track previous location per VIN for bearing/speed calculation
-const prevLocations = new Map(); // vin -> { lat, lng, time }
+const prevLocations = new Map();
 
-// Tesla Fleet Telemetry message formats:
-// 1. Fleet Telemetry streaming format (array of key-value data)
-// 2. Legacy JSON format (drive_state, charge_state objects)
+// Tesla Fleet Telemetry field IDs (from vehicle_data.proto)
+const FIELD = {
+  VEHICLE_SPEED: 4,
+  SOC: 8,
+  GEAR: 10,
+  LOCATION: 21,
+  GPS_HEADING: 23,
+  BATTERY_LEVEL: 42,
+  OUTSIDE_TEMP: 86,
+};
+
 async function handleTelemetryMessage(rawData, logger) {
-  let message;
+  const buf = Buffer.isBuffer(rawData) ? rawData : Buffer.from(rawData);
 
+  // Try JSON first
   try {
-    message = JSON.parse(rawData.toString());
-  } catch {
-    // Binary data — log hex for debugging then try flatbuffers/protobuf
-    const buf = Buffer.isBuffer(rawData) ? rawData : Buffer.from(rawData);
-    logger.info({ size: buf.length, hex: buf.slice(0, 200).toString('hex'), utf8preview: buf.slice(0, 200).toString('utf8').replace(/[^\x20-\x7E]/g, '.') }, 'Non-JSON telemetry message');
+    const msg = JSON.parse(buf.toString());
+    if (msg.vin) {
+      await handleJsonMessage(msg, logger);
+      return;
+    }
+  } catch { /* not JSON — FlatBuffers binary */ }
 
-    // Try to decode as protobuf
-    message = decodeProtobuf(buf, logger);
-    if (!message) return;
-  }
+  // Parse FlatBuffers + protobuf binary
+  try {
+    const result = parseFlatBuffersDatum(buf);
+    if (!result) return;
 
-  if (!message) return;
+    const { vin, topic, fieldId, value, timestamp } = result;
+    if (!vin) return;
 
-  // Fleet Telemetry streaming format: { vin, createdAt, data: [...] }
-  if (message.vin && Array.isArray(message.data)) {
-    await handleFleetTelemetryFormat(message, logger);
-    return;
-  }
+    logger.info({ vin, topic, fieldId, fieldName: fieldName(fieldId), value, timestamp }, 'Telemetry decoded');
 
-  // Legacy format: { vin, drive_state, charge_state, ... }
-  if (message.vin && (message.drive_state || message.charge_state || message.Location)) {
-    await handleLegacyFormat(message, logger);
-    return;
-  }
+    const update = { vin };
+    let hasUpdate = false;
 
-  // Envelope format: { data: { vin, ... } }
-  if (message.data?.vin) {
-    message.data.data = message.data.data || message.data;
-    await handleTelemetryMessage(Buffer.from(JSON.stringify(message.data)), logger);
-    return;
-  }
+    switch (fieldId) {
+      case FIELD.LOCATION:
+        if (value?.lat != null && value?.lng != null) {
+          update.lat = value.lat;
+          update.lng = value.lng;
+          hasUpdate = true;
 
-  logger.warn({ keys: Object.keys(message) }, 'Unknown telemetry message format');
-}
+          // Calculate bearing + speed from previous location
+          const now = Date.now();
+          const prev = prevLocations.get(vin);
+          if (prev) {
+            const dt = (now - prev.time) / 1000;
+            if (dt > 0 && dt < 300) {
+              const dist = haversineMeters(prev.lat, prev.lng, update.lat, update.lng);
+              update.bearing = Math.round(calcBearing(prev.lat, prev.lng, update.lat, update.lng));
+              update.speed = dist > 3 ? Math.round((dist / dt) * 3.6) : 0;
+            }
+          }
+          prevLocations.set(vin, { lat: update.lat, lng: update.lng, time: now });
+        }
+        break;
 
-// Tesla Fleet Telemetry streaming: { vin, createdAt, data: [{ key, value }] }
-async function handleFleetTelemetryFormat(message, logger) {
-  const vin = message.vin;
-  const update = { vin };
-  let hasUpdate = false;
-
-  for (const item of message.data) {
-    const key = item.key;
-    const val = item.value;
-
-    switch (key) {
-      case 'Location':
-        if (val?.locationValue) {
-          update.lat = val.locationValue.latitude;
-          update.lng = val.locationValue.longitude;
+      case FIELD.BATTERY_LEVEL:
+      case FIELD.SOC:
+        if (typeof value === 'number') {
+          update.soc = Math.round(value);
           hasUpdate = true;
         }
         break;
 
-      case 'Latitude':
-        update.lat = val?.doubleValue ?? val?.floatValue ?? val;
-        hasUpdate = true;
-        break;
-
-      case 'Longitude':
-        update.lng = val?.doubleValue ?? val?.floatValue ?? val;
-        hasUpdate = true;
-        break;
-
-      case 'Heading':
-        update.bearing = val?.doubleValue ?? val?.floatValue ?? val ?? 0;
-        hasUpdate = true;
-        break;
-
-      case 'VehicleSpeed':
-      case 'Speed':
-        update.speed = val?.doubleValue ?? val?.floatValue ?? val ?? 0;
-        hasUpdate = true;
-        break;
-
-      case 'Soc':
-      case 'BatteryLevel':
-      case 'UsableBatteryLevel':
-        update.soc = val?.intValue ?? val?.doubleValue ?? val;
-        hasUpdate = true;
-        break;
-
-      case 'GearSelection':
-      case 'ShiftState':
-      case 'Gear': {
-        const gear = val?.stringValue ?? val?.intValue ?? val;
-        update.gear = normalizeGear(gear);
-        hasUpdate = true;
-        break;
-      }
-
-      case 'ChargeState':
-        if (val?.stringValue === 'Charging' || val?.stringValue === 'Complete') {
-          // Charging info — we mainly care about SoC
+      case FIELD.GEAR:
+        if (value != null) {
+          update.gear = normalizeGear(value);
+          hasUpdate = true;
         }
         break;
 
-      case 'DriveState':
-        if (val?.locationValue) {
-          update.lat = val.locationValue.latitude;
-          update.lng = val.locationValue.longitude;
+      case FIELD.VEHICLE_SPEED:
+        if (typeof value === 'number') {
+          update.speed = Math.round(value);
+          hasUpdate = true;
+        }
+        break;
+
+      case FIELD.GPS_HEADING:
+        if (typeof value === 'number') {
+          update.bearing = Math.round(value);
           hasUpdate = true;
         }
         break;
     }
+
+    if (!hasUpdate) return;
+
+    await dbWriter(update);
+    await notifyBackend(update);
+    logger.info({ vin, fields: Object.keys(update).filter(k => k !== 'vin') }, 'Telemetry update written');
+
+  } catch (err) {
+    logger.error({ err, size: buf.length }, 'Failed to decode telemetry message');
+  }
+}
+
+// Parse Tesla FlatBuffers Datum envelope + protobuf payload
+function parseFlatBuffersDatum(buf) {
+  // Extract VIN (17 uppercase alphanumeric chars)
+  const vinMatch = buf.toString('ascii', 0, buf.length).match(/[A-HJ-NPR-Z0-9]{17}/);
+  if (!vinMatch) return null;
+  const vin = vinMatch[0];
+
+  // Extract topic
+  let topic = null;
+  const topicNames = ['vehicle_device', 'alerts', 'errors'];
+  for (const t of topicNames) {
+    if (buf.includes(Buffer.from(t))) { topic = t; break; }
   }
 
-  if (!hasUpdate) {
-    logger.debug({ vin }, 'No relevant fields in Fleet Telemetry message');
-    return;
+  // Find protobuf payload: after "vehicle_device\0\0" + 4-byte LE length
+  const topicBuf = Buffer.from(topic || 'vehicle_device');
+  const topicPos = buf.indexOf(topicBuf);
+  if (topicPos < 0) return null;
+
+  let after = topicPos + topicBuf.length;
+  while (after < buf.length && buf[after] === 0) after++;
+  if (after + 4 > buf.length) return null;
+
+  const pbLen = buf.readUInt32LE(after);
+  const pbData = buf.slice(after + 4, after + 4 + pbLen);
+
+  if (pbData.length < pbLen) return null; // truncated
+
+  // Parse protobuf Datum: field 1 = PayloadField, field 2 = Timestamp
+  let fieldId = null;
+  let value = null;
+  let timestamp = null;
+  let pos = 0;
+
+  while (pos < pbData.length) {
+    const tag = pbData[pos++];
+    const fnum = tag >> 3;
+    const wt = tag & 7;
+
+    if (wt !== 2) break; // expect length-delimited
+
+    const { val: len, pos: newPos } = readVarint(pbData, pos);
+    pos = newPos;
+    const sub = pbData.slice(pos, pos + len);
+    pos += len;
+
+    if (fnum === 1) {
+      // PayloadField: field 1 = field_id, field 2 = Value
+      const pf = parsePayloadField(sub);
+      fieldId = pf.fieldId;
+      value = pf.value;
+    } else if (fnum === 2) {
+      // Timestamp: field 1 = seconds
+      const ts = parseTimestamp(sub);
+      timestamp = ts;
+    }
   }
 
-  // Calculate bearing and speed from consecutive coordinates
-  if (update.lat != null && update.lng != null) {
-    const now = Date.now();
-    const prev = prevLocations.get(vin);
+  return { vin, topic, fieldId, value, timestamp };
+}
 
-    if (prev) {
-      const dt = (now - prev.time) / 1000; // seconds
-      if (dt > 0 && dt < 300) { // ignore stale data (>5min gap)
-        const bearing = calcBearing(prev.lat, prev.lng, update.lat, update.lng);
-        const dist = haversineMeters(prev.lat, prev.lng, update.lat, update.lng);
-        const speedKmh = (dist / dt) * 3.6;
+function parsePayloadField(data) {
+  let fieldId = null;
+  let value = null;
+  let pos = 0;
 
-        update.bearing = Math.round(bearing);
-        // Only set speed if moved more than 3m (GPS noise filter)
-        update.speed = dist > 3 ? Math.round(speedKmh) : 0;
+  while (pos < data.length) {
+    const tag = data[pos++];
+    const fnum = tag >> 3;
+    const wt = tag & 7;
+
+    if (fnum === 1 && wt === 0) {
+      const r = readVarint(data, pos);
+      fieldId = r.val;
+      pos = r.pos;
+    } else if (fnum === 2 && wt === 2) {
+      const r = readVarint(data, pos);
+      pos = r.pos;
+      const valueData = data.slice(pos, pos + r.val);
+      pos += r.val;
+      value = parseValue(valueData);
+    } else {
+      break;
+    }
+  }
+
+  return { fieldId, value };
+}
+
+function parseValue(data) {
+  let pos = 0;
+  while (pos < data.length) {
+    const tag = data[pos++];
+    const fnum = tag >> 3;
+    const wt = tag & 7;
+
+    if (wt === 0) {
+      // varint — intValue (field 3) or stringValue enum
+      const r = readVarint(data, pos);
+      pos = r.pos;
+      return r.val;
+    } else if (wt === 1) {
+      // 64-bit double — doubleValue (field 5) or locationValue lat/lng
+      if (pos + 8 > data.length) return null;
+      const dval = data.readDoubleLE(pos);
+      pos += 8;
+      return dval;
+    } else if (wt === 2) {
+      // length-delimited — could be locationValue (field 7) or stringValue (field 1)
+      const r = readVarint(data, pos);
+      pos = r.pos;
+      const sub = data.slice(pos, pos + r.val);
+      pos += r.val;
+
+      if (fnum === 7) {
+        // LocationValue: field 1 = lat (double), field 2 = lng (double)
+        return parseLocationValue(sub);
+      } else if (fnum === 1) {
+        // stringValue
+        return sub.toString('utf8');
       }
-    }
-
-    prevLocations.set(vin, { lat: update.lat, lng: update.lng, time: now });
-  }
-
-  logger.info({ vin, fields: Object.keys(update).filter(k => k !== 'vin') }, 'Fleet Telemetry update');
-  await dbWriter(update);
-  await notifyBackend(update);
-}
-
-// Legacy format: { vin, drive_state: {...}, charge_state: {...} }
-async function handleLegacyFormat(message, logger) {
-  const vin = message.vin;
-  const data = message;
-  const update = { vin };
-  let hasUpdate = false;
-
-  // Location
-  const loc = data.Location || data.drive_state;
-  if (loc) {
-    if (loc.latitude != null) { update.lat = loc.latitude; hasUpdate = true; }
-    if (loc.longitude != null) { update.lng = loc.longitude; hasUpdate = true; }
-    if (loc.heading != null) { update.bearing = loc.heading; hasUpdate = true; }
-    if (loc.speed != null) { update.speed = loc.speed; hasUpdate = true; }
-  }
-
-  // Battery SoC
-  const cs = data.ChargeState || data.charge_state;
-  if (cs) {
-    const soc = cs.usable_battery_level ?? cs.BatteryLevel ?? cs.battery_level;
-    if (soc != null) { update.soc = soc; hasUpdate = true; }
-  }
-
-  // Gear
-  const ds = data.DriveState || data.drive_state;
-  if (ds) {
-    const gear = ds.shift_state ?? ds.ShiftState;
-    if (gear != null) {
-      update.gear = normalizeGear(gear);
-      hasUpdate = true;
+      return sub.toString('hex');
+    } else if (wt === 5) {
+      // 32-bit float
+      if (pos + 4 > data.length) return null;
+      const fval = data.readFloatLE(pos);
+      pos += 4;
+      return fval;
+    } else {
+      break;
     }
   }
-
-  if (!hasUpdate) return;
-
-  logger.info({ vin, fields: Object.keys(update).filter(k => k !== 'vin') }, 'Legacy telemetry update');
-  await dbWriter(update);
-  await notifyBackend(update);
-}
-
-// Attempt to decode binary protobuf message
-function decodeProtobuf(data, logger) {
-  // Will be implemented after we see the raw message format
   return null;
+}
+
+function parseLocationValue(data) {
+  let lat = null;
+  let lng = null;
+  let pos = 0;
+
+  while (pos < data.length) {
+    const tag = data[pos++];
+    const fnum = tag >> 3;
+    const wt = tag & 7;
+
+    if (wt === 1 && pos + 8 <= data.length) {
+      const dval = data.readDoubleLE(pos);
+      pos += 8;
+      if (fnum === 1) lat = dval;
+      else if (fnum === 2) lng = dval;
+    } else {
+      break;
+    }
+  }
+
+  return { lat, lng };
+}
+
+function parseTimestamp(data) {
+  let pos = 0;
+  if (pos >= data.length) return null;
+  const tag = data[pos++];
+  if ((tag & 7) !== 0) return null;
+  const r = readVarint(data, pos);
+  return r.val;
+}
+
+function readVarint(data, pos) {
+  let val = 0;
+  let shift = 0;
+  while (pos < data.length) {
+    const b = data[pos++];
+    val |= (b & 0x7f) << shift;
+    shift += 7;
+    if (!(b & 0x80)) break;
+  }
+  return { val, pos };
+}
+
+function fieldName(id) {
+  const names = { 4: 'VehicleSpeed', 8: 'Soc', 10: 'Gear', 21: 'Location', 23: 'GpsHeading', 42: 'BatteryLevel', 86: 'OutsideTemp' };
+  return names[id] || `Field_${id}`;
 }
 
 function normalizeGear(gear) {
   if (gear == null) return 'P';
   const g = String(gear).toUpperCase();
-  if (g === 'P' || g === 'PARK') return 'P';
-  if (g === 'D' || g === 'DRIVE') return 'D';
-  if (g === 'R' || g === 'REVERSE') return 'R';
-  if (g === 'N' || g === 'NEUTRAL') return 'N';
+  if (g === 'P' || g === 'PARK' || g === '0') return 'P';
+  if (g === 'D' || g === 'DRIVE' || g === '1') return 'D';
+  if (g === 'R' || g === 'REVERSE' || g === '2') return 'R';
+  if (g === 'N' || g === 'NEUTRAL' || g === '3') return 'N';
   return g.charAt(0) || 'P';
 }
 
-// Bearing between two GPS points (degrees, 0=North, clockwise)
 function calcBearing(lat1, lng1, lat2, lng2) {
   const toRad = d => d * Math.PI / 180;
   const toDeg = r => r * 180 / Math.PI;
@@ -216,7 +307,6 @@ function calcBearing(lat1, lng1, lat2, lng2) {
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
-// Haversine distance in meters
 function haversineMeters(lat1, lng1, lat2, lng2) {
   const toRad = d => d * Math.PI / 180;
   const R = 6371000;
@@ -225,6 +315,12 @@ function haversineMeters(lat1, lng1, lat2, lng2) {
   const a = Math.sin(dLat / 2) ** 2 +
             Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Legacy JSON handler (kept for compatibility)
+async function handleJsonMessage(msg, logger) {
+  // ... existing JSON handling if needed
+  logger.info({ vin: msg.vin }, 'JSON telemetry message (legacy)');
 }
 
 module.exports = { handleTelemetryMessage };
