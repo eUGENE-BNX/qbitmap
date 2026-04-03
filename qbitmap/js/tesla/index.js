@@ -104,29 +104,119 @@ export const TeslaSystem = {
     TeslaWebSocket.unsubscribe();
   },
 
-  async _showTelemetryPrompt(vehicles) {
-    for (const v of vehicles) {
-      showNotification(
-        `${v.displayName}: Fleet Telemetry aktif degil. Tesla uygulamanizdan virtual key onaylayin.`,
-        'warning'
-      );
+  _showTelemetryPrompt(vehicles) {
+    // Remove existing modal
+    const existing = document.getElementById('tesla-vk-modal');
+    if (existing) existing.remove();
 
-      // Auto-enable telemetry config after showing prompt
-      try {
-        const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${v.vehicleId}/enable-telemetry`, {
-          method: 'POST',
-          credentials: 'include',
-        });
-        const data = await res.json();
-        if (data.telemetryEnabled) {
-          showNotification(`${v.displayName}: Fleet Telemetry basariyla etkinlestirildi!`, 'success');
-        } else if (data.error) {
-          console.warn('Telemetry enable failed:', data.error, data.detail);
+    const vehicleNames = vehicles.map(v => v.displayName).join(', ');
+    const vkUrl = 'https://tesla.com/_ak/telemetry.qbitmap.com';
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(vkUrl)}&bgcolor=1a1a2e&color=ffffff`;
+
+    // Build modal
+    const overlay = document.createElement('div');
+    overlay.id = 'tesla-vk-modal';
+    overlay.className = 'tesla-vk-overlay';
+
+    const modal = document.createElement('div');
+    modal.className = 'tesla-vk-modal';
+
+    // Close button
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'tesla-vk-close';
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', () => overlay.remove());
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'tesla-vk-header';
+    const logoSpan = document.createElement('span');
+    logoSpan.className = 'tesla-popup-logo-t';
+    logoSpan.textContent = 'T';
+    const title = document.createElement('span');
+    title.className = 'tesla-vk-title';
+    title.textContent = 'Qbitmap Tesla Community';
+    header.append(logoSpan, title);
+
+    // Description
+    const desc = document.createElement('p');
+    desc.className = 'tesla-vk-desc';
+    desc.textContent = 'Tesla uygulamanizdan "virtual key" onaylamaniz gerekiyor.';
+
+    // QR Code
+    const qrSection = document.createElement('div');
+    qrSection.className = 'tesla-vk-qr';
+    const qrImg = document.createElement('img');
+    qrImg.src = qrUrl;
+    qrImg.alt = 'QR Code';
+    qrImg.width = 200;
+    qrImg.height = 200;
+    const qrLabel = document.createElement('p');
+    qrLabel.className = 'tesla-vk-qr-label';
+    qrLabel.textContent = 'Cep telefonunuzdan bu QR kodu okutun';
+    qrSection.append(qrImg, qrLabel);
+
+    // Or link
+    const orDiv = document.createElement('div');
+    orDiv.className = 'tesla-vk-or';
+    orDiv.textContent = 'veya asagidaki linki tiklayin';
+
+    const linkEl = document.createElement('a');
+    linkEl.className = 'tesla-vk-link';
+    linkEl.href = vkUrl;
+    linkEl.target = '_blank';
+    linkEl.rel = 'noopener';
+    linkEl.textContent = vkUrl;
+
+    // Warning
+    const warning = document.createElement('p');
+    warning.className = 'tesla-vk-warning';
+    warning.textContent = 'Aracınızın yakınında olmanız gerekiyor (Bluetooth pairing)';
+
+    // Enable button
+    const enableBtn = document.createElement('button');
+    enableBtn.className = 'tesla-vk-enable';
+    enableBtn.textContent = 'Onayladim, Etkinlestir';
+    enableBtn.addEventListener('click', async () => {
+      enableBtn.disabled = true;
+      enableBtn.textContent = 'Etkinlestiriliyor...';
+
+      let allSuccess = true;
+      for (const v of vehicles) {
+        try {
+          const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${v.vehicleId}/enable-telemetry`, {
+            method: 'POST',
+            credentials: 'include',
+          });
+          const data = await res.json();
+          if (!data.telemetryEnabled) {
+            allSuccess = false;
+            console.warn('Enable failed:', data.error, data.detail);
+          }
+        } catch (err) {
+          allSuccess = false;
+          console.warn('Enable error:', err);
         }
-      } catch (err) {
-        console.warn('Telemetry enable error:', err);
       }
-    }
+
+      if (allSuccess) {
+        overlay.remove();
+        showNotification('Fleet Telemetry basariyla etkinlestirildi!', 'success');
+      } else {
+        enableBtn.disabled = false;
+        enableBtn.textContent = 'Tekrar Dene';
+        showNotification('Telemetry etkinlestirme basarisiz. Virtual key onayladiniz mi?', 'error');
+      }
+    });
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    modal.append(closeBtn, header, desc, qrSection, orDiv, linkEl, warning, enableBtn);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
   }
 };
 

@@ -140,3 +140,128 @@
   border-radius: 50%;
   object-fit: cover;
 }
+
+/* Virtual Key Setup Modal */
+.tesla-vk-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.tesla-vk-modal {
+  background: #1a1a2e;
+  color: #e0e0e0;
+  border-radius: 16px;
+  padding: 28px;
+  max-width: 380px;
+  width: 100%;
+  position: relative;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.tesla-vk-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.tesla-vk-close:hover {
+  color: #fff;
+}
+
+.tesla-vk-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tesla-vk-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.tesla-vk-desc {
+  font-size: 13px;
+  color: #aaa;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.tesla-vk-qr {
+  margin-bottom: 16px;
+}
+
+.tesla-vk-qr img {
+  border-radius: 8px;
+  border: 2px solid #333;
+}
+
+.tesla-vk-qr-label {
+  font-size: 12px;
+  color: #888;
+  margin: 8px 0 0;
+}
+
+.tesla-vk-or {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.tesla-vk-link {
+  display: inline-block;
+  font-size: 12px;
+  color: #e31937;
+  word-break: break-all;
+  margin-bottom: 16px;
+}
+
+.tesla-vk-link:hover {
+  color: #ff2d4d;
+}
+
+.tesla-vk-warning {
+  font-size: 11px;
+  color: #f59e0b;
+  margin: 0 0 20px;
+  padding: 8px 12px;
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: 6px;
+}
+
+.tesla-vk-enable {
+  width: 100%;
+  padding: 12px;
+  background: #e31937;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tesla-vk-enable:hover {
+  background: #c71530;
+}
+
+.tesla-vk-enable:disabled {
+  background: #555;
+  cursor: not-allowed;
+}
