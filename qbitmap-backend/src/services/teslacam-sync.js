@@ -140,15 +140,8 @@ async function _downloadSegment(segSummary) {
   // Create directory
   fs.mkdirSync(segDir, { recursive: true });
 
-  // Download manifest
-  const manifestResp = await fetchWithTimeout(
-    TESLACAM_API + '/api/segments/' + segId + '/manifest', {}, 10000
-  );
-  if (!manifestResp.ok) throw new Error('Manifest fetch failed: ' + manifestResp.status);
-  const manifest = await manifestResp.json();
-  fs.writeFileSync(path.join(segDir, 'manifest.json'), JSON.stringify(manifest));
-
   // Download all 15 frames (images + metadata) in parallel batches of 5
+  const frameMetas = [];
   for (let batch = 0; batch < 3; batch++) {
     const promises = [];
     for (let i = 1; i <= 5; i++) {
@@ -163,16 +156,34 @@ async function _downloadSegment(segSummary) {
         )
       );
 
-      // Download metadata JSON
+      // Download metadata JSON and collect for manifest
       promises.push(
-        _downloadFile(
+        _downloadAndReturn(
           TESLACAM_API + '/api/segments/' + segId + '/frames/' + num + '.json',
           path.join(segDir, 'frame_' + String(num).padStart(3, '0') + '.json')
-        )
+        ).then(data => { if (data) frameMetas[num - 1] = data; })
       );
     }
     await Promise.all(promises);
   }
+
+  // Build manifest from frame metadata (since /manifest endpoint has a bug)
+  const manifest = [];
+  for (let i = 0; i < 15; i++) {
+    const meta = frameMetas[i];
+    if (meta) {
+      manifest.push({
+        frame_jpg: 'frame_' + String(i + 1).padStart(3, '0') + '.jpg',
+        metadata_json: 'frame_' + String(i + 1).padStart(3, '0') + '.json',
+        timestamp_sec: meta.timestamp_sec || (i + 1) * 4,
+        latitude: meta.latitude_deg || null,
+        longitude: meta.longitude_deg || null,
+        speed_mps: meta.vehicle_speed_mps || 0,
+        heading_deg: meta.heading_deg || 0
+      });
+    }
+  }
+  fs.writeFileSync(path.join(segDir, 'manifest.json'), JSON.stringify(manifest));
 
   // Add to local segments list
   localSegments.unshift({
@@ -185,6 +196,19 @@ async function _downloadSegment(segSummary) {
   });
 
   logger.info({ segId, frames: 15 }, 'Segment synced');
+}
+
+async function _downloadAndReturn(url, destPath) {
+  try {
+    const resp = await fetchWithTimeout(url, {}, 15000);
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    fs.writeFileSync(destPath, text);
+    try { return JSON.parse(text); } catch (e) { return null; }
+  } catch (e) {
+    logger.debug({ url, err: e.message }, 'Failed to download file');
+    return null;
+  }
 }
 
 async function _downloadFile(url, destPath) {
