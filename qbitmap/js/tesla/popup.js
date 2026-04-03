@@ -26,7 +26,6 @@ export const TeslaPopup = {
 
       const props = features[0].properties;
       const coords = features[0].geometry.coordinates.slice();
-      const html = self._buildHTML(props);
 
       self.popup = new maplibregl.Popup({
         closeButton: true,
@@ -36,7 +35,7 @@ export const TeslaPopup = {
         className: 'tesla-vehicle-popup'
       })
       .setLngLat(coords)
-      .setHTML(html)
+      .setHTML(self._buildHTML(props))
       .addTo(self.map);
     });
   },
@@ -49,11 +48,21 @@ export const TeslaPopup = {
     const speed = Math.round(props.speed || 0);
     const displayName = escapeHtml(props.displayName || 'Tesla');
     const model = escapeHtml(props.model || 'Tesla');
-    const ownerName = escapeHtml(props.ownerName || '');
 
     let batteryClass = 'green';
     if (soc < 20) batteryClass = 'red';
     else if (soc < 50) batteryClass = 'amber';
+
+    // Range: Tesla sends miles, backend converts to km
+    const estRange = props.estRange != null ? Math.round(props.estRange) : null;
+
+    // Temps
+    const insideTemp = props.insideTemp != null ? Math.round(props.insideTemp) : null;
+    const outsideTemp = props.outsideTemp != null ? Math.round(props.outsideTemp) : null;
+
+    // Locked & Sentry
+    const locked = props.locked;
+    const sentry = props.sentry;
 
     return `<div class="tv-card">
       <div class="tv-header">
@@ -63,21 +72,27 @@ export const TeslaPopup = {
           <div class="tv-model">${model}</div>
         </div>
       </div>
-      <div class="tv-stats">
-        <div class="tv-stat">
-          <div class="tv-stat-label">Pil</div>
-          <div class="tv-battery">
-            <div class="tv-battery-bar">
-              <div class="tv-battery-fill tv-battery-${batteryClass}" style="width:${soc}%"></div>
-            </div>
-            <span class="tv-battery-pct">${soc}%</span>
+      <div class="tv-row">
+        <div class="tv-battery">
+          <div class="tv-battery-bar">
+            <div class="tv-battery-fill tv-battery-${batteryClass}" style="width:${soc}%"></div>
           </div>
+          <span class="tv-battery-pct">${soc}%</span>
         </div>
-        <div class="tv-stat">
-          <div class="tv-stat-label">Durum</div>
-          <div class="tv-gear tv-gear-${gearClass}">${gearText}${speed > 0 ? ' - ' + speed + ' km/h' : ''}</div>
-        </div>
+        ${estRange != null ? `<span class="tv-range">${estRange} km</span>` : ''}
       </div>
+      ${insideTemp != null || outsideTemp != null ? `<div class="tv-row tv-temps">
+        ${outsideTemp != null ? `<span class="tv-temp-item">Dis ${outsideTemp}&deg;</span>` : ''}
+        ${insideTemp != null ? `<span class="tv-temp-item">Ic ${insideTemp}&deg;</span>` : ''}
+      </div>` : ''}
+      <div class="tv-row">
+        <span class="tv-gear tv-gear-${gearClass}">${gearText}</span>
+        ${speed > 0 ? `<span class="tv-speed">${speed} km/h</span>` : ''}
+      </div>
+      ${locked != null || sentry != null ? `<div class="tv-row tv-status">
+        ${locked != null ? `<span class="tv-badge ${locked ? 'tv-badge-ok' : 'tv-badge-warn'}">${locked ? 'Kilitli' : 'Acik'}</span>` : ''}
+        ${sentry != null && sentry ? `<span class="tv-badge tv-badge-blue">Nobetci</span>` : ''}
+      </div>` : ''}
     </div>`;
   }
 };

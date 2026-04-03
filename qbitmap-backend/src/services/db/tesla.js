@@ -75,7 +75,7 @@ DatabaseService.prototype.upsertTeslaVehicle = async function({ teslaAccountId, 
   );
 };
 
-DatabaseService.prototype.updateVehicleTelemetry = async function({ vin, lat, lng, soc, gear, bearing, speed }) {
+DatabaseService.prototype.updateVehicleTelemetry = async function({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry }) {
   const fields = [];
   const values = [];
   if (lat != null) { fields.push('last_lat = ?'); values.push(lat); }
@@ -84,6 +84,12 @@ DatabaseService.prototype.updateVehicleTelemetry = async function({ vin, lat, ln
   if (gear != null) { fields.push('last_gear = ?'); values.push(gear); }
   if (bearing != null) { fields.push('last_bearing = ?'); values.push(bearing); }
   if (speed != null) { fields.push('last_speed = ?'); values.push(speed); }
+  if (insideTemp != null) { fields.push('last_inside_temp = ?'); values.push(insideTemp); }
+  if (outsideTemp != null) { fields.push('last_outside_temp = ?'); values.push(outsideTemp); }
+  if (estRange != null) { fields.push('last_est_range = ?'); values.push(estRange); }
+  if (chargeLimit != null) { fields.push('last_charge_limit = ?'); values.push(chargeLimit); }
+  if (locked != null) { fields.push('last_locked = ?'); values.push(locked); }
+  if (sentry != null) { fields.push('last_sentry = ?'); values.push(sentry); }
   if (fields.length === 0) return;
 
   fields.push('last_telemetry_at = NOW()', 'is_online = 1', 'updated_at = NOW()');

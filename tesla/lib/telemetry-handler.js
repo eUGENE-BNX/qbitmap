@@ -11,7 +11,12 @@ const FIELD = {
   GEAR: 10,
   LOCATION: 21,
   GPS_HEADING: 23,
+  CHARGE_LIMIT_SOC: 38,
+  EST_BATTERY_RANGE: 40,
   BATTERY_LEVEL: 42,
+  LOCKED: 59,
+  SENTRY_MODE: 65,
+  INSIDE_TEMP: 85,
   OUTSIDE_TEMP: 86,
 };
 
@@ -87,6 +92,49 @@ async function handleTelemetryMessage(rawData, logger) {
       case FIELD.GPS_HEADING:
         if (typeof value === 'number') {
           update.bearing = Math.round(value);
+          hasUpdate = true;
+        }
+        break;
+
+      case FIELD.INSIDE_TEMP:
+        if (typeof value === 'number') {
+          update.insideTemp = Math.round(value * 10) / 10;
+          hasUpdate = true;
+        }
+        break;
+
+      case FIELD.OUTSIDE_TEMP:
+        if (typeof value === 'number') {
+          update.outsideTemp = Math.round(value * 10) / 10;
+          hasUpdate = true;
+        }
+        break;
+
+      case FIELD.EST_BATTERY_RANGE:
+        if (typeof value === 'number') {
+          // Tesla sends miles, convert to km
+          update.estRange = Math.round(value * 1.60934);
+          hasUpdate = true;
+        }
+        break;
+
+      case FIELD.CHARGE_LIMIT_SOC:
+        if (typeof value === 'number') {
+          update.chargeLimit = Math.round(value);
+          hasUpdate = true;
+        }
+        break;
+
+      case FIELD.LOCKED:
+        if (value != null) {
+          update.locked = value === 1 || value === true ? 1 : 0;
+          hasUpdate = true;
+        }
+        break;
+
+      case FIELD.SENTRY_MODE:
+        if (value != null) {
+          update.sentry = value === 1 || value === true || value === 'Active' ? 1 : 0;
           hasUpdate = true;
         }
         break;
@@ -283,7 +331,7 @@ function readVarint(data, pos) {
 }
 
 function fieldName(id) {
-  const names = { 4: 'VehicleSpeed', 8: 'Soc', 10: 'Gear', 21: 'Location', 23: 'GpsHeading', 42: 'BatteryLevel', 86: 'OutsideTemp' };
+  const names = { 4: 'VehicleSpeed', 8: 'Soc', 10: 'Gear', 21: 'Location', 23: 'GpsHeading', 38: 'ChargeLimitSoc', 40: 'EstBatteryRange', 42: 'BatteryLevel', 59: 'Locked', 65: 'SentryMode', 85: 'InsideTemp', 86: 'OutsideTemp' };
   return names[id] || `Field_${id}`;
 }
 

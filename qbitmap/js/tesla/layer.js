@@ -101,8 +101,12 @@ export const TeslaLayer = {
           bearing: v.bearing || 0,
           speed: v.speed || 0,
           isOnline: v.isOnline,
-          ownerName: v.ownerName || '',
-          ownerAvatar: v.ownerAvatar || '',
+          insideTemp: v.insideTemp ?? null,
+          outsideTemp: v.outsideTemp ?? null,
+          estRange: v.estRange ?? null,
+          chargeLimit: v.chargeLimit ?? null,
+          locked: v.locked ?? null,
+          sentry: v.sentry ?? null,
         }
       }));
 
