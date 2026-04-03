@@ -8,6 +8,7 @@ const wsService = require('./src/services/websocket');
 const streamCache = require('./src/services/stream-cache');
 const frameCache = require('./src/services/frame-cache');
 const cleanupService = require('./src/services/cleanup');
+const teslacamSync = require('./src/services/teslacam-sync');
 const voiceCallService = require('./src/services/voice-call');
 const logger = require('./src/utils/logger').child({ module: 'main' });
 
@@ -68,6 +69,7 @@ async function shutdown(signal) {
 
   // Stop periodic services
   cleanupService.stop();
+  teslacamSync.stop();
   voiceCallService.shutdown();
 
   // Cleanup caches and timers

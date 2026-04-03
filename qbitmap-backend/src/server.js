@@ -12,6 +12,7 @@ const db = require('./services/database');
 const cleanupService = require('./services/cleanup');
 const teslaTokenService = require('./services/tesla-token');
 const teslaPoller = require('./services/tesla-poller');
+const teslacamSync = require('./services/teslacam-sync');
 const wsService = require('./services/websocket');
 const mediamtx = require('./services/mediamtx');
 
@@ -209,6 +210,9 @@ async function buildServer() {
   await fastify.register(teslaApiRoutes, { prefix: '/api/tesla' });
   await fastify.register(teslaTelemetryRoutes, { prefix: '/api/tesla' });
 
+  // Register TeslaCAM routes (locally cached segments from car's Pi)
+  await fastify.register(require('./routes/teslacam'), { prefix: '/api/teslacam' });
+
   // Start cleanup service
   cleanupService.start();
 
@@ -217,6 +221,9 @@ async function buildServer() {
 
   // Start Tesla vehicle data poller
   teslaPoller.start();
+
+  // Start TeslaCAM sync service (downloads segments from car's Pi)
+  teslacamSync.start();
 
   // Initialize WebSocket server after server is ready
   fastify.ready((err) => {

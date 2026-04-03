@@ -144,7 +144,8 @@ class LayersDropdownControl {
             { id: 'video', label: 'Canlı Uydu Görüntüleri' },
             { id: '3d-buildings', label: '3D Binalar' },
             { id: 'vehicles', label: 'Online Araçlar' },
-            { id: 'tesla-vehicles', label: 'Tesla Araçları' }
+            { id: 'tesla-vehicles', label: 'Tesla Araçları' },
+            { id: 'teslacam-live', label: 'TeslaCAM Live' }
         ];
 
         this._toggles = {};
@@ -308,6 +309,19 @@ class LayersDropdownControl {
                 const teslaBtn = document.getElementById('tesla-button');
                 if (teslaBtn) teslaBtn.classList.toggle('active', layers.teslaVehiclesVisible);
                 break;
+            case 'teslacam-live':
+                layers.teslaCamLiveVisible = !layers.teslaCamLiveVisible;
+                toggle.classList.toggle('active', layers.teslaCamLiveVisible);
+                if (layers.teslaCamLiveVisible) {
+                    import('/js/teslacam-live.js').then(m => {
+                        m.TeslaCamLive.show();
+                    });
+                } else {
+                    import('/js/teslacam-live.js').then(m => {
+                        m.TeslaCamLive.hide();
+                    });
+                }
+                break;
             case 'city-cameras':
                 layers.cityCamerasVisible = !layers.cityCamerasVisible;
                 toggle.classList.toggle('active', layers.cityCamerasVisible);
@@ -365,7 +379,7 @@ class LayersDropdownControl {
     }
 
     _updateButtonState() {
-        const anyActive = _satelliteMode || _videoLayerVisible || _buildings3DVisible || layers.h3GridVisible || layers.vehiclesVisible || layers.teslaVehiclesVisible || _videoMessagesVisible || _photoMessagesVisible;
+        const anyActive = _satelliteMode || _videoLayerVisible || _buildings3DVisible || layers.h3GridVisible || layers.vehiclesVisible || layers.teslaVehiclesVisible || layers.teslaCamLiveVisible || _videoMessagesVisible || _photoMessagesVisible;
         this._button.style.backgroundColor = anyActive ? '#a0a0a0' : '';
         this._button.style.color = anyActive ? '#fff' : '';
     }

@@ -1,0 +1,341 @@
+/* ============================================
+   TeslaCAM Live - Canli / Arsiv Mod
+   ============================================ */
+
+.teslacam-live-popup {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: auto;
+  transform: translate(-50%, -100%);
+  border-radius: 10px;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.teslacam-live-popup.active {
+  opacity: 1;
+}
+
+/* Arrow */
+.teslacam-live-popup::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid #000;
+}
+
+/* Container */
+.teslacam-live-container {
+  position: relative;
+  width: 362px;
+  height: 234px;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Header */
+.teslacam-live-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  background: linear-gradient(rgba(0, 0, 0, 0.6), transparent);
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.2s;
+  gap: 6px;
+}
+
+.teslacam-live-container:hover .teslacam-live-header {
+  opacity: 1;
+}
+
+.teslacam-live-title {
+  font-size: 11px;
+  color: #888;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* CANLI / ARSIV Badge */
+.teslacam-live-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.teslacam-live-badge.live {
+  background: rgba(82, 196, 26, 0.2);
+  color: #52c41a;
+  border: 1px solid rgba(82, 196, 26, 0.3);
+}
+
+.teslacam-live-badge.live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #52c41a;
+  animation: teslacam-live-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes teslacam-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.teslacam-live-badge.archive {
+  background: rgba(102, 102, 102, 0.2);
+  color: #999;
+  border: 1px solid rgba(102, 102, 102, 0.3);
+}
+
+.teslacam-live-close {
+  border: none;
+  background: none;
+  color: #888;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+  flex-shrink: 0;
+}
+
+.teslacam-live-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Frame Image */
+.teslacam-live-frame {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Waiting overlay */
+.teslacam-live-waiting {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 12px;
+  border-radius: 6px;
+  z-index: 6;
+  display: none;
+}
+
+.teslacam-live-waiting.visible {
+  display: block;
+}
+
+/* Frame Progress Bar (15 dots) */
+.teslacam-live-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+  z-index: 4;
+}
+
+.teslacam-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  transition: background 0.2s, transform 0.2s;
+  cursor: pointer;
+}
+
+.teslacam-live-dot.active {
+  background: #e74c3c;
+  transform: scale(1.3);
+}
+
+.teslacam-live-dot:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.teslacam-live-dot.active:hover {
+  background: #e74c3c;
+}
+
+/* Segment Selector Dropdown */
+.teslacam-live-segment-selector {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 20;
+  min-width: 220px;
+  max-height: 300px;
+  overflow-y: auto;
+  display: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.teslacam-live-segment-selector.visible {
+  display: block;
+  animation: teslacam-fade-in 0.15s ease;
+}
+
+.teslacam-live-segment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 12px;
+  color: #ccc;
+}
+
+.teslacam-live-segment-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.teslacam-live-segment-item.active {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+}
+
+.teslacam-live-segment-time {
+  font-family: 'Segoe UI', monospace;
+}
+
+.teslacam-live-segment-speed {
+  font-size: 11px;
+  color: #666;
+}
+
+.teslacam-live-segment-item.active .teslacam-live-segment-speed {
+  color: #e74c3c;
+}
+
+/* New segment notification dot */
+.teslacam-live-new-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #52c41a;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+/* Dashboard position override for smaller popup */
+.teslacam-live-container .tesla-dashboard {
+  bottom: 22px;
+  padding: 5px 10px;
+  border-radius: 10px;
+}
+
+.teslacam-live-container .tesla-dashboard .meta-speed-value {
+  font-size: 1.4rem;
+}
+
+.teslacam-live-container .tesla-dashboard .meta-gear {
+  font-size: 0.9rem;
+}
+
+.teslacam-live-container .tesla-dashboard .metadata-dashboard {
+  gap: 5px;
+}
+
+.teslacam-live-container .tesla-dashboard .meta-left-col,
+.teslacam-live-container .tesla-dashboard .meta-right-col {
+  height: 40px;
+  min-width: 22px;
+}
+
+.teslacam-live-container .tesla-dashboard .meta-steering-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.teslacam-live-container .tesla-dashboard .meta-brake-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.teslacam-live-container .tesla-dashboard .meta-accelerator-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.teslacam-live-container .tesla-dashboard .meta-blinker svg {
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes teslacam-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+
+@media (max-width: 768px) {
+  .teslacam-live-container {
+    width: 280px;
+    height: 181px;
+  }
+
+  .teslacam-live-container .tesla-dashboard .meta-speed-value {
+    font-size: 1.1rem;
+  }
+
+  .teslacam-live-container .tesla-dashboard {
+    padding: 4px 8px;
+  }
+
+  .teslacam-live-progress {
+    gap: 3px;
+  }
+
+  .teslacam-live-dot {
+    width: 5px;
+    height: 5px;
+  }
+}

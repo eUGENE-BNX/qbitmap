@@ -19,6 +19,7 @@ export const layers = {
   cityCamerasVisible: true,
   userCamerasVisible: true,
   teslaVehiclesVisible: false,
+  teslaCamLiveVisible: false,
 };
 
 // Map mode state
