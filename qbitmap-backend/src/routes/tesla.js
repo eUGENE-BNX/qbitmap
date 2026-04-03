@@ -290,15 +290,15 @@ async function teslaApiRoutes(fastify) {
 
     const accessToken = decrypt(tokens.access_token);
 
-    // Read public key PEM for CA field
+    // Read TLS certificate PEM for CA field (Tesla requires the server's TLS cert, not the EC public key)
     let caPem = '';
     try {
       const fs = require('fs');
-      const keyPath = process.env.TESLA_PUBLIC_KEY_PATH || '/opt/tesla/public-key.pem';
-      caPem = fs.readFileSync(keyPath, 'utf8');
+      const certPath = process.env.TESLA_TLS_CERT_PATH || '/opt/tesla/tls-cert.pem';
+      caPem = fs.readFileSync(certPath, 'utf8').trim();
     } catch (err) {
-      logger.error({ err }, 'Failed to read Tesla public key');
-      return reply.code(500).send({ error: 'Public key not found' });
+      logger.error({ err }, 'Failed to read TLS certificate for Fleet Telemetry');
+      return reply.code(500).send({ error: 'TLS certificate not found' });
     }
 
     // Discover regional API base
@@ -330,14 +330,10 @@ async function teslaApiRoutes(fastify) {
       },
     };
 
-    const res = await fetchWithTimeout(`${apiBase}/api/1/vehicles/${vehicleId}/fleet_telemetry_config`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(telemetryConfig),
-    }, 15000);
+    // Send via Tesla Vehicle Command HTTP Proxy (required for fleet_telemetry_config)
+    logger.info({ vehicleId, vin: vehicle.vin }, 'Sending fleet telemetry config via proxy');
+    const proxyRes = await sendToProxy('/api/1/vehicles/fleet_telemetry_config', accessToken, telemetryConfig);
+    const res = { ok: proxyRes.ok, status: proxyRes.status, text: () => Promise.resolve(proxyRes.body) };
 
     if (!res.ok) {
       const errBody = await res.text().catch(() => '');
@@ -464,6 +460,36 @@ function inferModel(vin) {
   const modelChar = vin.charAt(3);
   const models = { 'S': 'Model S', '3': 'Model 3', 'X': 'Model X', 'Y': 'Model Y' };
   return models[modelChar] || null;
+}
+
+// Send request through Tesla Vehicle Command HTTP Proxy (localhost:8443)
+function sendToProxy(path, accessToken, body) {
+  const https = require('https');
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(body);
+    const req = https.request({
+      hostname: 'localhost',
+      port: 8443,
+      path,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data),
+      },
+      rejectUnauthorized: false, // localhost proxy, cert hostname mismatch ok
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => {
+        resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, body });
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('Proxy request timeout')); });
+    req.write(data);
+    req.end();
+  });
 }
 
 module.exports = { teslaRoutes, teslaApiRoutes, teslaTelemetryRoutes };
