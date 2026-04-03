@@ -1,3 +1,5 @@
+import { escapeHtml } from '../utils.js';
+
 export const TeslaPopup = {
   map: null,
   popup: null,
@@ -17,27 +19,65 @@ export const TeslaPopup = {
       const features = self.map.queryRenderedFeatures(e.point, { layers: ['tesla-fleet-vehicles'] });
       if (!features.length) return;
 
+      if (self.popup) {
+        self.popup.remove();
+        self.popup = null;
+      }
+
       const props = features[0].properties;
       const coords = features[0].geometry.coordinates.slice();
+      const html = self._buildHTML(props);
 
-      if (self.popup) self.popup.remove();
-
-      const soc = props.soc ?? 0;
-      const gearMap = { 'P': 'Park', 'D': 'Sürüş', 'R': 'Geri', 'N': 'Nötr' };
-      const gear = gearMap[props.gear] || props.gear || '-';
-      const speed = Math.round(props.speed || 0);
-      const name = props.displayName || 'Tesla';
-      const model = props.model || 'Tesla';
-      const owner = props.ownerName || '';
-
-      let text = `🚗 ${name} — ${model}\n🔋 ${soc}%  ⚙️ ${gear}`;
-      if (speed > 0) text += `  🏎️ ${speed} km/h`;
-      if (owner) text += `\n👤 ${owner}`;
-
-      self.popup = new maplibregl.Popup({ offset: [0, -15], closeButton: true, maxWidth: '280px' })
-        .setLngLat(coords)
-        .setText(text)
-        .addTo(self.map);
+      self.popup = new maplibregl.Popup({
+        closeButton: true,
+        closeOnClick: false,
+        maxWidth: 'none',
+        anchor: 'bottom',
+        className: 'tesla-vehicle-popup'
+      })
+      .setLngLat(coords)
+      .setHTML(html)
+      .addTo(self.map);
     });
+  },
+
+  _buildHTML(props) {
+    const soc = props.soc ?? 0;
+    const gearMap = { 'P': 'Park', 'D': 'Drive', 'R': 'Reverse', 'N': 'Neutral' };
+    const gearText = gearMap[props.gear] || props.gear || 'Park';
+    const gearClass = props.gear === 'D' ? 'driving' : props.gear === 'R' ? 'reverse' : 'parked';
+    const speed = Math.round(props.speed || 0);
+    const displayName = escapeHtml(props.displayName || 'Tesla');
+    const model = escapeHtml(props.model || 'Tesla');
+    const ownerName = escapeHtml(props.ownerName || '');
+
+    let batteryClass = 'green';
+    if (soc < 20) batteryClass = 'red';
+    else if (soc < 50) batteryClass = 'amber';
+
+    return `<div class="tv-card">
+      <div class="tv-header">
+        <div class="tv-logo">T</div>
+        <div class="tv-title">
+          <div class="tv-name">${displayName}</div>
+          <div class="tv-model">${model}</div>
+        </div>
+      </div>
+      <div class="tv-stats">
+        <div class="tv-stat">
+          <div class="tv-stat-label">Pil</div>
+          <div class="tv-battery">
+            <div class="tv-battery-bar">
+              <div class="tv-battery-fill tv-battery-${batteryClass}" style="width:${soc}%"></div>
+            </div>
+            <span class="tv-battery-pct">${soc}%</span>
+          </div>
+        </div>
+        <div class="tv-stat">
+          <div class="tv-stat-label">Durum</div>
+          <div class="tv-gear tv-gear-${gearClass}">${gearText}${speed > 0 ? ' - ' + speed + ' km/h' : ''}</div>
+        </div>
+      </div>
+    </div>`;
   }
 };
