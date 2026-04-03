@@ -13,9 +13,13 @@ async function handleTelemetryMessage(rawData, logger) {
   try {
     message = JSON.parse(rawData.toString());
   } catch {
-    // Binary protobuf — not yet supported
-    logger.warn('Non-JSON telemetry message received, skipping');
-    return;
+    // Binary data — log hex for debugging then try flatbuffers/protobuf
+    const buf = Buffer.isBuffer(rawData) ? rawData : Buffer.from(rawData);
+    logger.info({ size: buf.length, hex: buf.slice(0, 200).toString('hex'), utf8preview: buf.slice(0, 200).toString('utf8').replace(/[^\x20-\x7E]/g, '.') }, 'Non-JSON telemetry message');
+
+    // Try to decode as protobuf
+    message = decodeProtobuf(buf, logger);
+    if (!message) return;
   }
 
   if (!message) return;
@@ -183,6 +187,12 @@ async function handleLegacyFormat(message, logger) {
   logger.info({ vin, fields: Object.keys(update).filter(k => k !== 'vin') }, 'Legacy telemetry update');
   await dbWriter(update);
   await notifyBackend(update);
+}
+
+// Attempt to decode binary protobuf message
+function decodeProtobuf(data, logger) {
+  // Will be implemented after we see the raw message format
+  return null;
 }
 
 function normalizeGear(gear) {
