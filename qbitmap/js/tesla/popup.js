@@ -37,6 +37,12 @@ export const TeslaPopup = {
       .setLngLat(coords)
       .setHTML(self._buildHTML(props))
       .addTo(self.map);
+
+      // Set battery bar width via JS (CSP blocks inline styles)
+      requestAnimationFrame(() => {
+        const fill = self.popup?.getElement()?.querySelector('.tv-battery-fill');
+        if (fill) fill.style.width = (props.soc ?? 0) + '%';
+      });
     });
   },
 
@@ -75,7 +81,7 @@ export const TeslaPopup = {
       <div class="tv-row">
         <div class="tv-battery">
           <div class="tv-battery-bar">
-            <div class="tv-battery-fill tv-battery-${batteryClass}" style="width:${soc}%"></div>
+            <div class="tv-battery-fill tv-battery-${batteryClass}"></div>
           </div>
           <span class="tv-battery-pct">${soc}%</span>
         </div>
