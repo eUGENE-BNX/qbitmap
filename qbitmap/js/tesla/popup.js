@@ -59,16 +59,14 @@ export const TeslaPopup = {
     if (soc < 20) batteryClass = 'red';
     else if (soc < 50) batteryClass = 'amber';
 
-    // Range: Tesla sends miles, backend converts to km
-    const estRange = props.estRange != null ? Math.round(props.estRange) : null;
+    // Helper: MapLibre serializes null as string "null"
+    const val = (v) => (v != null && v !== 'null' && v !== '') ? v : null;
 
-    // Temps
-    const insideTemp = props.insideTemp != null ? Math.round(props.insideTemp) : null;
-    const outsideTemp = props.outsideTemp != null ? Math.round(props.outsideTemp) : null;
-
-    // Locked & Sentry
-    const locked = props.locked;
-    const sentry = props.sentry;
+    const estRange = val(props.estRange) != null ? Math.round(props.estRange) : null;
+    const insideTemp = val(props.insideTemp) != null ? Math.round(props.insideTemp) : null;
+    const outsideTemp = val(props.outsideTemp) != null ? Math.round(props.outsideTemp) : null;
+    const locked = val(props.locked);
+    const sentry = val(props.sentry);
 
     return `<div class="tv-card">
       <div class="tv-header">
@@ -85,19 +83,19 @@ export const TeslaPopup = {
           </div>
           <span class="tv-battery-pct">${soc}%</span>
         </div>
-        ${estRange != null ? `<span class="tv-range">${estRange} km</span>` : ''}
+        ${estRange ? `<span class="tv-range">${estRange} km</span>` : ''}
       </div>
-      ${insideTemp != null || outsideTemp != null ? `<div class="tv-row tv-temps">
-        ${outsideTemp != null ? `<span class="tv-temp-item">Dis ${outsideTemp}&deg;</span>` : ''}
-        ${insideTemp != null ? `<span class="tv-temp-item">Ic ${insideTemp}&deg;</span>` : ''}
+      ${insideTemp || outsideTemp ? `<div class="tv-row tv-temps">
+        ${outsideTemp ? `<span class="tv-temp-item">Dis ${outsideTemp}&deg;</span>` : ''}
+        ${insideTemp ? `<span class="tv-temp-item">Ic ${insideTemp}&deg;</span>` : ''}
       </div>` : ''}
       <div class="tv-row">
         <span class="tv-gear tv-gear-${gearClass}">${gearText}</span>
         ${speed > 0 ? `<span class="tv-speed">${speed} km/h</span>` : ''}
       </div>
-      ${locked != null || sentry != null ? `<div class="tv-row tv-status">
-        ${locked != null ? `<span class="tv-badge ${locked ? 'tv-badge-ok' : 'tv-badge-warn'}">${locked ? 'Kilitli' : 'Acik'}</span>` : ''}
-        ${sentry != null && sentry ? `<span class="tv-badge tv-badge-blue">Nobetci</span>` : ''}
+      ${locked || sentry ? `<div class="tv-row tv-status">
+        ${locked ? `<span class="tv-badge tv-badge-ok">Kilitli</span>` : locked === false || locked === 0 ? `<span class="tv-badge tv-badge-warn">Acik</span>` : ''}
+        ${sentry ? `<span class="tv-badge tv-badge-blue">Nobetci</span>` : ''}
       </div>` : ''}
     </div>`;
   }
