@@ -384,12 +384,12 @@ async function teslaTelemetryRoutes(fastify) {
       return reply.code(401).send({ error: 'Invalid webhook secret' });
     }
 
-    const { vin, lat, lng, soc, gear, bearing, speed } = request.body;
+    const { vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry } = request.body;
     if (!vin) {
       return reply.code(400).send({ error: 'VIN required' });
     }
 
-    await db.updateVehicleTelemetry({ vin, lat, lng, soc, gear, bearing, speed });
+    await db.updateVehicleTelemetry({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry });
 
     // Broadcast via WebSocket if available
     const vehicle = await db.getTeslaVehicleByVin(vin);
@@ -404,6 +404,12 @@ async function teslaTelemetryRoutes(fastify) {
         gear: gear ?? vehicle.last_gear,
         bearing: bearing ?? vehicle.last_bearing,
         speed: speed ?? vehicle.last_speed,
+        insideTemp: insideTemp ?? vehicle.last_inside_temp,
+        outsideTemp: outsideTemp ?? vehicle.last_outside_temp,
+        estRange: estRange ?? vehicle.last_est_range,
+        chargeLimit: chargeLimit ?? vehicle.last_charge_limit,
+        locked: locked ?? vehicle.last_locked,
+        sentry: sentry ?? vehicle.last_sentry,
       });
     }
 
