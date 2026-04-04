@@ -804,7 +804,8 @@ var TeslaCamLive = {
     });
 
     // Click on frame: toggle play/pause (archive mode) or show segment selector
-    popup.querySelector('.teslacam-live-stage').addEventListener('click', function() {
+    var stage = popup.querySelector('.teslacam-live-stage');
+    stage.addEventListener('click', function() {
       if (self.mode === 'archive') {
         if (self.isPlaying) {
           self._stopPlayback();
@@ -814,6 +815,13 @@ var TeslaCamLive = {
       } else {
         self._toggleSegmentSelector();
       }
+    });
+
+    // Double-click: toggle native resolution (724x469) / small (362x234)
+    stage.addEventListener('dblclick', function(e) {
+      e.stopPropagation();
+      var container = popup.querySelector('.teslacam-live-container');
+      if (container) container.classList.toggle('native');
     });
 
     // Click on progress bar: seek to position

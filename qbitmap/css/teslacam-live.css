@@ -32,6 +32,12 @@
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+.teslacam-live-container.native {
+  width: 724px;
+  height: 469px;
 }
 
 /* Header */
