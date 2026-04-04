@@ -1,7 +1,7 @@
 /**
  * TeslaCAM Sync Service
  * Periodically syncs segments from teslacam.qbitmap.com (Raspberry Pi in Tesla)
- * Downloads manifest + frames (1fps, ~60 per segment) to local disk
+ * Downloads video.mp4 + metadata.json per segment to local disk
  * Keeps last 10 segments, deletes older ones
  */
 
@@ -11,15 +11,14 @@ const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'teslacam-sync' });
 
 const TESLACAM_API = 'https://teslacam.qbitmap.com';
-const SYNC_INTERVAL = 30 * 1000;   // 30s poll
+const SYNC_INTERVAL = 30 * 1000;
 const MAX_SEGMENTS = 10;
-const DOWNLOAD_BATCH = 10;         // parallel downloads per batch
+const VIDEO_TIMEOUT = 90 * 1000; // 90s for ~13MB video download
 const STORAGE_DIR = path.join(__dirname, '../../uploads/teslacam');
 
-// In-memory state
 let syncTimer = null;
 let watcherStatus = { running: false, last_check: null, reachable: false };
-let localSegments = [];  // ordered newest first
+let localSegments = [];
 let syncing = false;
 
 function start() {
@@ -32,7 +31,6 @@ function start() {
 
 function stop() {
   if (syncTimer) { clearInterval(syncTimer); syncTimer = null; }
-  logger.info('TeslaCAM sync service stopped');
 }
 
 function getStatus() {
@@ -46,7 +44,7 @@ function getStatus() {
 function getSegments() {
   return localSegments.map(s => ({
     id: s.id,
-    frame_count: s.frame_count || 60,
+    points: s.points || 60,
     start_gps: s.start_gps || [null, null],
     end_gps: s.end_gps || [null, null],
     start_speed_mps: s.start_speed_mps || 0,
@@ -83,7 +81,6 @@ async function tick() {
       watcherStatus.reachable = false;
       watcherStatus.running = false;
       watcherStatus.last_check = new Date().toISOString();
-      logger.debug('TeslaCAM API unreachable');
       syncing = false;
       return;
     }
@@ -134,44 +131,29 @@ async function _downloadSegment(segSummary) {
   const segDir = path.join(STORAGE_DIR, segId);
   fs.mkdirSync(segDir, { recursive: true });
 
-  // 1. Download manifest (now works — returns array of frames)
-  const manifestResp = await fetchWithTimeout(
-    TESLACAM_API + '/api/segments/' + segId + '/manifest', {}, 15000
+  // 1. Download metadata JSON
+  const metaResp = await fetchWithTimeout(
+    TESLACAM_API + '/api/segments/' + segId + '/metadata', {}, 15000
   );
-  if (!manifestResp.ok) throw new Error('Manifest fetch failed: ' + manifestResp.status);
-  const manifest = await manifestResp.json();
-  fs.writeFileSync(path.join(segDir, 'manifest.json'), JSON.stringify(manifest));
+  if (!metaResp.ok) throw new Error('Metadata fetch failed: ' + metaResp.status);
+  const metadata = await metaResp.json();
+  fs.writeFileSync(path.join(segDir, 'metadata.json'), JSON.stringify(metadata));
 
-  const frameCount = manifest.length;
+  // 2. Download video MP4
+  const videoResp = await fetchWithTimeout(
+    TESLACAM_API + '/api/segments/' + segId + '/video.mp4', {}, VIDEO_TIMEOUT
+  );
+  if (!videoResp.ok) throw new Error('Video fetch failed: ' + videoResp.status);
+  const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
+  fs.writeFileSync(path.join(segDir, 'video.mp4'), videoBuffer);
 
-  // 2. Download all frames (jpg + json) in parallel batches
-  for (let start = 1; start <= frameCount; start += DOWNLOAD_BATCH) {
-    const promises = [];
-    for (let num = start; num < start + DOWNLOAD_BATCH && num <= frameCount; num++) {
-      const pad = String(num).padStart(3, '0');
+  // 3. Extract GPS summary from metadata
+  const first = metadata[0] || {};
+  const last = metadata[metadata.length - 1] || {};
 
-      promises.push(
-        _downloadFile(
-          TESLACAM_API + '/api/segments/' + segId + '/frames/' + num + '.jpg',
-          path.join(segDir, 'frame_' + pad + '.jpg')
-        )
-      );
-      promises.push(
-        _downloadFile(
-          TESLACAM_API + '/api/segments/' + segId + '/frames/' + num + '.json',
-          path.join(segDir, 'frame_' + pad + '.json')
-        )
-      );
-    }
-    await Promise.all(promises);
-  }
-
-  // 3. Add to local segments
-  const first = manifest[0] || {};
-  const last = manifest[manifest.length - 1] || {};
   localSegments.unshift({
     id: segId,
-    frame_count: frameCount,
+    points: metadata.length,
     start_gps: [first.latitude || null, first.longitude || null],
     end_gps: [last.latitude || null, last.longitude || null],
     start_speed_mps: first.speed_mps || 0,
@@ -179,18 +161,8 @@ async function _downloadSegment(segSummary) {
     synced_at: new Date().toISOString()
   });
 
-  logger.info({ segId, frames: frameCount }, 'Segment synced');
-}
-
-async function _downloadFile(url, destPath) {
-  try {
-    const resp = await fetchWithTimeout(url, {}, 15000);
-    if (!resp.ok) return;
-    const buffer = Buffer.from(await resp.arrayBuffer());
-    fs.writeFileSync(destPath, buffer);
-  } catch (e) {
-    logger.debug({ url, err: e.message }, 'Failed to download file');
-  }
+  const videoMB = (videoBuffer.length / 1024 / 1024).toFixed(1);
+  logger.info({ segId, points: metadata.length, videoMB }, 'Segment synced');
 }
 
 function _pruneSegments() {
@@ -217,17 +189,17 @@ function _loadLocalSegments() {
 
     localSegments = [];
     for (const dir of dirs.slice(0, MAX_SEGMENTS)) {
-      const manifestPath = path.join(STORAGE_DIR, dir, 'manifest.json');
+      const metaPath = path.join(STORAGE_DIR, dir, 'metadata.json');
       let start_gps = [null, null], end_gps = [null, null];
-      let start_speed_mps = 0, end_speed_mps = 0, frame_count = 60;
+      let start_speed_mps = 0, end_speed_mps = 0, points = 60;
 
-      if (fs.existsSync(manifestPath)) {
+      if (fs.existsSync(metaPath)) {
         try {
-          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-          frame_count = manifest.length;
-          if (manifest.length > 0) {
-            const first = manifest[0];
-            const last = manifest[manifest.length - 1];
+          const metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+          points = metadata.length;
+          if (metadata.length > 0) {
+            const first = metadata[0];
+            const last = metadata[metadata.length - 1];
             start_gps = [first.latitude || null, first.longitude || null];
             end_gps = [last.latitude || null, last.longitude || null];
             start_speed_mps = first.speed_mps || 0;
@@ -236,7 +208,10 @@ function _loadLocalSegments() {
         } catch (e) { /* ignore */ }
       }
 
-      localSegments.push({ id: dir, frame_count, start_gps, end_gps, start_speed_mps, end_speed_mps });
+      // Only include if video exists
+      if (fs.existsSync(path.join(STORAGE_DIR, dir, 'video.mp4'))) {
+        localSegments.push({ id: dir, points, start_gps, end_gps, start_speed_mps, end_speed_mps });
+      }
     }
 
     for (const dir of dirs.slice(MAX_SEGMENTS)) {

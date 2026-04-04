@@ -1,9 +1,9 @@
 /**
  * TeslaCAM Live — Canli / Arsiv mod
- * teslacam.qbitmap.com API uzerinden Tesla on kamera goruntusu
+ * Video-based Tesla on kamera goruntusu
  */
 import '../css/teslacam-live.css';
-import '../css/tesla-dashcam.css'; // dashboard stilleri icin
+import '../css/tesla-dashcam.css';
 import * as AppState from '/js/state.js';
 import { QBitmapConfig } from '/js/config.js';
 
@@ -11,30 +11,27 @@ var TeslaCamLive = {
 
   // ── Config ──────────────────────────────────────────────
   API_BASE: QBitmapConfig.api.base + '/api/teslacam',
-  POLL_INTERVAL: 30000,   // 30sn
-  FRAME_INTERVAL: 1000,   // 1sn (kare yasam suresi)
+  POLL_INTERVAL: 30000,
   MAX_SEGMENTS: 10,
 
   // ── State ───────────────────────────────────────────────
   map: null,
   layerReady: false,
-  mode: null,             // 'live' | 'archive'
+  mode: null,
   watcherRunning: false,
 
-  segments: new Map(),     // id -> { manifest, frameMetas: Map, frameImages: Map }
-  segmentOrder: [],        // newest first
+  segments: new Map(),     // id -> { summary, metadata }
+  segmentOrder: [],
   activeSegmentId: null,
-  currentFrameIndex: 0,
   isPlaying: false,
   pollIntervalId: null,
-  frameIntervalId: null,
-  nextSegmentReady: null,  // preloaded next segment id (live mode)
+  nextSegmentReady: null,
 
   popupEl: null,
   selectorVisible: false,
   vehicleCoord: null,
   vehicleBearing: 0,
-  _fadeTimeoutId: null,
+  _lastMetaIndex: -1,
 
   // ── Init / Lifecycle ────────────────────────────────────
   init: function(map) {
@@ -45,7 +42,6 @@ var TeslaCamLive = {
   show: async function() {
     if (!this.map) return;
 
-    // Check watcher status and fetch segments in parallel
     var results = await Promise.all([
       this._fetchWatcherStatus(),
       this._fetchSegments()
@@ -56,7 +52,6 @@ var TeslaCamLive = {
 
     this.watcherRunning = watcher && watcher.running === true;
 
-    // Store segments (newest first)
     if (segList && segList.segments) {
       var segs = segList.segments.slice(0, this.MAX_SEGMENTS);
       this.segmentOrder = segs.map(function(s) { return s.id; });
@@ -64,23 +59,18 @@ var TeslaCamLive = {
         if (!this.segments.has(segs[i].id)) {
           this.segments.set(segs[i].id, {
             summary: segs[i],
-            manifest: null,
-            frameMetas: new Map(),
-            frameImages: new Map()
+            metadata: null
           });
         }
       }
     }
 
-    // Show layer
     if (this.map.getLayer('teslacam-live-vehicle')) {
       this.map.setLayoutProperty('teslacam-live-vehicle', 'visibility', 'visible');
     }
 
-    // Start polling regardless (new segments will appear)
     this._startPolling();
 
-    // If segments exist, show car icon + flyTo
     if (this.segmentOrder.length > 0) {
       if (this.watcherRunning) {
         await this._switchToLive();
@@ -96,7 +86,6 @@ var TeslaCamLive = {
     this._removePopup();
     this._clearTrail();
 
-    // Hide layer
     if (this.map && this.map.getLayer('teslacam-live-vehicle')) {
       this.map.setLayoutProperty('teslacam-live-vehicle', 'visibility', 'none');
     }
@@ -104,7 +93,6 @@ var TeslaCamLive = {
     this.segments.clear();
     this.segmentOrder = [];
     this.activeSegmentId = null;
-    this.currentFrameIndex = 0;
     this.mode = null;
     this.nextSegmentReady = null;
   },
@@ -126,68 +114,25 @@ var TeslaCamLive = {
     } catch (e) { return null; }
   },
 
-  _fetchManifest: async function(id) {
+  _fetchMetadata: async function(id) {
     try {
-      var resp = await fetch(this.API_BASE + '/segments/' + id + '/manifest', { credentials: 'include' });
+      var resp = await fetch(this.API_BASE + '/segments/' + id + '/metadata', { credentials: 'include' });
       if (!resp.ok) return null;
       return await resp.json();
     } catch (e) { return null; }
   },
 
-  _fetchFrameMeta: async function(id, num) {
-    try {
-      var resp = await fetch(this.API_BASE + '/segments/' + id + '/frames/' + num + '.json', { credentials: 'include' });
-      if (!resp.ok) return null;
-      return await resp.json();
-    } catch (e) { return null; }
-  },
-
-  _frameUrl: function(id, num) {
-    return this.API_BASE + '/segments/' + id + '/frames/' + num + '.jpg';
+  _videoUrl: function(id) {
+    return this.API_BASE + '/segments/' + id + '/video.mp4';
   },
 
   _preloadSegment: async function(id) {
     var seg = this.segments.get(id);
     if (!seg) return false;
-
-    // Fetch manifest if not cached
-    if (!seg.manifest) {
-      seg.manifest = await this._fetchManifest(id);
-      if (!seg.manifest) return false;
+    if (!seg.metadata) {
+      seg.metadata = await this._fetchMetadata(id);
+      if (!seg.metadata) return false;
     }
-
-    // Store frame count from manifest
-    seg.frameCount = seg.manifest.length;
-
-    // Preload all frames (images + metadata) in parallel
-    var self = this;
-    var promises = [];
-    for (var i = 1; i <= seg.frameCount; i++) {
-      (function(num) {
-        // Preload image
-        if (!seg.frameImages.has(num)) {
-          promises.push(new Promise(function(resolve) {
-            var img = new Image();
-            img.onload = function() {
-              seg.frameImages.set(num, img);
-              resolve();
-            };
-            img.onerror = function() { resolve(); };
-            img.src = self._frameUrl(id, num);
-          }));
-        }
-        // Fetch metadata
-        if (!seg.frameMetas.has(num)) {
-          promises.push(
-            self._fetchFrameMeta(id, num).then(function(meta) {
-              if (meta) seg.frameMetas.set(num, meta);
-            })
-          );
-        }
-      })(i);
-    }
-
-    await Promise.all(promises);
     return true;
   },
 
@@ -217,12 +162,10 @@ var TeslaCamLive = {
     var wasRunning = this.watcherRunning;
     this.watcherRunning = watcher && watcher.running === true;
 
-    // Update segment list
     if (segList && segList.segments) {
       var newSegs = segList.segments.slice(0, this.MAX_SEGMENTS);
       var newIds = newSegs.map(function(s) { return s.id; });
 
-      // Detect new segments
       var self = this;
       var brandNew = [];
       for (var i = 0; i < newIds.length; i++) {
@@ -230,22 +173,17 @@ var TeslaCamLive = {
           brandNew.push(newIds[i]);
           this.segments.set(newIds[i], {
             summary: newSegs[i],
-            manifest: null,
-            frameMetas: new Map(),
-            frameImages: new Map()
+            metadata: null
           });
         }
       }
 
-      // Remove old segments beyond MAX
       this.segmentOrder = newIds;
       this.segments.forEach(function(val, key) {
-        if (newIds.indexOf(key) === -1) {
-          self.segments.delete(key);
-        }
+        if (newIds.indexOf(key) === -1) self.segments.delete(key);
       });
 
-      // In live mode: preload newest segment for seamless transition
+      // Live mode: preload newest for seamless transition
       if (this.mode === 'live' && brandNew.length > 0) {
         var newest = brandNew[0];
         this._preloadSegment(newest).then(function() {
@@ -253,13 +191,10 @@ var TeslaCamLive = {
         });
       }
 
-      // Update segment selector if visible
-      if (this.selectorVisible) {
-        this._buildSegmentSelector();
-      }
+      if (this.selectorVisible) this._buildSegmentSelector();
     }
 
-    // First time segments arrived — show car icon
+    // First time segments arrived
     if (!this.mode && this.segmentOrder.length > 0) {
       if (this.watcherRunning) {
         this._switchToLive();
@@ -269,11 +204,9 @@ var TeslaCamLive = {
       return;
     }
 
-    // Mode transition
     if (!wasRunning && this.watcherRunning && this.mode !== 'live') {
       this._switchToLive();
     } else if (wasRunning && !this.watcherRunning && this.mode === 'live') {
-      // Let current playback finish, then switch to archive
       this._pendingArchiveSwitch = true;
     }
   },
@@ -286,26 +219,21 @@ var TeslaCamLive = {
     var latestId = this.segmentOrder[0];
     if (!latestId) return;
 
-    // Preload latest segment in background
     var self = this;
     this._preloadSegment(latestId).then(function() {
       self.activeSegmentId = latestId;
-      self.currentFrameIndex = 0;
       self._updateTrail();
-
-      // If popup is already open, start playback
       if (self.popupEl) {
         self._updateBadge('live');
-        self._startPlayback();
+        self._playVideo(latestId);
       }
     });
 
-    // Show car icon + flyTo immediately (use manifest or summary GPS)
     var seg = this.segments.get(latestId);
     if (seg && seg.summary) {
       var gps = seg.summary.start_gps;
       if (gps && gps[0] !== null) {
-        this.vehicleCoord = [gps[1], gps[0]]; // [lng, lat]
+        this.vehicleCoord = [gps[1], gps[0]];
         this._updateVehicle();
         this.map.flyTo({ center: this.vehicleCoord, zoom: 16, duration: 1500 });
       }
@@ -317,18 +245,15 @@ var TeslaCamLive = {
     this._stopPlayback();
     this._pendingArchiveSwitch = false;
 
-    if (this.popupEl) {
-      this._updateBadge('archive');
-    }
+    if (this.popupEl) this._updateBadge('archive');
 
-    // Show car icon at last known position + flyTo
     if (this.segmentOrder.length > 0) {
       var latestId = this.segmentOrder[0];
       var seg = this.segments.get(latestId);
       if (seg && seg.summary) {
         var gps = seg.summary.start_gps;
         if (gps && gps[0] !== null) {
-          this.vehicleCoord = [gps[1], gps[0]]; // [lng, lat]
+          this.vehicleCoord = [gps[1], gps[0]];
           this._updateVehicle();
           this.map.flyTo({ center: this.vehicleCoord, zoom: 15, duration: 1500 });
         }
@@ -336,150 +261,83 @@ var TeslaCamLive = {
     }
   },
 
-  // ── Playback ────────────────────────────────────────────
-  _startPlayback: function() {
-    if (this.isPlaying) return;
-    this.isPlaying = true;
-    this._showFrame();
+  // ── Video Playback ──────────────────────────────────────
+  _playVideo: function(segId) {
+    if (!this.popupEl) return;
+    var video = this.popupEl.querySelector('.teslacam-live-video');
+    if (!video) return;
 
-    var self = this;
-    this.frameIntervalId = setInterval(function() {
-      self._advanceFrame();
-    }, this.FRAME_INTERVAL);
+    this.activeSegmentId = segId;
+    this._lastMetaIndex = -1;
+    this.isPlaying = true;
+
+    video.src = this._videoUrl(segId);
+    video.load();
+    video.play().catch(function() {});
+
+    this._updateTrail();
+
+    // Update title
+    var titleEl = this.popupEl.querySelector('.teslacam-live-title');
+    if (titleEl) titleEl.textContent = segId;
   },
 
   _stopPlayback: function() {
     this.isPlaying = false;
-    if (this.frameIntervalId) {
-      clearInterval(this.frameIntervalId);
-      this.frameIntervalId = null;
-    }
-    if (this._fadeTimeoutId) {
-      clearTimeout(this._fadeTimeoutId);
-      this._fadeTimeoutId = null;
-    }
-  },
-
-  _advanceFrame: function() {
-    this.currentFrameIndex++;
-    var seg = this.segments.get(this.activeSegmentId);
-    var totalFrames = (seg && seg.frameCount) || 60;
-
-    if (this.currentFrameIndex >= totalFrames) {
-      // Segment finished
-      if (this.mode === 'live') {
-        if (this.nextSegmentReady) {
-          // Seamless transition to next segment
-          this.activeSegmentId = this.nextSegmentReady;
-          this.nextSegmentReady = null;
-          this.currentFrameIndex = 0;
-          this._updateTrail();
-          this._showFrame();
-          return;
-        } else {
-          // Wait for next segment
-          this.currentFrameIndex = totalFrames - 1;
-          this._showWaiting(true);
-
-          if (this._pendingArchiveSwitch) {
-            this._switchToArchive();
-          }
-          return;
-        }
-      } else {
-        // Archive mode: stop at end
-        this.currentFrameIndex = totalFrames - 1;
-        this._stopPlayback();
-        return;
+    if (this.popupEl) {
+      var video = this.popupEl.querySelector('.teslacam-live-video');
+      if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
       }
     }
-
-    this._showWaiting(false);
-    this._showFrame();
   },
 
-  _showFrame: function() {
-    var segId = this.activeSegmentId;
-    var frameNum = this.currentFrameIndex + 1; // API uses 1-based
-    var seg = this.segments.get(segId);
-    if (!seg || !this.popupEl) return;
+  _onTimeUpdate: function() {
+    if (!this.popupEl || !this.activeSegmentId) return;
+    var video = this.popupEl.querySelector('.teslacam-live-video');
+    if (!video) return;
 
-    var layerA = this.popupEl.querySelector('[data-layer="a"]');
-    var layerB = this.popupEl.querySelector('[data-layer="b"]');
-    if (!layerA || !layerB) return;
+    var seg = this.segments.get(this.activeSegmentId);
+    if (!seg || !seg.metadata) return;
 
-    var totalFrames = seg.frameCount || 60;
+    var t = Math.floor(video.currentTime);
+    if (t === this._lastMetaIndex) return;
+    this._lastMetaIndex = t;
 
-    // Determine target layer by frame parity (no state needed)
-    var target = (frameNum % 2 === 1) ? layerA : layerB;
-    var other = (frameNum % 2 === 1) ? layerB : layerA;
-
-    // Load current frame onto target
-    var cached = seg.frameImages.get(frameNum);
-    target.src = cached ? cached.src : this._frameUrl(segId, frameNum);
-
-    // Put target on top and fade in
-    target.style.zIndex = 2;
-    other.style.zIndex = 1;
-    target.classList.add('active');
-
-    // After fade completes, hide the other layer
-    if (this._fadeTimeoutId) clearTimeout(this._fadeTimeoutId);
-    this._fadeTimeoutId = setTimeout(function() {
-      other.classList.remove('active');
-    }, 450);
-
-    // Update progress bar
-    var progressFill = this.popupEl.querySelector('.teslacam-live-progress-fill');
-    if (progressFill) {
-      var pct = (frameNum / totalFrames) * 100;
-      progressFill.style.width = pct + '%';
-    }
-
-    // Update dashboard with metadata
-    var meta = seg.frameMetas.get(frameNum);
+    var meta = seg.metadata[t];
     if (meta) {
       this._updateDashboard(meta);
-      if (meta.latitude_deg && meta.longitude_deg) {
-        this.vehicleCoord = [meta.longitude_deg, meta.latitude_deg];
+
+      if (meta.latitude && meta.longitude) {
+        this.vehicleCoord = [meta.longitude, meta.latitude];
         this.vehicleBearing = meta.heading_deg || this.vehicleBearing;
         this._updateVehicle();
       }
-    } else if (seg.manifest && seg.manifest[this.currentFrameIndex]) {
-      var mf = seg.manifest[this.currentFrameIndex];
-      if (mf.latitude && mf.longitude) {
-        this.vehicleCoord = [mf.longitude, mf.latitude];
-        this.vehicleBearing = mf.heading_deg || this.vehicleBearing;
-        this._updateVehicle();
-      }
-      if (this.popupEl && mf.speed_mps !== undefined) {
-        var speedEl = this.popupEl.querySelector('.meta-speed-value');
-        if (speedEl) speedEl.textContent = Math.round(mf.speed_mps * 3.6);
-      }
     }
 
-    // Update title
-    var titleEl = this.popupEl.querySelector('.teslacam-live-title');
-    if (titleEl) {
-      titleEl.textContent = segId + ' (' + frameNum + '/' + totalFrames + ')';
+    // Progress bar
+    var progressFill = this.popupEl.querySelector('.teslacam-live-progress-fill');
+    if (progressFill && video.duration) {
+      progressFill.style.width = (video.currentTime / video.duration * 100) + '%';
     }
-
-    // Preload ahead (+5 frames)
-    this._preloadAhead(seg, frameNum);
   },
 
-  _preloadAhead: function(seg, currentNum) {
-    var self = this;
-    for (var i = 1; i <= 5; i++) {
-      var num = currentNum + i;
-      if (num > (seg.frameCount || 60)) break;
-      if (!seg.frameImages.has(num)) {
-        (function(n) {
-          var img = new Image();
-          img.onload = function() { seg.frameImages.set(n, img); };
-          img.src = self._frameUrl(self.activeSegmentId, n);
-        })(num);
+  _onVideoEnded: function() {
+    if (this.mode === 'live') {
+      if (this.nextSegmentReady) {
+        var nextId = this.nextSegmentReady;
+        this.nextSegmentReady = null;
+        this._playVideo(nextId);
+      } else {
+        this._showWaiting(true);
+        if (this._pendingArchiveSwitch) {
+          this._switchToArchive();
+        }
       }
+    } else {
+      this.isPlaying = false;
     }
   },
 
@@ -487,17 +345,13 @@ var TeslaCamLive = {
     this._stopPlayback();
     this._hideSegmentSelector();
 
-    // Preload segment
     var ok = await this._preloadSegment(segId);
     if (!ok) return;
 
-    this.activeSegmentId = segId;
-    this.currentFrameIndex = 0;
-
     // Fly to start position
     var seg = this.segments.get(segId);
-    if (seg && seg.manifest && seg.manifest.length > 0) {
-      var first = seg.manifest[0];
+    if (seg && seg.metadata && seg.metadata.length > 0) {
+      var first = seg.metadata[0];
       if (first.latitude && first.longitude) {
         this.vehicleCoord = [first.longitude, first.latitude];
         this.vehicleBearing = first.heading_deg || 0;
@@ -506,8 +360,7 @@ var TeslaCamLive = {
       }
     }
 
-    this._updateTrail();
-    this._startPlayback();
+    this._playVideo(segId);
   },
 
   // ── Dashboard Update ────────────────────────────────────
@@ -515,14 +368,11 @@ var TeslaCamLive = {
     if (!this.popupEl) return;
     var popup = this.popupEl;
 
-    // Speed
     var speedEl = popup.querySelector('.meta-speed-value');
     if (speedEl) {
-      var speed = meta.vehicle_speed_mps || 0;
-      speedEl.textContent = Math.round(speed * 3.6);
+      speedEl.textContent = Math.round((meta.speed_mps || 0) * 3.6);
     }
 
-    // Gear
     var gearEl = popup.querySelector('.meta-gear');
     if (gearEl) {
       var gearMap = { 'PARK': 'P', 'DRIVE': 'D', 'REVERSE': 'R', 'NEUTRAL': 'N' };
@@ -532,44 +382,19 @@ var TeslaCamLive = {
       gearEl.style.color = gearColors[gs] || 'rgba(255,255,255,0.85)';
     }
 
-    // Brake
     var brakeIcon = popup.querySelector('.meta-brake-icon');
     if (brakeIcon) {
       brakeIcon.classList.toggle('active', !!meta.brake_applied);
     }
 
-    // Steering wheel
     var steeringIcon = popup.querySelector('.meta-steering-icon');
     if (steeringIcon) {
       steeringIcon.style.transform = 'rotate(' + (meta.steering_wheel_angle || 0) + 'deg)';
-
-      // Autopilot state
       steeringIcon.classList.remove('autopilot-active', 'autopilot-self-driving');
       var ap = meta.autopilot_state || 'NONE';
       if (ap === 'SELF_DRIVING') steeringIcon.classList.add('autopilot-self-driving');
       else if (ap === 'AUTOSTEER' || ap === 'TACC') steeringIcon.classList.add('autopilot-active');
     }
-
-    // Accelerator
-    var accelFillRect = popup.querySelector('.accel-fill-rect');
-    var accelIcon = popup.querySelector('.meta-accelerator-icon');
-    var accelPct = meta.accelerator_pedal_position || 0;
-    if (accelFillRect) {
-      var maxHeight = 20;
-      var fillHeight = (accelPct / 100) * maxHeight;
-      accelFillRect.setAttribute('y', 26 - fillHeight);
-      accelFillRect.setAttribute('height', fillHeight);
-      accelFillRect.setAttribute('opacity', accelPct > 0 ? 0.9 : 0);
-    }
-    if (accelIcon) {
-      accelIcon.classList.toggle('active', accelPct > 5);
-    }
-
-    // Blinkers
-    var blinkerLeft = popup.querySelector('.meta-blinker-left');
-    var blinkerRight = popup.querySelector('.meta-blinker-right');
-    if (blinkerLeft) blinkerLeft.classList.toggle('active', !!meta.blinker_on_left);
-    if (blinkerRight) blinkerRight.classList.toggle('active', !!meta.blinker_on_right);
   },
 
   // ── Map Layer ───────────────────────────────────────────
@@ -586,9 +411,7 @@ var TeslaCamLive = {
       }
       self._createSourceAndLayer();
     };
-    img.onerror = function() {
-      self._createSourceAndLayer();
-    };
+    img.onerror = function() { self._createSourceAndLayer(); };
     img.src = '/car.png';
   },
 
@@ -622,7 +445,6 @@ var TeslaCamLive = {
 
     this.layerReady = true;
 
-    // Click handler — toggle popup
     var self = this;
     this.map.on('click', 'teslacam-live-vehicle', function() {
       if (self.popupEl) {
@@ -631,11 +453,6 @@ var TeslaCamLive = {
       } else {
         self._openPopupAndPlay();
       }
-    });
-
-    // Move handler — update popup position
-    this.map.on('move', function() {
-      self._updatePopupPosition();
     });
   },
 
@@ -657,12 +474,12 @@ var TeslaCamLive = {
     this._clearTrail();
 
     var seg = this.segments.get(this.activeSegmentId);
-    if (!seg || !seg.manifest) return;
+    if (!seg || !seg.metadata) return;
 
     var coords = [];
-    for (var i = 0; i < seg.manifest.length; i++) {
-      var m = seg.manifest[i];
-      if (m.latitude && m.longitude && m.latitude !== null && m.longitude !== null) {
+    for (var i = 0; i < seg.metadata.length; i++) {
+      var m = seg.metadata[i];
+      if (m.latitude && m.longitude) {
         coords.push([m.longitude, m.latitude]);
       }
     }
@@ -670,10 +487,7 @@ var TeslaCamLive = {
 
     this.map.addSource('teslacam-live-trail', {
       type: 'geojson',
-      data: {
-        type: 'Feature',
-        geometry: { type: 'LineString', coordinates: coords }
-      }
+      data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } }
     });
 
     this.map.addLayer({
@@ -694,30 +508,23 @@ var TeslaCamLive = {
     if (this.map.getSource('teslacam-live-trail')) this.map.removeSource('teslacam-live-trail');
   },
 
-  // ── Open popup and start playback based on mode ──────────
+  // ── Open popup and play ─────────────────────────────────
   _openPopupAndPlay: async function() {
     if (this.popupEl) return;
 
-    var latestId = this.segmentOrder[0];
+    var latestId = this.activeSegmentId || this.segmentOrder[0];
     if (!latestId) return;
 
-    // Ensure segment is preloaded
-    if (!this.activeSegmentId) {
-      this.activeSegmentId = latestId;
-      this.currentFrameIndex = 0;
-    }
-
-    await this._preloadSegment(this.activeSegmentId);
+    await this._preloadSegment(latestId);
+    this.activeSegmentId = latestId;
 
     this._createPopup();
     this._updateBadge(this.mode || 'archive');
     this._updateTrail();
-    this._showFrame();
 
     if (this.mode === 'live') {
-      this._startPlayback();
+      this._playVideo(latestId);
     } else {
-      // Archive: show segment selector, user picks one to play
       this._showSegmentSelector();
     }
   },
@@ -730,7 +537,7 @@ var TeslaCamLive = {
     var popup = document.createElement('div');
     popup.className = 'teslacam-live-popup';
 
-    // SVG Icons (from tesla-dashcam.js)
+    // SVG Icons
     var steeringSVG = '<svg class="meta-steering-icon" viewBox="0 0 64 64" width="16" height="16">' +
       '<circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="5"/>' +
       '<circle cx="32" cy="32" r="9" fill="rgba(255,255,255,0.9)"/>' +
@@ -744,24 +551,6 @@ var TeslaCamLive = {
       '<g class="brake-active"><path d="M821.394 861.482H200.242c-23.709 0-44.013-20.191-45.124-44.975 0 0-30.555-129.896-30.044-166.228 0.325-23.102 15.23-164.3 15.23-164.3 2.449-27.739 18.019-48.258 42.686-48.258h646.233c24.667 0 44.357 21.769 43.759 48.258l14.579 163.622-22.043 166.906c-0.56 24.784-20.414 44.975-44.124 44.975z m24.716-358.364l0.292-10.498c0.23-8.275-6.452-15.059-14.85-15.059H186.497c-8.397 0-14.828 6.784-14.291 15.059l0.681 10.498c0.534 8.232 7.802 14.954 16.153 14.954h641.472c8.35 0 15.37-6.722 15.598-14.954z m8.739 81.304l0.296-10.264c0.233-8.091-6.628-14.724-15.248-14.724H177.735c-8.62 0-15.226 6.633-14.681 14.724l0.691 10.264c0.542 8.049 7.999 14.622 16.571 14.622H838.84c8.574 0 15.777-6.572 16.009-14.622z m6.172 79.506l0.298-10.038c0.235-7.912-6.747-14.399-15.516-14.399H172.234c-8.769 0-15.494 6.487-14.945 14.399l0.695 10.038c0.545 7.872 8.126 14.3 16.847 14.3h669.91c8.721 0 16.047-6.428 16.28-14.3z m-14.901 77.765l0.282-9.819c0.222-7.74-6.466-14.085-14.863-14.085H186.526c-8.397 0-14.841 6.345-14.322 14.085l0.659 9.819c0.517 7.701 7.772 13.989 16.123 13.989h641.548c8.351 0 15.365-6.288 15.586-13.989z m-8.749 76.081l0.267-9.608c0.21-7.573-6.189-13.781-14.222-13.781H206.385c-8.033 0-14.202 6.208-13.711 13.781l0.623 9.608c0.489 7.535 7.425 13.688 15.415 13.688h613.751c7.99 0.001 14.698-6.152 14.908-13.688z m1.869-378.856l36.038-94.167 21.623-119.775H785.183L752.749 356.56l-118.926 82.358H839.24z" fill="#ff4d4f"/></g>' +
     '</svg>';
 
-    var blinkerLeftSVG = '<svg viewBox="0 0 48 48" width="14" height="14">' +
-      '<path class="blinker-outline" d="M20 8 L6 24 L20 40 L20 30 L42 30 L42 18 L20 18 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>' +
-      '<path class="blinker-fill" d="M20 8 L6 24 L20 40 L20 30 L42 30 L42 18 L20 18 Z" fill="#f59e0b" stroke="none" opacity="0"/>' +
-    '</svg>';
-
-    var blinkerRightSVG = '<svg viewBox="0 0 48 48" width="14" height="14">' +
-      '<path class="blinker-outline" d="M28 8 L42 24 L28 40 L28 30 L6 30 L6 18 L28 18 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>' +
-      '<path class="blinker-fill" d="M28 8 L42 24 L28 40 L28 30 L6 30 L6 18 L28 18 Z" fill="#f59e0b" stroke="none" opacity="0"/>' +
-    '</svg>';
-
-    var accelSVG = '<svg class="meta-accelerator-icon" viewBox="0 0 32 32" width="18" height="18">' +
-      '<rect x="8" y="4" width="16" height="24" rx="3" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>' +
-      '<path d="M18 8 L13 16 L16 16 L14 24 L19 15 L16 15 L18 8 Z" fill="rgba(255,255,255,0.4)"/>' +
-      '<rect class="accel-fill-rect" x="10" y="26" width="12" height="0" rx="2" fill="#73d13d" opacity="0"/>' +
-    '</svg>';
-
-    // Progress bar (replaces dots for 60fps)
-
     popup.innerHTML =
       '<div class="teslacam-live-container">' +
         '<div class="teslacam-live-header">' +
@@ -771,10 +560,7 @@ var TeslaCamLive = {
           '</span>' +
           '<button class="teslacam-live-close" title="Kapat">&times;</button>' +
         '</div>' +
-        '<div class="teslacam-live-stage">' +
-          '<img class="teslacam-live-layer" data-layer="a">' +
-          '<img class="teslacam-live-layer" data-layer="b">' +
-        '</div>' +
+        '<video class="teslacam-live-video" playsinline muted></video>' +
         '<div class="teslacam-live-waiting">Sonraki segment bekleniyor...</div>' +
         '<div class="tesla-dashboard">' +
           '<div class="metadata-dashboard">' +
@@ -782,15 +568,12 @@ var TeslaCamLive = {
               '<div class="meta-gear">P</div>' +
               '<div class="meta-brake-container">' + brakeSVG + '</div>' +
             '</div>' +
-            '<div class="meta-blinker meta-blinker-left">' + blinkerLeftSVG + '</div>' +
             '<div class="meta-speed-container">' +
               '<span class="meta-speed-value">0</span>' +
               '<span class="meta-speed-unit">km/h</span>' +
             '</div>' +
-            '<div class="meta-blinker meta-blinker-right">' + blinkerRightSVG + '</div>' +
             '<div class="meta-right-col">' +
               '<div class="meta-steering-container">' + steeringSVG + '</div>' +
-              '<div class="meta-accelerator-container">' + accelSVG + '</div>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -798,59 +581,55 @@ var TeslaCamLive = {
       '</div>' +
       '<div class="teslacam-live-segment-selector"></div>';
 
-    // Close button
+    // Video events
+    var video = popup.querySelector('.teslacam-live-video');
+    video.addEventListener('timeupdate', function() { self._onTimeUpdate(); });
+    video.addEventListener('ended', function() { self._onVideoEnded(); });
+
+    // Close
     popup.querySelector('.teslacam-live-close').addEventListener('click', function() {
       self._removePopup();
     });
 
-    // Click on frame: toggle play/pause (archive mode) or show segment selector
-    var stage = popup.querySelector('.teslacam-live-stage');
-    stage.addEventListener('click', function() {
+    // Click video: play/pause (archive) or segment selector (live)
+    video.addEventListener('click', function() {
       if (self.mode === 'archive') {
-        if (self.isPlaying) {
-          self._stopPlayback();
-        } else if (self.activeSegmentId) {
-          self._startPlayback();
-        }
+        if (video.paused) { video.play(); self.isPlaying = true; }
+        else { video.pause(); self.isPlaying = false; }
       } else {
         self._toggleSegmentSelector();
       }
     });
 
-    // Double-click: toggle native resolution (724x469) / small (362x234)
-    stage.addEventListener('dblclick', function(e) {
+    // Double-click: toggle native resolution
+    video.addEventListener('dblclick', function(e) {
       e.stopPropagation();
-      var container = popup.querySelector('.teslacam-live-container');
-      if (container) container.classList.toggle('native');
+      popup.querySelector('.teslacam-live-container').classList.toggle('native');
     });
 
-    // Click on progress bar: seek to position
+    // Progress bar seek
     var progressBar = popup.querySelector('.teslacam-live-progress');
     if (progressBar) {
       progressBar.addEventListener('click', function(e) {
         e.stopPropagation();
+        if (!video.duration) return;
         var rect = progressBar.getBoundingClientRect();
         var pct = (e.clientX - rect.left) / rect.width;
-        var seg = self.segments.get(self.activeSegmentId);
-        var total = (seg && seg.frameCount) || 60;
-        self.currentFrameIndex = Math.floor(pct * total);
-        if (self.currentFrameIndex >= total) self.currentFrameIndex = total - 1;
-        self._showFrame();
+        video.currentTime = pct * video.duration;
       });
     }
 
-    // Badge click: toggle segment selector
+    // Badge click: segment selector
     popup.querySelector('.teslacam-live-badge').addEventListener('click', function(e) {
       e.stopPropagation();
       self._toggleSegmentSelector();
     });
 
-    // Drag handler — header'dan surukle (close button haric her yerden)
+    // Drag
     var header = popup.querySelector('.teslacam-live-header');
     var dragging = false, dragX = 0, dragY = 0;
 
     function startDrag(clientX, clientY, e) {
-      // Close button'a basilmissa drag baslatma
       if (e.target.closest('.teslacam-live-close')) return;
       dragging = true;
       var rect = popup.getBoundingClientRect();
@@ -858,7 +637,6 @@ var TeslaCamLive = {
       dragY = clientY - rect.top;
       e.preventDefault();
     }
-
     function moveDrag(clientX, clientY) {
       if (!dragging) return;
       popup.style.right = 'auto';
@@ -866,33 +644,24 @@ var TeslaCamLive = {
       popup.style.left = (clientX - dragX) + 'px';
       popup.style.top = (clientY - dragY) + 'px';
     }
-
     function endDrag() { dragging = false; }
 
     header.addEventListener('mousedown', function(e) { startDrag(e.clientX, e.clientY, e); });
     document.addEventListener('mousemove', function(e) { moveDrag(e.clientX, e.clientY); });
     document.addEventListener('mouseup', endDrag);
-
-    header.addEventListener('touchstart', function(e) {
-      startDrag(e.touches[0].clientX, e.touches[0].clientY, e);
-    });
-    document.addEventListener('touchmove', function(e) {
-      if (dragging) moveDrag(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: true });
+    header.addEventListener('touchstart', function(e) { startDrag(e.touches[0].clientX, e.touches[0].clientY, e); });
+    document.addEventListener('touchmove', function(e) { if (dragging) moveDrag(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
     document.addEventListener('touchend', endDrag);
 
     document.body.appendChild(popup);
     this.popupEl = popup;
 
-    // Animate in
-    requestAnimationFrame(function() {
-      popup.classList.add('active');
-    });
+    requestAnimationFrame(function() { popup.classList.add('active'); });
   },
 
   _removePopup: function() {
     if (!this.popupEl) return;
-    if (this._fadeTimeoutId) { clearTimeout(this._fadeTimeoutId); this._fadeTimeoutId = null; }
+    this._stopPlayback();
     this.popupEl.classList.remove('active');
     var el = this.popupEl;
     this.popupEl = null;
@@ -902,9 +671,7 @@ var TeslaCamLive = {
     }, 300);
   },
 
-  _updatePopupPosition: function() {
-    // Popup is now a free-floating draggable window — no map tracking
-  },
+  _updatePopupPosition: function() {},
 
   _updateBadge: function(mode) {
     if (!this.popupEl) return;
@@ -922,11 +689,8 @@ var TeslaCamLive = {
 
   // ── Segment Selector ────────────────────────────────────
   _toggleSegmentSelector: function() {
-    if (this.selectorVisible) {
-      this._hideSegmentSelector();
-    } else {
-      this._showSegmentSelector();
-    }
+    if (this.selectorVisible) this._hideSegmentSelector();
+    else this._showSegmentSelector();
   },
 
   _showSegmentSelector: function() {
@@ -961,7 +725,6 @@ var TeslaCamLive = {
       if (seg && seg.summary && seg.summary.start_speed_mps !== undefined) {
         speedTxt = Math.round(seg.summary.start_speed_mps * 3.6) + ' km/h';
       }
-      // Format timestamp for display
       var displayTime = id.replace(/_/g, ' ').replace(/-/g, ':').replace(/ (\d{2}):/, ' $1:');
 
       html += '<div class="teslacam-live-segment-item' + (isActive ? ' active' : '') + '" data-segment="' + id + '">' +
@@ -971,13 +734,9 @@ var TeslaCamLive = {
     }
 
     sel.innerHTML = html;
-
-    // Click handlers
-    var items = sel.querySelectorAll('.teslacam-live-segment-item');
-    items.forEach(function(item) {
+    sel.querySelectorAll('.teslacam-live-segment-item').forEach(function(item) {
       item.addEventListener('click', function() {
-        var segId = item.getAttribute('data-segment');
-        self.playArchiveSegment(segId);
+        self.playArchiveSegment(item.getAttribute('data-segment'));
       });
     });
   }
