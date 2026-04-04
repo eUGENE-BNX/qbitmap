@@ -42,8 +42,8 @@ async function teslacamRoutes(fastify) {
   fastify.get('/segments/:id/frames/:num.jpg', async (request, reply) => {
     const { id, num } = request.params;
     const frameNum = parseInt(num);
-    if (isNaN(frameNum) || frameNum < 1 || frameNum > 15) {
-      return reply.code(400).send({ error: 'Frame number must be 1-15' });
+    if (isNaN(frameNum) || frameNum < 1 || frameNum > 120) {
+      return reply.code(400).send({ error: 'Invalid frame number' });
     }
 
     const filePath = path.join(
@@ -65,8 +65,8 @@ async function teslacamRoutes(fastify) {
   fastify.get('/segments/:id/frames/:num.json', async (request, reply) => {
     const { id, num } = request.params;
     const frameNum = parseInt(num);
-    if (isNaN(frameNum) || frameNum < 1 || frameNum > 15) {
-      return reply.code(400).send({ error: 'Frame number must be 1-15' });
+    if (isNaN(frameNum) || frameNum < 1 || frameNum > 120) {
+      return reply.code(400).send({ error: 'Invalid frame number' });
     }
 
     const filePath = path.join(

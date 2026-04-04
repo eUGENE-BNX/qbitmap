@@ -12,7 +12,7 @@ var TeslaCamLive = {
   // ── Config ──────────────────────────────────────────────
   API_BASE: QBitmapConfig.api.base + '/api/teslacam',
   POLL_INTERVAL: 30000,   // 30sn
-  FRAME_INTERVAL: 4000,   // 4sn (frame arasi)
+  FRAME_INTERVAL: 1000,   // 1sn (kare yasam suresi)
   MAX_SEGMENTS: 10,
 
   // ── State ───────────────────────────────────────────────
@@ -34,6 +34,7 @@ var TeslaCamLive = {
   selectorVisible: false,
   vehicleCoord: null,
   vehicleBearing: 0,
+  _fadeTimeoutId: null,
 
   // ── Init / Lifecycle ────────────────────────────────────
   init: function(map) {
@@ -155,10 +156,13 @@ var TeslaCamLive = {
       if (!seg.manifest) return false;
     }
 
-    // Preload all 15 frames (images + metadata) in parallel
+    // Store frame count from manifest
+    seg.frameCount = seg.manifest.length;
+
+    // Preload all frames (images + metadata) in parallel
     var self = this;
     var promises = [];
-    for (var i = 1; i <= 15; i++) {
+    for (var i = 1; i <= seg.frameCount; i++) {
       (function(num) {
         // Preload image
         if (!seg.frameImages.has(num)) {
@@ -350,12 +354,18 @@ var TeslaCamLive = {
       clearInterval(this.frameIntervalId);
       this.frameIntervalId = null;
     }
+    if (this._fadeTimeoutId) {
+      clearTimeout(this._fadeTimeoutId);
+      this._fadeTimeoutId = null;
+    }
   },
 
   _advanceFrame: function() {
     this.currentFrameIndex++;
+    var seg = this.segments.get(this.activeSegmentId);
+    var totalFrames = (seg && seg.frameCount) || 60;
 
-    if (this.currentFrameIndex >= 15) {
+    if (this.currentFrameIndex >= totalFrames) {
       // Segment finished
       if (this.mode === 'live') {
         if (this.nextSegmentReady) {
@@ -368,7 +378,7 @@ var TeslaCamLive = {
           return;
         } else {
           // Wait for next segment
-          this.currentFrameIndex = 14; // stay on last frame
+          this.currentFrameIndex = totalFrames - 1;
           this._showWaiting(true);
 
           if (this._pendingArchiveSwitch) {
@@ -378,7 +388,7 @@ var TeslaCamLive = {
         }
       } else {
         // Archive mode: stop at end
-        this.currentFrameIndex = 14;
+        this.currentFrameIndex = totalFrames - 1;
         this._stopPlayback();
         return;
       }
@@ -394,45 +404,54 @@ var TeslaCamLive = {
     var seg = this.segments.get(segId);
     if (!seg || !this.popupEl) return;
 
-    // Update image
-    var imgEl = this.popupEl.querySelector('.teslacam-live-frame');
-    if (imgEl) {
-      var cached = seg.frameImages.get(frameNum);
-      if (cached) {
-        imgEl.src = cached.src;
-      } else {
-        imgEl.src = this._frameUrl(segId, frameNum);
-      }
-    }
+    var layerA = this.popupEl.querySelector('[data-layer="a"]');
+    var layerB = this.popupEl.querySelector('[data-layer="b"]');
+    if (!layerA || !layerB) return;
 
-    // Update progress dots
-    var dots = this.popupEl.querySelectorAll('.teslacam-live-dot');
-    for (var i = 0; i < dots.length; i++) {
-      dots[i].classList.toggle('active', i === this.currentFrameIndex);
+    var totalFrames = seg.frameCount || 60;
+
+    // Determine target layer by frame parity (no state needed)
+    var target = (frameNum % 2 === 1) ? layerA : layerB;
+    var other = (frameNum % 2 === 1) ? layerB : layerA;
+
+    // Load current frame onto target
+    var cached = seg.frameImages.get(frameNum);
+    target.src = cached ? cached.src : this._frameUrl(segId, frameNum);
+
+    // Put target on top and fade in
+    target.style.zIndex = 2;
+    other.style.zIndex = 1;
+    target.classList.add('active');
+
+    // After fade completes, hide the other layer
+    if (this._fadeTimeoutId) clearTimeout(this._fadeTimeoutId);
+    this._fadeTimeoutId = setTimeout(function() {
+      other.classList.remove('active');
+    }, 450);
+
+    // Update progress bar
+    var progressFill = this.popupEl.querySelector('.teslacam-live-progress-fill');
+    if (progressFill) {
+      var pct = (frameNum / totalFrames) * 100;
+      progressFill.style.width = pct + '%';
     }
 
     // Update dashboard with metadata
     var meta = seg.frameMetas.get(frameNum);
     if (meta) {
       this._updateDashboard(meta);
-
-      // Update vehicle position
       if (meta.latitude_deg && meta.longitude_deg) {
         this.vehicleCoord = [meta.longitude_deg, meta.latitude_deg];
         this.vehicleBearing = meta.heading_deg || this.vehicleBearing;
         this._updateVehicle();
-        this._updatePopupPosition();
       }
     } else if (seg.manifest && seg.manifest[this.currentFrameIndex]) {
-      // Fallback to manifest data (limited fields)
       var mf = seg.manifest[this.currentFrameIndex];
       if (mf.latitude && mf.longitude) {
         this.vehicleCoord = [mf.longitude, mf.latitude];
         this.vehicleBearing = mf.heading_deg || this.vehicleBearing;
         this._updateVehicle();
-        this._updatePopupPosition();
       }
-      // Update speed from manifest
       if (this.popupEl && mf.speed_mps !== undefined) {
         var speedEl = this.popupEl.querySelector('.meta-speed-value');
         if (speedEl) speedEl.textContent = Math.round(mf.speed_mps * 3.6);
@@ -442,7 +461,25 @@ var TeslaCamLive = {
     // Update title
     var titleEl = this.popupEl.querySelector('.teslacam-live-title');
     if (titleEl) {
-      titleEl.textContent = segId + ' (' + frameNum + '/15)';
+      titleEl.textContent = segId + ' (' + frameNum + '/' + totalFrames + ')';
+    }
+
+    // Preload ahead (+5 frames)
+    this._preloadAhead(seg, frameNum);
+  },
+
+  _preloadAhead: function(seg, currentNum) {
+    var self = this;
+    for (var i = 1; i <= 5; i++) {
+      var num = currentNum + i;
+      if (num > (seg.frameCount || 60)) break;
+      if (!seg.frameImages.has(num)) {
+        (function(n) {
+          var img = new Image();
+          img.onload = function() { seg.frameImages.set(n, img); };
+          img.src = self._frameUrl(self.activeSegmentId, n);
+        })(num);
+      }
     }
   },
 
@@ -723,11 +760,7 @@ var TeslaCamLive = {
       '<rect class="accel-fill-rect" x="10" y="26" width="12" height="0" rx="2" fill="#73d13d" opacity="0"/>' +
     '</svg>';
 
-    // Build progress dots
-    var dotsHtml = '';
-    for (var i = 0; i < 15; i++) {
-      dotsHtml += '<div class="teslacam-live-dot" data-frame="' + i + '"></div>';
-    }
+    // Progress bar (replaces dots for 60fps)
 
     popup.innerHTML =
       '<div class="teslacam-live-container">' +
@@ -738,7 +771,10 @@ var TeslaCamLive = {
           '</span>' +
           '<button class="teslacam-live-close" title="Kapat">&times;</button>' +
         '</div>' +
-        '<img class="teslacam-live-frame" src="" alt="TeslaCAM">' +
+        '<div class="teslacam-live-stage">' +
+          '<img class="teslacam-live-layer" data-layer="a">' +
+          '<img class="teslacam-live-layer" data-layer="b">' +
+        '</div>' +
         '<div class="teslacam-live-waiting">Sonraki segment bekleniyor...</div>' +
         '<div class="tesla-dashboard">' +
           '<div class="metadata-dashboard">' +
@@ -758,7 +794,7 @@ var TeslaCamLive = {
             '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="teslacam-live-progress">' + dotsHtml + '</div>' +
+        '<div class="teslacam-live-progress"><div class="teslacam-live-progress-fill"></div></div>' +
       '</div>' +
       '<div class="teslacam-live-segment-selector"></div>';
 
@@ -768,7 +804,7 @@ var TeslaCamLive = {
     });
 
     // Click on frame: toggle play/pause (archive mode) or show segment selector
-    popup.querySelector('.teslacam-live-frame').addEventListener('click', function() {
+    popup.querySelector('.teslacam-live-stage').addEventListener('click', function() {
       if (self.mode === 'archive') {
         if (self.isPlaying) {
           self._stopPlayback();
@@ -780,22 +816,62 @@ var TeslaCamLive = {
       }
     });
 
-    // Click on dots: jump to frame
-    var dotEls = popup.querySelectorAll('.teslacam-live-dot');
-    dotEls.forEach(function(dot) {
-      dot.addEventListener('click', function(e) {
+    // Click on progress bar: seek to position
+    var progressBar = popup.querySelector('.teslacam-live-progress');
+    if (progressBar) {
+      progressBar.addEventListener('click', function(e) {
         e.stopPropagation();
-        var frameIdx = parseInt(dot.getAttribute('data-frame'));
-        self.currentFrameIndex = frameIdx;
+        var rect = progressBar.getBoundingClientRect();
+        var pct = (e.clientX - rect.left) / rect.width;
+        var seg = self.segments.get(self.activeSegmentId);
+        var total = (seg && seg.frameCount) || 60;
+        self.currentFrameIndex = Math.floor(pct * total);
+        if (self.currentFrameIndex >= total) self.currentFrameIndex = total - 1;
         self._showFrame();
       });
-    });
+    }
 
     // Badge click: toggle segment selector
     popup.querySelector('.teslacam-live-badge').addEventListener('click', function(e) {
       e.stopPropagation();
       self._toggleSegmentSelector();
     });
+
+    // Drag handler — header'dan surukle (close button haric her yerden)
+    var header = popup.querySelector('.teslacam-live-header');
+    var dragging = false, dragX = 0, dragY = 0;
+
+    function startDrag(clientX, clientY, e) {
+      // Close button'a basilmissa drag baslatma
+      if (e.target.closest('.teslacam-live-close')) return;
+      dragging = true;
+      var rect = popup.getBoundingClientRect();
+      dragX = clientX - rect.left;
+      dragY = clientY - rect.top;
+      e.preventDefault();
+    }
+
+    function moveDrag(clientX, clientY) {
+      if (!dragging) return;
+      popup.style.right = 'auto';
+      popup.style.bottom = 'auto';
+      popup.style.left = (clientX - dragX) + 'px';
+      popup.style.top = (clientY - dragY) + 'px';
+    }
+
+    function endDrag() { dragging = false; }
+
+    header.addEventListener('mousedown', function(e) { startDrag(e.clientX, e.clientY, e); });
+    document.addEventListener('mousemove', function(e) { moveDrag(e.clientX, e.clientY); });
+    document.addEventListener('mouseup', endDrag);
+
+    header.addEventListener('touchstart', function(e) {
+      startDrag(e.touches[0].clientX, e.touches[0].clientY, e);
+    });
+    document.addEventListener('touchmove', function(e) {
+      if (dragging) moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    document.addEventListener('touchend', endDrag);
 
     document.body.appendChild(popup);
     this.popupEl = popup;
@@ -804,12 +880,11 @@ var TeslaCamLive = {
     requestAnimationFrame(function() {
       popup.classList.add('active');
     });
-
-    this._updatePopupPosition();
   },
 
   _removePopup: function() {
     if (!this.popupEl) return;
+    if (this._fadeTimeoutId) { clearTimeout(this._fadeTimeoutId); this._fadeTimeoutId = null; }
     this.popupEl.classList.remove('active');
     var el = this.popupEl;
     this.popupEl = null;
@@ -820,10 +895,7 @@ var TeslaCamLive = {
   },
 
   _updatePopupPosition: function() {
-    if (!this.popupEl || !this.vehicleCoord || !this.map) return;
-    var point = this.map.project(this.vehicleCoord);
-    this.popupEl.style.left = point.x + 'px';
-    this.popupEl.style.top = (point.y - 20) + 'px';
+    // Popup is now a free-floating draggable window — no map tracking
   },
 
   _updateBadge: function(mode) {

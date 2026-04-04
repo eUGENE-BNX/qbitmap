@@ -1,7 +1,7 @@
 /**
  * TeslaCAM Sync Service
  * Periodically syncs segments from teslacam.qbitmap.com (Raspberry Pi in Tesla)
- * Downloads frames + metadata to local disk for serving from qbitmap backend
+ * Downloads manifest + frames (1fps, ~60 per segment) to local disk
  * Keeps last 10 segments, deletes older ones
  */
 
@@ -13,23 +13,20 @@ const logger = require('../utils/logger').child({ module: 'teslacam-sync' });
 const TESLACAM_API = 'https://teslacam.qbitmap.com';
 const SYNC_INTERVAL = 30 * 1000;   // 30s poll
 const MAX_SEGMENTS = 10;
+const DOWNLOAD_BATCH = 10;         // parallel downloads per batch
 const STORAGE_DIR = path.join(__dirname, '../../uploads/teslacam');
 
 // In-memory state
 let syncTimer = null;
 let watcherStatus = { running: false, last_check: null, reachable: false };
-let localSegments = [];  // ordered newest first: [{ id, manifest, synced_at }]
+let localSegments = [];  // ordered newest first
 let syncing = false;
 
 function start() {
-  // Ensure storage directory exists
   fs.mkdirSync(STORAGE_DIR, { recursive: true });
-
-  // Load existing segments from disk
   _loadLocalSegments();
-
   syncTimer = setInterval(tick, SYNC_INTERVAL);
-  setTimeout(tick, 3000); // first check after 3s
+  setTimeout(tick, 3000);
   logger.info('TeslaCAM sync service started');
 }
 
@@ -49,7 +46,7 @@ function getStatus() {
 function getSegments() {
   return localSegments.map(s => ({
     id: s.id,
-    frame_count: 15,
+    frame_count: s.frame_count || 60,
     start_gps: s.start_gps || [null, null],
     end_gps: s.end_gps || [null, null],
     start_speed_mps: s.start_speed_mps || 0,
@@ -67,11 +64,10 @@ async function tick() {
 
   try {
     // 1. Check watcher status
-    let watcher = null;
     try {
       const resp = await fetchWithTimeout(TESLACAM_API + '/api/watcher/status', {}, 8000);
       if (resp.ok) {
-        watcher = await resp.json();
+        const watcher = await resp.json();
         watcherStatus = {
           running: watcher.running === true,
           processed_count: watcher.processed_count,
@@ -106,7 +102,7 @@ async function tick() {
       return;
     }
 
-    // 3. Find new segments to download
+    // 3. Find new segments
     const localIds = new Set(localSegments.map(s => s.id));
     const newSegments = remoteSegments.filter(s => !localIds.has(s.id));
 
@@ -114,7 +110,7 @@ async function tick() {
       logger.info({ count: newSegments.length }, 'New TeslaCAM segments to sync');
     }
 
-    // 4. Download new segments (newest first)
+    // 4. Download new segments
     for (const seg of newSegments) {
       try {
         await _downloadSegment(seg);
@@ -123,7 +119,7 @@ async function tick() {
       }
     }
 
-    // 5. Prune old segments (keep MAX_SEGMENTS)
+    // 5. Prune old segments
     _pruneSegments();
 
   } catch (e) {
@@ -136,79 +132,54 @@ async function tick() {
 async function _downloadSegment(segSummary) {
   const segId = segSummary.id;
   const segDir = path.join(STORAGE_DIR, segId);
-
-  // Create directory
   fs.mkdirSync(segDir, { recursive: true });
 
-  // Download all 15 frames (images + metadata) in parallel batches of 5
-  const frameMetas = [];
-  for (let batch = 0; batch < 3; batch++) {
-    const promises = [];
-    for (let i = 1; i <= 5; i++) {
-      const num = batch * 5 + i;
-      if (num > 15) break;
+  // 1. Download manifest (now works — returns array of frames)
+  const manifestResp = await fetchWithTimeout(
+    TESLACAM_API + '/api/segments/' + segId + '/manifest', {}, 15000
+  );
+  if (!manifestResp.ok) throw new Error('Manifest fetch failed: ' + manifestResp.status);
+  const manifest = await manifestResp.json();
+  fs.writeFileSync(path.join(segDir, 'manifest.json'), JSON.stringify(manifest));
 
-      // Download JPEG
+  const frameCount = manifest.length;
+
+  // 2. Download all frames (jpg + json) in parallel batches
+  for (let start = 1; start <= frameCount; start += DOWNLOAD_BATCH) {
+    const promises = [];
+    for (let num = start; num < start + DOWNLOAD_BATCH && num <= frameCount; num++) {
+      const pad = String(num).padStart(3, '0');
+
       promises.push(
         _downloadFile(
           TESLACAM_API + '/api/segments/' + segId + '/frames/' + num + '.jpg',
-          path.join(segDir, 'frame_' + String(num).padStart(3, '0') + '.jpg')
+          path.join(segDir, 'frame_' + pad + '.jpg')
         )
       );
-
-      // Download metadata JSON and collect for manifest
       promises.push(
-        _downloadAndReturn(
+        _downloadFile(
           TESLACAM_API + '/api/segments/' + segId + '/frames/' + num + '.json',
-          path.join(segDir, 'frame_' + String(num).padStart(3, '0') + '.json')
-        ).then(data => { if (data) frameMetas[num - 1] = data; })
+          path.join(segDir, 'frame_' + pad + '.json')
+        )
       );
     }
     await Promise.all(promises);
   }
 
-  // Build manifest from frame metadata (since /manifest endpoint has a bug)
-  const manifest = [];
-  for (let i = 0; i < 15; i++) {
-    const meta = frameMetas[i];
-    if (meta) {
-      manifest.push({
-        frame_jpg: 'frame_' + String(i + 1).padStart(3, '0') + '.jpg',
-        metadata_json: 'frame_' + String(i + 1).padStart(3, '0') + '.json',
-        timestamp_sec: meta.timestamp_sec || (i + 1) * 4,
-        latitude: meta.latitude_deg || null,
-        longitude: meta.longitude_deg || null,
-        speed_mps: meta.vehicle_speed_mps || 0,
-        heading_deg: meta.heading_deg || 0
-      });
-    }
-  }
-  fs.writeFileSync(path.join(segDir, 'manifest.json'), JSON.stringify(manifest));
-
-  // Add to local segments list
+  // 3. Add to local segments
+  const first = manifest[0] || {};
+  const last = manifest[manifest.length - 1] || {};
   localSegments.unshift({
     id: segId,
-    start_gps: segSummary.start_gps,
-    end_gps: segSummary.end_gps,
-    start_speed_mps: segSummary.start_speed_mps,
-    end_speed_mps: segSummary.end_speed_mps,
+    frame_count: frameCount,
+    start_gps: [first.latitude || null, first.longitude || null],
+    end_gps: [last.latitude || null, last.longitude || null],
+    start_speed_mps: first.speed_mps || 0,
+    end_speed_mps: last.speed_mps || 0,
     synced_at: new Date().toISOString()
   });
 
-  logger.info({ segId, frames: 15 }, 'Segment synced');
-}
-
-async function _downloadAndReturn(url, destPath) {
-  try {
-    const resp = await fetchWithTimeout(url, {}, 15000);
-    if (!resp.ok) return null;
-    const text = await resp.text();
-    fs.writeFileSync(destPath, text);
-    try { return JSON.parse(text); } catch (e) { return null; }
-  } catch (e) {
-    logger.debug({ url, err: e.message }, 'Failed to download file');
-    return null;
-  }
+  logger.info({ segId, frames: frameCount }, 'Segment synced');
 }
 
 async function _downloadFile(url, destPath) {
@@ -242,17 +213,18 @@ function _loadLocalSegments() {
     const dirs = fs.readdirSync(STORAGE_DIR)
       .filter(d => fs.statSync(path.join(STORAGE_DIR, d)).isDirectory())
       .sort()
-      .reverse(); // newest first
+      .reverse();
 
     localSegments = [];
     for (const dir of dirs.slice(0, MAX_SEGMENTS)) {
       const manifestPath = path.join(STORAGE_DIR, dir, 'manifest.json');
       let start_gps = [null, null], end_gps = [null, null];
-      let start_speed_mps = 0, end_speed_mps = 0;
+      let start_speed_mps = 0, end_speed_mps = 0, frame_count = 60;
 
       if (fs.existsSync(manifestPath)) {
         try {
           const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          frame_count = manifest.length;
           if (manifest.length > 0) {
             const first = manifest[0];
             const last = manifest[manifest.length - 1];
@@ -261,17 +233,14 @@ function _loadLocalSegments() {
             start_speed_mps = first.speed_mps || 0;
             end_speed_mps = last.speed_mps || 0;
           }
-        } catch (e) { /* ignore parse errors */ }
+        } catch (e) { /* ignore */ }
       }
 
-      localSegments.push({ id: dir, start_gps, end_gps, start_speed_mps, end_speed_mps });
+      localSegments.push({ id: dir, frame_count, start_gps, end_gps, start_speed_mps, end_speed_mps });
     }
 
-    // Prune extra dirs on disk
     for (const dir of dirs.slice(MAX_SEGMENTS)) {
-      try {
-        fs.rmSync(path.join(STORAGE_DIR, dir), { recursive: true, force: true });
-      } catch (e) { /* ignore */ }
+      try { fs.rmSync(path.join(STORAGE_DIR, dir), { recursive: true, force: true }); } catch (e) { /* ignore */ }
     }
 
     logger.info({ count: localSegments.length }, 'Loaded local TeslaCAM segments');
