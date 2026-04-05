@@ -325,6 +325,7 @@ var TeslaCamLive = {
   },
 
   _onVideoEnded: function() {
+    var self = this;
     if (this.mode === 'live') {
       if (this.nextSegmentReady) {
         var nextId = this.nextSegmentReady;
@@ -337,7 +338,17 @@ var TeslaCamLive = {
         }
       }
     } else {
-      this.isPlaying = false;
+      // Archive: auto-play next segment (chronological order)
+      var idx = this.segmentOrder.indexOf(this.activeSegmentId);
+      // segmentOrder is newest-first, so next chronological = idx - 1
+      if (idx > 0) {
+        var nextId = this.segmentOrder[idx - 1];
+        this._preloadSegment(nextId).then(function() {
+          self._playVideo(nextId);
+        });
+      } else {
+        this.isPlaying = false;
+      }
     }
   },
 
