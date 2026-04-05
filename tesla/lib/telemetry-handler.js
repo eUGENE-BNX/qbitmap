@@ -40,15 +40,6 @@ async function handleTelemetryMessage(rawData, logger) {
     const { vin, topic, fieldId, value, timestamp } = result;
     if (!vin) return;
 
-    if (fieldId == null) {
-      // Debug: log raw payload for unrecognized fields
-      const tp = buf.indexOf(Buffer.from(topic || 'vehicle_device'));
-      let after = tp + (topic || 'vehicle_device').length;
-      while (after < buf.length && buf[after] === 0) after++;
-      const pbLen = buf.readUInt32LE(after);
-      const pbHex = buf.slice(after + 4, after + 4 + pbLen).toString('hex');
-      logger.warn({ vin, topic, pbHex, pbLen }, 'Unrecognized field - raw payload');
-    }
     const fname = fieldName(fieldId);
     logger.info({ vin, topic, fieldId, fieldName: fname, value, timestamp }, 'Telemetry decoded');
 

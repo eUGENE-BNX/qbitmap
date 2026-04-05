@@ -74,7 +74,6 @@ export const TeslaSystem = {
       const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles`, { credentials: 'include' });
       const data = await res.json();
       if (data.vehicles && data.vehicles.length > 0) {
-        console.log('[Tesla] API vehicles:', JSON.stringify(data.vehicles[0]));
         TeslaLayer.updateVehicles(data.vehicles);
         TeslaLayer.show();
 

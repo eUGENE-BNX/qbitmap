@@ -66,7 +66,6 @@ export const TeslaPopup = {
     const locked = props.locked >= 0 ? props.locked : null;
     const sentry = props.sentry >= 0 ? props.sentry : null;
 
-    console.log('[Tesla Popup] props:', JSON.stringify(props));
     return `<div class="tv-card">
       <div class="tv-header">
         <div class="tv-logo">T</div>
