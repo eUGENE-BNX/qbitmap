@@ -18,7 +18,7 @@ export const TeslaLayer = {
           resolve();
         };
         img.onerror = resolve;
-        img.src = '/car.png';
+        img.src = '/car4.png';
       });
     }
 
@@ -40,10 +40,10 @@ export const TeslaLayer = {
           'icon-image': 'tesla-car-icon',
           'icon-size': [
             'interpolate', ['linear'], ['zoom'],
-            4, 0.3,
-            10, 0.5,
-            14, 0.7,
-            18, 1.0
+            4, 0.15,
+            10, 0.25,
+            14, 0.35,
+            18, 0.5
           ],
           'icon-rotate': ['get', 'bearing'],
           'icon-rotation-alignment': 'map',
