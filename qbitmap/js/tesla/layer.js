@@ -49,6 +49,12 @@ export const TeslaLayer = {
           'icon-rotation-alignment': 'map',
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
+          'text-field': ['concat', ['to-string', ['get', 'speed']], ' km/h'],
+          'text-font': ['Open Sans Bold'],
+          'text-size': 11,
+          'text-offset': [0, 2.2],
+          'text-anchor': 'top',
+          'text-allow-overlap': true,
           'visibility': 'none'
         },
         paint: {
@@ -56,7 +62,10 @@ export const TeslaLayer = {
             'case',
             ['==', ['get', 'gear'], 'P'], 0.5,
             1.0
-          ]
+          ],
+          'text-color': '#22c55e',
+          'text-halo-color': 'rgba(0,0,0,0.8)',
+          'text-halo-width': 1.5
         },
         minzoom: 4,
         maxzoom: 22
