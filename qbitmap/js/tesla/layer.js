@@ -50,7 +50,7 @@ export const TeslaLayer = {
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
           'text-field': ['concat', ['to-string', ['get', 'speed']], ' km/h'],
-          'text-font': ['Noto Sans Bold'],
+          'text-font': ['Noto Sans Medium'],
           'text-size': 11,
           'text-offset': [0, 2.2],
           'text-anchor': 'top',
