@@ -41,4 +41,15 @@ async function dbWriter(update) {
   );
 }
 
-module.exports = { dbWriter };
+async function logTelemetry(vin, fieldId, fieldName, value, timestamp) {
+  const p = getPool();
+  try {
+    const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
+    await p.execute(
+      'INSERT INTO tesla_telemetry_log (vin, field_id, field_name, value_raw, timestamp_unix) VALUES (?, ?, ?, ?, ?)',
+      [vin, fieldId, fieldName, valueStr, timestamp]
+    );
+  } catch { /* don't fail telemetry processing if log write fails */ }
+}
+
+module.exports = { dbWriter, logTelemetry };

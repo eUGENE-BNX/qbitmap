@@ -1,4 +1,4 @@
-const { dbWriter } = require('./db-writer');
+const { dbWriter, logTelemetry } = require('./db-writer');
 const { notifyBackend } = require('./ws-notifier');
 
 // Track previous location per VIN for bearing/speed calculation
@@ -49,7 +49,11 @@ async function handleTelemetryMessage(rawData, logger) {
       const pbHex = buf.slice(after + 4, after + 4 + pbLen).toString('hex');
       logger.warn({ vin, topic, pbHex, pbLen }, 'Unrecognized field - raw payload');
     }
-    logger.info({ vin, topic, fieldId, fieldName: fieldName(fieldId), value, timestamp }, 'Telemetry decoded');
+    const fname = fieldName(fieldId);
+    logger.info({ vin, topic, fieldId, fieldName: fname, value, timestamp }, 'Telemetry decoded');
+
+    // Log every decoded message to DB for analysis
+    await logTelemetry(vin, fieldId, fname, value, timestamp);
 
     const update = { vin };
     let hasUpdate = false;
