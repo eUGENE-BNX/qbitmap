@@ -355,10 +355,12 @@ function fieldName(id) {
 function normalizeGear(gear) {
   if (gear == null) return 'P';
   const g = String(gear).toUpperCase();
-  if (g === 'P' || g === 'PARK' || g === '0') return 'P';
-  if (g === 'D' || g === 'DRIVE' || g === '1') return 'D';
+  // Tesla protobuf enum: Invalid=0, P=1, R=2, N=3, D=4, SNA=5
+  // SNA (5) = "State Not Available" but often sent while driving = treat as D
+  if (g === 'P' || g === 'PARK' || g === '1') return 'P';
   if (g === 'R' || g === 'REVERSE' || g === '2') return 'R';
   if (g === 'N' || g === 'NEUTRAL' || g === '3') return 'N';
+  if (g === 'D' || g === 'DRIVE' || g === '4' || g === '5') return 'D';
   return g.charAt(0) || 'P';
 }
 

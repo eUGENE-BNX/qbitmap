@@ -32,6 +32,7 @@ var TeslaCamLive = {
   vehicleCoord: null,
   vehicleBearing: 0,
   _lastMetaIndex: -1,
+  _activeVideo: 'a',
 
   // ── Init / Lifecycle ────────────────────────────────────
   init: function(map) {
@@ -264,20 +265,39 @@ var TeslaCamLive = {
   // ── Video Playback ──────────────────────────────────────
   _playVideo: function(segId) {
     if (!this.popupEl) return;
-    var video = this.popupEl.querySelector('.teslacam-live-video');
-    if (!video) return;
+    var videoA = this.popupEl.querySelector('[data-video="a"]');
+    var videoB = this.popupEl.querySelector('[data-video="b"]');
+    if (!videoA || !videoB) return;
+
+    var self = this;
+    var active = this._activeVideo === 'b' ? videoB : videoA;
+    var next = this._activeVideo === 'b' ? videoA : videoB;
 
     this.activeSegmentId = segId;
     this._lastMetaIndex = -1;
     this.isPlaying = true;
 
-    video.src = this._videoUrl(segId);
-    video.load();
-    video.play().catch(function() {});
+    // Load new video on the hidden element
+    next.src = this._videoUrl(segId);
+    next.load();
+
+    // When ready, swap: show next, hide active
+    next.oncanplay = function() {
+      next.oncanplay = null;
+      next.style.zIndex = 2;
+      next.style.opacity = 1;
+      active.style.zIndex = 1;
+      next.play().catch(function() {});
+      // After transition, fully hide old
+      setTimeout(function() {
+        active.pause();
+        active.style.opacity = 0;
+      }, 100);
+      self._activeVideo = (self._activeVideo === 'b') ? 'a' : 'b';
+    };
 
     this._updateTrail();
 
-    // Update title
     var titleEl = this.popupEl.querySelector('.teslacam-live-title');
     if (titleEl) titleEl.textContent = segId;
   },
@@ -285,18 +305,18 @@ var TeslaCamLive = {
   _stopPlayback: function() {
     this.isPlaying = false;
     if (this.popupEl) {
-      var video = this.popupEl.querySelector('.teslacam-live-video');
-      if (video) {
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-      }
+      var videos = this.popupEl.querySelectorAll('.teslacam-live-video');
+      videos.forEach(function(v) {
+        v.pause();
+        v.removeAttribute('src');
+        v.load();
+      });
     }
   },
 
   _onTimeUpdate: function() {
     if (!this.popupEl || !this.activeSegmentId) return;
-    var video = this.popupEl.querySelector('.teslacam-live-video');
+    var video = this.popupEl.querySelector('[data-video="' + this._activeVideo + '"]');
     if (!video) return;
 
     var seg = this.segments.get(this.activeSegmentId);
@@ -481,10 +501,16 @@ var TeslaCamLive = {
     });
   },
 
-  _updateTrail: function() {
-    this._clearTrail();
+  _trailIds: [], // track active trail source/layer IDs
 
-    var seg = this.segments.get(this.activeSegmentId);
+  _updateTrail: function() {
+    var segId = this.activeSegmentId;
+    var trailId = 'teslacam-trail-' + segId;
+
+    // Already exists
+    if (this.map.getSource(trailId)) return;
+
+    var seg = this.segments.get(segId);
     if (!seg || !seg.metadata) return;
 
     var coords = [];
@@ -496,15 +522,16 @@ var TeslaCamLive = {
     }
     if (coords.length < 2) return;
 
-    this.map.addSource('teslacam-live-trail', {
+    this.map.addSource(trailId, {
       type: 'geojson',
       data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } }
     });
 
     this.map.addLayer({
-      id: 'teslacam-live-trail',
+      id: trailId,
       type: 'line',
-      source: 'teslacam-live-trail',
+      source: trailId,
+      interactive: false,
       paint: {
         'line-color': '#e74c3c',
         'line-width': 3,
@@ -512,11 +539,24 @@ var TeslaCamLive = {
         'line-opacity': 0.7
       }
     });
+
+    this._trailIds.push(trailId);
+
+    // Keep only last 5 trails
+    while (this._trailIds.length > 5) {
+      var old = this._trailIds.shift();
+      if (this.map.getLayer(old)) this.map.removeLayer(old);
+      if (this.map.getSource(old)) this.map.removeSource(old);
+    }
   },
 
   _clearTrail: function() {
-    if (this.map.getLayer('teslacam-live-trail')) this.map.removeLayer('teslacam-live-trail');
-    if (this.map.getSource('teslacam-live-trail')) this.map.removeSource('teslacam-live-trail');
+    for (var i = 0; i < this._trailIds.length; i++) {
+      var id = this._trailIds[i];
+      if (this.map.getLayer(id)) this.map.removeLayer(id);
+      if (this.map.getSource(id)) this.map.removeSource(id);
+    }
+    this._trailIds = [];
   },
 
   // ── Open popup and play ─────────────────────────────────
@@ -571,7 +611,8 @@ var TeslaCamLive = {
           '</span>' +
           '<button class="teslacam-live-close" title="Kapat">&times;</button>' +
         '</div>' +
-        '<video class="teslacam-live-video" playsinline muted></video>' +
+        '<video class="teslacam-live-video" data-video="a" playsinline muted style="z-index:2;opacity:1"></video>' +
+        '<video class="teslacam-live-video" data-video="b" playsinline muted style="z-index:1;opacity:0"></video>' +
         '<div class="teslacam-live-waiting">Sonraki segment bekleniyor...</div>' +
         '<div class="tesla-dashboard">' +
           '<div class="metadata-dashboard">' +
@@ -592,30 +633,30 @@ var TeslaCamLive = {
       '</div>' +
       '<div class="teslacam-live-segment-selector"></div>';
 
-    // Video events
-    var video = popup.querySelector('.teslacam-live-video');
-    video.addEventListener('timeupdate', function() { self._onTimeUpdate(); });
-    video.addEventListener('ended', function() { self._onVideoEnded(); });
-
-    // Close
-    popup.querySelector('.teslacam-live-close').addEventListener('click', function() {
+    // Close button
+    popup.querySelector('.teslacam-live-close').addEventListener('click', function(e) {
+      e.stopPropagation();
       self._removePopup();
     });
 
-    // Click video: play/pause (archive) or segment selector (live)
-    video.addEventListener('click', function() {
-      if (self.mode === 'archive') {
-        if (video.paused) { video.play(); self.isPlaying = true; }
-        else { video.pause(); self.isPlaying = false; }
-      } else {
-        self._toggleSegmentSelector();
-      }
-    });
-
-    // Double-click: toggle native resolution
-    video.addEventListener('dblclick', function(e) {
-      e.stopPropagation();
-      popup.querySelector('.teslacam-live-container').classList.toggle('native');
+    // Video events — bind to both video elements
+    var videos = popup.querySelectorAll('.teslacam-live-video');
+    videos.forEach(function(v) {
+      v.addEventListener('timeupdate', function() { self._onTimeUpdate(); });
+      v.addEventListener('ended', function() { self._onVideoEnded(); });
+      v.addEventListener('click', function() {
+        var active = popup.querySelector('[data-video="' + self._activeVideo + '"]');
+        if (self.mode === 'archive') {
+          if (active && active.paused) { active.play(); self.isPlaying = true; }
+          else if (active) { active.pause(); self.isPlaying = false; }
+        } else {
+          self._toggleSegmentSelector();
+        }
+      });
+      v.addEventListener('dblclick', function(e) {
+        e.stopPropagation();
+        popup.querySelector('.teslacam-live-container').classList.toggle('native');
+      });
     });
 
     // Progress bar seek
@@ -623,10 +664,11 @@ var TeslaCamLive = {
     if (progressBar) {
       progressBar.addEventListener('click', function(e) {
         e.stopPropagation();
-        if (!video.duration) return;
+        var active = popup.querySelector('[data-video="' + self._activeVideo + '"]');
+        if (!active || !active.duration) return;
         var rect = progressBar.getBoundingClientRect();
         var pct = (e.clientX - rect.left) / rect.width;
-        video.currentTime = pct * video.duration;
+        active.currentTime = pct * active.duration;
       });
     }
 
@@ -677,6 +719,7 @@ var TeslaCamLive = {
     var el = this.popupEl;
     this.popupEl = null;
     this.selectorVisible = false;
+    this._activeVideo = 'a';
     setTimeout(function() {
       if (el.parentNode) el.parentNode.removeChild(el);
     }, 300);

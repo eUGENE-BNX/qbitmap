@@ -338,8 +338,6 @@ async function teslaApiRoutes(fastify) {
           InsideTemp: { interval_seconds: 600 },
           OutsideTemp: { interval_seconds: 600 },
           Locked: { interval_seconds: 600 },
-          SentryMode: { interval_seconds: 600 },
-          ChargeLimitSoc: { interval_seconds: 600 },
         },
         alert_types: ['service'],
       },
