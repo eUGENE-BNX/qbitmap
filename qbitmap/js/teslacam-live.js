@@ -54,7 +54,8 @@ var TeslaCamLive = {
     this.watcherRunning = watcher && watcher.running === true;
 
     if (segList && segList.segments) {
-      var segs = segList.segments.slice(0, this.MAX_SEGMENTS);
+      // Sort newest-first by ID and keep MAX
+      var segs = segList.segments.sort(function(a, b) { return b.id.localeCompare(a.id); }).slice(0, this.MAX_SEGMENTS);
       this.segmentOrder = segs.map(function(s) { return s.id; });
       for (var i = 0; i < segs.length; i++) {
         if (!this.segments.has(segs[i].id)) {
@@ -164,7 +165,7 @@ var TeslaCamLive = {
     this.watcherRunning = watcher && watcher.running === true;
 
     if (segList && segList.segments) {
-      var newSegs = segList.segments.slice(0, this.MAX_SEGMENTS);
+      var newSegs = segList.segments.sort(function(a, b) { return b.id.localeCompare(a.id); }).slice(0, this.MAX_SEGMENTS);
       var newIds = newSegs.map(function(s) { return s.id; });
 
       var self = this;

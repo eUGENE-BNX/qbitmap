@@ -99,15 +99,18 @@ async function tick() {
       return;
     }
 
-    // 3. Find new segments
+    // 3. Sort remote by ID descending (newest first) and take newest MAX
+    remoteSegments.sort((a, b) => b.id.localeCompare(a.id));
+    const targetSegments = remoteSegments.slice(0, MAX_SEGMENTS);
+
+    // 4. Download missing segments
     const localIds = new Set(localSegments.map(s => s.id));
-    const newSegments = remoteSegments.filter(s => !localIds.has(s.id));
+    const newSegments = targetSegments.filter(s => !localIds.has(s.id));
 
     if (newSegments.length > 0) {
       logger.info({ count: newSegments.length }, 'New TeslaCAM segments to sync');
     }
 
-    // 4. Download new segments
     for (const seg of newSegments) {
       try {
         await _downloadSegment(seg);
@@ -116,8 +119,8 @@ async function tick() {
       }
     }
 
-    // 5. Prune old segments
-    _pruneSegments();
+    // 5. Rebuild localSegments from disk (single source of truth)
+    _loadLocalSegments();
 
   } catch (e) {
     logger.error({ err: e.message }, 'TeslaCAM sync tick error');
@@ -146,20 +149,6 @@ async function _downloadSegment(segSummary) {
   if (!videoResp.ok) throw new Error('Video fetch failed: ' + videoResp.status);
   const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
   fs.writeFileSync(path.join(segDir, 'video.mp4'), videoBuffer);
-
-  // 3. Extract GPS summary from metadata
-  const first = metadata[0] || {};
-  const last = metadata[metadata.length - 1] || {};
-
-  localSegments.unshift({
-    id: segId,
-    points: metadata.length,
-    start_gps: [first.latitude || null, first.longitude || null],
-    end_gps: [last.latitude || null, last.longitude || null],
-    start_speed_mps: first.speed_mps || 0,
-    end_speed_mps: last.speed_mps || 0,
-    synced_at: new Date().toISOString()
-  });
 
   const videoMB = (videoBuffer.length / 1024 / 1024).toFixed(1);
   logger.info({ segId, points: metadata.length, videoMB }, 'Segment synced');
