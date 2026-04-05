@@ -101,12 +101,11 @@ export const TeslaLayer = {
           bearing: v.bearing || 0,
           speed: v.speed || 0,
           isOnline: v.isOnline,
-          insideTemp: v.insideTemp ?? null,
-          outsideTemp: v.outsideTemp ?? null,
-          estRange: v.estRange ?? null,
-          chargeLimit: v.chargeLimit ?? null,
-          locked: v.locked ?? null,
-          sentry: v.sentry ?? null,
+          insideTemp: v.insideTemp ?? -999,
+          outsideTemp: v.outsideTemp ?? -999,
+          estRange: v.estRange ?? -1,
+          locked: v.locked != null ? (v.locked ? 1 : 0) : -1,
+          sentry: v.sentry != null ? (v.sentry ? 1 : 0) : -1,
         }
       }));
 

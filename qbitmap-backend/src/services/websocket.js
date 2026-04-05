@@ -581,6 +581,11 @@ class WebSocketService {
           bearing: v.last_bearing,
           speed: v.last_speed,
           isOnline: !!v.is_online,
+          insideTemp: v.last_inside_temp,
+          outsideTemp: v.last_outside_temp,
+          estRange: v.last_est_range,
+          locked: v.last_locked != null ? !!v.last_locked : null,
+          sentry: v.last_sentry != null ? !!v.last_sentry : null,
           ownerName: v.display_name,
           ownerAvatar: v.avatar_url,
         }))

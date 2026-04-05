@@ -59,15 +59,14 @@ export const TeslaPopup = {
     if (soc < 20) batteryClass = 'red';
     else if (soc < 50) batteryClass = 'amber';
 
-    // Helper: MapLibre serializes null as string "null"
-    const val = (v) => (v != null && v !== 'null' && v !== '') ? v : null;
+    // Sentinel values: -999 = no data (temp), -1 = no data (range/lock)
+    const estRange = props.estRange > 0 ? Math.round(props.estRange) : null;
+    const insideTemp = props.insideTemp > -900 ? Math.round(props.insideTemp) : null;
+    const outsideTemp = props.outsideTemp > -900 ? Math.round(props.outsideTemp) : null;
+    const locked = props.locked >= 0 ? props.locked : null;
+    const sentry = props.sentry >= 0 ? props.sentry : null;
 
-    const estRange = val(props.estRange) != null ? Math.round(props.estRange) : null;
-    const insideTemp = val(props.insideTemp) != null ? Math.round(props.insideTemp) : null;
-    const outsideTemp = val(props.outsideTemp) != null ? Math.round(props.outsideTemp) : null;
-    const locked = val(props.locked);
-    const sentry = val(props.sentry);
-
+    console.log('[Tesla Popup] props:', JSON.stringify(props));
     return `<div class="tv-card">
       <div class="tv-header">
         <div class="tv-logo">T</div>
