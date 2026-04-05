@@ -339,7 +339,7 @@ async function teslaApiRoutes(fastify) {
           OutsideTemp: { interval_seconds: 600 },
           Locked: { interval_seconds: 600 },
         },
-        alert_types: ['service'],
+        alert_types: [],
       },
     };
 
