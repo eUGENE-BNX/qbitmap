@@ -105,7 +105,7 @@ DatabaseService.prototype.updateVehicleTelemetry = async function({ vin, lat, ln
 
 DatabaseService.prototype.getTeslaVehiclesByUserId = async function(userId) {
   const [rows] = await this.pool.execute(
-    `SELECT v.*, a.full_name AS owner_name, a.profile_image_url AS owner_avatar,
+    `SELECT v.*, a.full_name AS owner_name, a.profile_image_url AS owner_profile_image,
             u.display_name, u.avatar_url
      FROM tesla_vehicles v
      JOIN tesla_accounts a ON a.id = v.tesla_account_id

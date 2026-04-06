@@ -248,6 +248,7 @@ async function teslaApiRoutes(fastify) {
         lastTelemetryAt: v.last_telemetry_at,
         ownerName: v.display_name,
         ownerAvatar: v.avatar_url,
+        teslaAvatar: v.owner_profile_image || null,
       }))
     };
   });

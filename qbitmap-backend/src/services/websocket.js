@@ -592,6 +592,7 @@ class WebSocketService {
           tpms: v.last_tpms_fl != null ? { fl: v.last_tpms_fl, fr: v.last_tpms_fr, rl: v.last_tpms_rl, rr: v.last_tpms_rr } : null,
           ownerName: v.display_name,
           ownerAvatar: v.avatar_url,
+          teslaAvatar: v.owner_profile_image || null,
         }))
       }));
     } catch (err) {

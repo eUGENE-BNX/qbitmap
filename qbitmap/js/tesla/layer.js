@@ -119,6 +119,7 @@ export const TeslaLayer = {
           carVersion: v.carVersion || '',
           odometer: v.odometer || 0,
           tpms: v.tpms ? JSON.stringify(v.tpms) : '',
+          teslaAvatar: v.teslaAvatar || '',
         }
       }));
 

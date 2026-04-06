@@ -72,9 +72,11 @@ export const TeslaPopup = {
     if (soc < 20) batteryClass = 'red';
     else if (soc < 50) batteryClass = 'amber';
 
+    const teslaAvatar = v(p.teslaAvatar);
+
     return `<div class="tv-card">
       <div class="tv-header">
-        <div class="tv-logo">T</div>
+        ${teslaAvatar ? `<img class="tv-avatar" src="${escapeHtml(teslaAvatar)}" alt="" />` : `<div class="tv-logo">T</div>`}
         <div class="tv-title">
           <div class="tv-name">${name}</div>
           <div class="tv-model">${model}${color ? ' · ' + escapeHtml(color) : ''}</div>
