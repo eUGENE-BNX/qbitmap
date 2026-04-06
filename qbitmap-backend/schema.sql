@@ -623,6 +623,7 @@ CREATE TABLE IF NOT EXISTS tesla_vehicles (
   model VARCHAR(50),
   car_type VARCHAR(50),
   color VARCHAR(50),
+  license_plate VARCHAR(20) DEFAULT NULL,
   wheel_type VARCHAR(50),
   car_version VARCHAR(50),
   odometer DOUBLE DEFAULT NULL,

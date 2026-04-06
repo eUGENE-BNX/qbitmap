@@ -146,6 +146,16 @@ DatabaseService.prototype.setTeslaVehicleTelemetryEnabled = async function(vehic
   await this.pool.execute('UPDATE tesla_vehicles SET telemetry_enabled = ?, updated_at = NOW() WHERE vehicle_id = ?', [enabled ? 1 : 0, vehicleId]);
 };
 
+DatabaseService.prototype.updateTeslaVehicleLicensePlate = async function(vehicleId, userId, licensePlate) {
+  await this.pool.execute(
+    `UPDATE tesla_vehicles v
+     JOIN tesla_accounts a ON a.id = v.tesla_account_id
+     SET v.license_plate = ?, v.updated_at = NOW()
+     WHERE v.vehicle_id = ? AND a.user_id = ?`,
+    [licensePlate, vehicleId, userId]
+  );
+};
+
 DatabaseService.prototype.getTeslaVehicleByVehicleId = async function(vehicleId) {
   const [rows] = await this.pool.execute(
     `SELECT v.*, a.user_id FROM tesla_vehicles v

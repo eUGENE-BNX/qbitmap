@@ -197,11 +197,95 @@
    =============================== */
 
 .profile-tesla-section {
+  position: relative;
   background: #f7f9fb;
   border: 1px solid #e8eaed;
   border-radius: 10px;
   padding: 12px 14px;
+  margin-top: 14px;
   margin-bottom: 10px;
+}
+
+.profile-tesla-temp-corner {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: #5f6368;
+}
+
+.profile-tesla-temp-corner svg {
+  color: #80868b;
+  flex-shrink: 0;
+}
+
+/* License plate */
+.profile-tesla-plate-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 1px;
+}
+
+.profile-tesla-plate {
+  font-size: 12px;
+  font-weight: 700;
+  color: #202124;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.profile-tesla-plate-input {
+  font-size: 12px;
+  font-weight: 600;
+  color: #202124;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: #fff;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid #1a73e8;
+  outline: none;
+  width: 110px;
+}
+
+.profile-tesla-plate-input::placeholder {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: #9aa0a6;
+  font-size: 11px;
+}
+
+.profile-tesla-plate-save,
+.profile-tesla-plate-edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #5f6368;
+  padding: 2px;
+  border-radius: 3px;
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.profile-tesla-plate-save {
+  color: #1e8e3e;
+}
+
+.profile-tesla-plate-save:hover {
+  background: #e6f4ea;
+}
+
+.profile-tesla-plate-edit:hover {
+  background: #e8eaed;
+  color: #202124;
 }
 
 .profile-tesla-header {
@@ -243,13 +327,20 @@
 .profile-tesla-battery {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 10px;
+}
+
+.profile-tesla-battery-icon {
+  display: flex;
+  align-items: center;
+  color: #80868b;
+  flex-shrink: 0;
 }
 
 .profile-tesla-battery-bar {
   flex: 1;
-  height: 6px;
+  height: 5px;
   background: #e8eaed;
   border-radius: 3px;
   overflow: hidden;
@@ -274,9 +365,16 @@
 }
 
 .profile-tesla-range {
+  display: flex;
+  align-items: center;
+  gap: 3px;
   font-size: 11px;
   color: #80868b;
   white-space: nowrap;
+}
+
+.profile-tesla-range svg {
+  flex-shrink: 0;
 }
 
 /* Status row */
@@ -288,17 +386,11 @@
   margin-bottom: 8px;
 }
 
-.profile-tesla-temp {
+.profile-tesla-tags-right {
   display: flex;
   align-items: center;
-  gap: 3px;
-  font-size: 11px;
-  color: #5f6368;
-}
-
-.profile-tesla-temp svg {
-  color: #80868b;
-  flex-shrink: 0;
+  gap: 4px;
+  margin-left: auto;
 }
 
 .profile-tesla-gear {
@@ -331,8 +423,8 @@
 }
 
 .profile-tesla-tag-green {
-  background: #e6f4ea;
-  color: #1e8e3e;
+  background: #fce8e6;
+  color: #b71c1c;
 }
 
 .profile-tesla-tag-red {
@@ -345,15 +437,19 @@
   color: #1a73e8;
 }
 
-/* TPMS grid */
-.profile-tesla-tpms {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px 12px;
+/* TPMS inline */
+.profile-tesla-tpms-inline {
+  display: flex;
+  align-items: center;
+  gap: 3px;
   font-size: 11px;
-  color: #80868b;
+  color: #5f6368;
   font-variant-numeric: tabular-nums;
-  margin-bottom: 10px;
+}
+
+.profile-tesla-tpms-inline svg {
+  color: #80868b;
+  flex-shrink: 0;
 }
 
 /* Footer (odo + version) */

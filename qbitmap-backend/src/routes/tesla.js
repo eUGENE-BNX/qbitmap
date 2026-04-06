@@ -252,6 +252,7 @@ async function teslaApiRoutes(fastify) {
         estRange: v.last_est_range,
         locked: v.last_locked != null ? !!v.last_locked : null,
         sentry: v.last_sentry != null ? !!v.last_sentry : null,
+        licensePlate: v.license_plate || null,
         tpms: v.last_tpms_fl != null ? { fl: v.last_tpms_fl, fr: v.last_tpms_fr, rl: v.last_tpms_rl, rr: v.last_tpms_rr } : null,
         lastTelemetryAt: v.last_telemetry_at,
         ownerName: v.display_name,
@@ -259,6 +260,15 @@ async function teslaApiRoutes(fastify) {
         teslaAvatar: v.owner_profile_image || null,
       }))
     };
+  });
+
+  // Update vehicle license plate
+  fastify.patch('/vehicles/:vehicleId/license-plate', async (request, reply) => {
+    const { vehicleId } = request.params;
+    const { licensePlate } = request.body || {};
+    const plate = (licensePlate || '').trim().slice(0, 20) || null;
+    await db.updateTeslaVehicleLicensePlate(vehicleId, request.user.userId, plate);
+    return { status: 'ok', licensePlate: plate };
   });
 
   // Disconnect Tesla account

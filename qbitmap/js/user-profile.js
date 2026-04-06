@@ -190,6 +190,8 @@ const UserProfileSystem = {
 
     const model = escapeHtml(vehicle.model || 'Tesla');
     const color = v(vehicle.color);
+    const licensePlate = v(vehicle.licensePlate);
+    const vehicleId = vehicle.vehicleId;
     const soc = vehicle.soc ?? 0;
     const estRange = v(vehicle.estRange) ? Math.round(vehicle.estRange) : null;
     const insideTemp = v(vehicle.insideTemp) != null ? Math.round(vehicle.insideTemp) : null;
@@ -217,42 +219,61 @@ const UserProfileSystem = {
     else if (soc < 50) batteryClass = 'amber';
 
     const tempIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v3h-2V5z"/></svg>';
+    const tireIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>';
+    const batteryIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="18" height="12" rx="2" ry="2"/><line x1="23" y1="13" x2="23" y2="11"/></svg>';
+    const rangeIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
 
     return `
       <div class="profile-tesla-section">
+        ${outsideTemp != null || insideTemp != null ? `
+          <span class="profile-tesla-temp-corner">
+            ${tempIcon}
+            ${outsideTemp != null ? `Dış ${outsideTemp}°` : ''}${outsideTemp != null && insideTemp != null ? ' / ' : ''}${insideTemp != null ? `İç ${insideTemp}°` : ''}
+          </span>
+        ` : ''}
         <div class="profile-tesla-header">
           <div class="profile-tesla-logo">T</div>
           <div class="profile-tesla-title">
-            <span class="profile-tesla-model">${model}</span>
-            ${color ? `<span class="profile-tesla-color"> · ${escapeHtml(color)}</span>` : ''}
+            <div class="profile-tesla-plate-row" data-vehicle-id="${escapeHtml(vehicleId)}">
+              ${licensePlate
+                ? `<span class="profile-tesla-plate">${escapeHtml(licensePlate)}</span>
+                   <button class="profile-tesla-plate-edit" title="Düzenle">
+                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                   </button>`
+                : `<input type="text" class="profile-tesla-plate-input" placeholder="Plaka girin" maxlength="20">
+                   <button class="profile-tesla-plate-save" title="Kaydet">
+                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                   </button>`
+              }
+            </div>
+            <div>
+              <span class="profile-tesla-model">${model}</span>
+              ${color ? `<span class="profile-tesla-color"> · ${escapeHtml(color)}</span>` : ''}
+            </div>
           </div>
         </div>
 
         <div class="profile-tesla-battery">
+          <span class="profile-tesla-battery-icon">${batteryIcon}</span>
           <div class="profile-tesla-battery-bar">
             <div class="profile-tesla-battery-fill profile-tesla-battery-${batteryClass}" style="width:${soc}%"></div>
           </div>
           <span class="profile-tesla-battery-pct">${soc}%</span>
-          ${estRange ? `<span class="profile-tesla-range">${estRange}km</span>` : ''}
+          ${estRange ? `<span class="profile-tesla-range">${rangeIcon} ${estRange} Km</span>` : ''}
         </div>
 
         <div class="profile-tesla-status">
-          ${outsideTemp != null || insideTemp != null ? `
-            <span class="profile-tesla-temp">
-              ${tempIcon}
-              ${outsideTemp != null ? `Dış ${outsideTemp}°` : ''}${outsideTemp != null && insideTemp != null ? ' / ' : ''}${insideTemp != null ? `İç ${insideTemp}°` : ''}
+          ${tpms ? `
+            <span class="profile-tesla-tpms-inline">
+              ${tireIcon} FL ${tpms.fl} bar · ${tireIcon} FR ${tpms.fr} bar · ${tireIcon} RL ${tpms.rl} bar · ${tireIcon} RR ${tpms.rr} bar
             </span>
           ` : ''}
-          <span class="profile-tesla-gear profile-tesla-gear-${gearClass}">${gearText}${speed > 0 ? ` ${speed}km/h` : ''}</span>
-          ${locked != null ? `<span class="profile-tesla-tag ${locked ? 'profile-tesla-tag-green' : 'profile-tesla-tag-red'}">${locked ? 'Kilitli' : 'Açık'}</span>` : ''}
-          ${sentry ? `<span class="profile-tesla-tag profile-tesla-tag-blue">Nöbetçi</span>` : ''}
+          <span class="profile-tesla-tags-right">
+            <span class="profile-tesla-gear profile-tesla-gear-${gearClass}">${gearText}${speed > 0 ? ` ${speed}km/h` : ''}</span>
+            ${locked != null ? `<span class="profile-tesla-tag ${locked ? 'profile-tesla-tag-green' : 'profile-tesla-tag-red'}">${locked ? 'Kilitli' : 'Açık'}</span>` : ''}
+            ${sentry ? `<span class="profile-tesla-tag profile-tesla-tag-blue">Nöbetçi</span>` : ''}
+          </span>
         </div>
-
-        ${tpms ? `
-        <div class="profile-tesla-tpms">
-          <span>${tpms.fl} bar</span><span>${tpms.fr} bar</span>
-          <span>${tpms.rl} bar</span><span>${tpms.rr} bar</span>
-        </div>` : ''}
 
         <div class="profile-tesla-footer">
           ${odometer ? `<span class="profile-tesla-odo">odometer:${odometer}km</span>` : ''}
@@ -265,20 +286,83 @@ const UserProfileSystem = {
   },
 
   setupTeslaListeners(content) {
-    const btn = content.querySelector('.profile-tesla-disconnect');
-    if (!btn) return;
-    btn.addEventListener('click', async () => {
-      if (!confirm('Tesla hesabınızı ayırmak istediğinize emin misiniz?')) return;
-      try {
-        await fetch(`${QBitmapConfig.api.base}/api/tesla/disconnect`, {
-          method: 'POST', credentials: 'include'
-        });
-        AuthSystem.showNotification('Tesla hesabı ayrıldı', 'info');
-        setTimeout(() => location.reload(), 1000);
-      } catch {
-        AuthSystem.showNotification('Bağlantı kesilemedi', 'error');
-      }
-    });
+    // Disconnect
+    const disconnectBtn = content.querySelector('.profile-tesla-disconnect');
+    if (disconnectBtn) {
+      disconnectBtn.addEventListener('click', async () => {
+        if (!confirm('Tesla hesabınızı ayırmak istediğinize emin misiniz?')) return;
+        try {
+          await fetch(`${QBitmapConfig.api.base}/api/tesla/disconnect`, {
+            method: 'POST', credentials: 'include'
+          });
+          AuthSystem.showNotification('Tesla hesabı ayrıldı', 'info');
+          setTimeout(() => location.reload(), 1000);
+        } catch {
+          AuthSystem.showNotification('Bağlantı kesilemedi', 'error');
+        }
+      });
+    }
+
+    // License plate save (new input)
+    const plateRow = content.querySelector('.profile-tesla-plate-row');
+    if (!plateRow) return;
+    const vehicleId = plateRow.dataset.vehicleId;
+
+    const saveBtn = content.querySelector('.profile-tesla-plate-save');
+    const plateInput = content.querySelector('.profile-tesla-plate-input');
+    if (saveBtn && plateInput) {
+      const savePlate = async () => {
+        const plate = plateInput.value.trim();
+        if (!plate) return;
+        try {
+          await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${vehicleId}/license-plate`, {
+            method: 'PATCH', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ licensePlate: plate })
+          });
+          AuthSystem.showNotification('Plaka kaydedildi', 'success');
+          await this.loadProfile();
+        } catch {
+          AuthSystem.showNotification('Plaka kaydedilemedi', 'error');
+        }
+      };
+      saveBtn.addEventListener('click', savePlate);
+      plateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') savePlate(); });
+    }
+
+    // License plate edit (existing plate)
+    const editBtn = content.querySelector('.profile-tesla-plate-edit');
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        const currentPlate = plateRow.querySelector('.profile-tesla-plate')?.textContent || '';
+        plateRow.innerHTML = `
+          <input type="text" class="profile-tesla-plate-input" value="${escapeHtml(currentPlate)}" maxlength="20">
+          <button class="profile-tesla-plate-save" title="Kaydet">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        `;
+        const input = plateRow.querySelector('.profile-tesla-plate-input');
+        const save = plateRow.querySelector('.profile-tesla-plate-save');
+        input.focus();
+        const savePlate = async () => {
+          const plate = input.value.trim();
+          if (!plate) return;
+          try {
+            await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${vehicleId}/license-plate`, {
+              method: 'PATCH', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ licensePlate: plate })
+            });
+            AuthSystem.showNotification('Plaka kaydedildi', 'success');
+            await this.loadProfile();
+          } catch {
+            AuthSystem.showNotification('Plaka kaydedilemedi', 'error');
+          }
+        };
+        save.addEventListener('click', savePlate);
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') savePlate(); });
+      });
+    }
   },
 
   renderInfoRow(location, hasFaceRegistered) {
