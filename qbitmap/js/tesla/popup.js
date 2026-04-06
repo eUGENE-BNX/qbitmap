@@ -123,9 +123,8 @@ export const TeslaPopup = {
         <div class="tv-left">
           ${tpms ? `
           <div class="tv-tpms-mini">
-            <span>${tpms.fl}</span><span>${tpms.fr}</span>
-            <span>${tpms.rl}</span><span>${tpms.rr}</span>
-            <span class="tv-tpms-unit">bar</span>
+            <span>${tpms.fl} bar</span><span>${tpms.fr} bar</span>
+            <span>${tpms.rl} bar</span><span>${tpms.rr} bar</span>
           </div>` : ''}
         </div>
         <div class="tv-right">
