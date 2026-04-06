@@ -586,6 +586,10 @@ class WebSocketService {
           estRange: v.last_est_range,
           locked: v.last_locked != null ? !!v.last_locked : null,
           sentry: v.last_sentry != null ? !!v.last_sentry : null,
+          color: v.color,
+          carVersion: v.car_version,
+          odometer: v.odometer ? Math.round(v.odometer) : null,
+          tpms: v.last_tpms_fl != null ? { fl: v.last_tpms_fl, fr: v.last_tpms_fr, rl: v.last_tpms_rl, rr: v.last_tpms_rr } : null,
           ownerName: v.display_name,
           ownerAvatar: v.avatar_url,
         }))
