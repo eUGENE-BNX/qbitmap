@@ -82,7 +82,7 @@ async function getLeaderboard(limit = 10) {
        GROUP BY user_id
      ) ci2 ON ci2.user_id = owned.user_id
      GROUP BY up.id, up.display_name, up.avatar_url, ci2.total_points
-     ORDER BY cell_count DESC
+     ORDER BY ci2.total_points DESC
      LIMIT $1`,
     [limit]
   );

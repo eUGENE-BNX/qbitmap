@@ -144,8 +144,8 @@ class LayersDropdownControl {
             { id: 'video', label: 'Canlı Uydu Görüntüleri' },
             { id: '3d-buildings', label: '3D Binalar' },
             { id: 'vehicles', label: 'Online Araçlar' },
-            { id: 'tesla-vehicles', label: 'Tesla Araçları' },
-            { id: 'teslacam-live', label: 'TeslaCAM Live' }
+            { id: 'tesla-vehicles', label: 'Tesla Mesh' },
+            { id: 'teslacam-live', label: 'TeslaCam' }
         ];
 
         this._toggles = {};
@@ -424,8 +424,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Camera Grid Control - Toggle 3x2 camera grid overlay
+// Camera Grid Controls - Two independent grid overlays
 class GridCameraControl {
+    constructor(gridId) {
+        this._gridId = gridId;
+    }
+
     onAdd(map) {
         this._map = map;
         this._container = document.createElement('div');
@@ -434,34 +438,39 @@ class GridCameraControl {
         this._button = document.createElement('button');
         this._button.className = 'satellite-toggle-btn grid-camera-btn';
         this._button.type = 'button';
-        this._button.title = 'Kamera Izgarasi';
+        this._button.title = `Kamera Izgarası ${this._gridId}`;
         this._button.innerHTML = this._getGridIcon();
 
         this._button.addEventListener('click', () => this._toggleGrid());
         this._container.appendChild(this._button);
 
         // Store reference for CameraSystem
-        if (CameraSystem) {
-            CameraSystem.gridControlButton = this._button;
+        if (CameraSystem && CameraSystem._grids) {
+            CameraSystem._grids[this._gridId].controlButton = this._button;
         }
 
         return this._container;
     }
 
     _getGridIcon() {
-        return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/>
-            <rect x="14" y="14" width="7" height="7" rx="1"/>
+        // Dense 3x3 grid icon
+        return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="2" width="5.5" height="5.5" rx="0.8"/>
+            <rect x="9.25" y="2" width="5.5" height="5.5" rx="0.8"/>
+            <rect x="16.5" y="2" width="5.5" height="5.5" rx="0.8"/>
+            <rect x="2" y="9.25" width="5.5" height="5.5" rx="0.8"/>
+            <rect x="9.25" y="9.25" width="5.5" height="5.5" rx="0.8"/>
+            <rect x="16.5" y="9.25" width="5.5" height="5.5" rx="0.8"/>
+            <rect x="2" y="16.5" width="5.5" height="5.5" rx="0.8"/>
+            <rect x="9.25" y="16.5" width="5.5" height="5.5" rx="0.8"/>
+            <rect x="16.5" y="16.5" width="5.5" height="5.5" rx="0.8"/>
         </svg>`;
     }
 
     _toggleGrid() {
         if (CameraSystem && CameraSystem.toggleGrid) {
-            // Ensure button reference is stored
-            CameraSystem.gridControlButton = this._button;
-            CameraSystem.toggleGrid();
+            CameraSystem._grids[this._gridId].controlButton = this._button;
+            CameraSystem.toggleGrid(this._gridId);
         } else {
             console.warn('[GridCameraControl] CameraSystem not available');
         }
@@ -473,7 +482,8 @@ class GridCameraControl {
     }
 }
 
-map.addControl(new GridCameraControl(), 'top-right');
+map.addControl(new GridCameraControl(1), 'top-right');
+map.addControl(new GridCameraControl(2), 'top-right');
 
 map.on("load", async () => {
     Logger.log("[Map] loaded");

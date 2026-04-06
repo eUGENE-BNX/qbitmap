@@ -45,7 +45,7 @@ export const TeslaLayer = {
             14, 0.35,
             18, 0.5
           ],
-          'icon-rotate': ['get', 'bearing'],
+          'icon-rotate': ['-', ['get', 'bearing'], 90],
           'icon-rotation-alignment': 'map',
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,

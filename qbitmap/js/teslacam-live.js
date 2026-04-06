@@ -497,7 +497,7 @@ var TeslaCamLive = {
       features: [{
         type: 'Feature',
         geometry: { type: 'Point', coordinates: this.vehicleCoord },
-        properties: { bearing: this.vehicleBearing || 0 }
+        properties: { bearing: this.vehicleBearing || 0, id: 'teslacam' }
       }]
     });
   },
@@ -532,7 +532,6 @@ var TeslaCamLive = {
       id: trailId,
       type: 'line',
       source: trailId,
-      interactive: false,
       paint: {
         'line-color': '#e74c3c',
         'line-width': 3,

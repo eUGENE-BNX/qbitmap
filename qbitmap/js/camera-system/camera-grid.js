@@ -4,33 +4,38 @@ import { Analytics } from '../analytics.js';
 
 /**
  * QBitmap Camera System - Grid Module
- * Provides a 3x2 camera grid overlay for simultaneous viewing
+ * Supports multiple independent grid overlays (Grid 1, Grid 2)
  */
 
 const CameraGridMixin = {
-  // Grid state
-  gridVisible: false,
-  gridCells: new Map(), // cellIndex -> { deviceId, peerConnection, hlsInstance, videoElement, name }
-  savedGridAssignments: new Map(), // cellIndex -> { deviceId, whepUrl, hlsUrl, name } - persists when grid is hidden
+  // Per-grid state: keyed by gridId (1 or 2)
+  _grids: {
+    1: { visible: false, cells: new Map(), savedAssignments: new Map(), controlButton: null },
+    2: { visible: false, cells: new Map(), savedAssignments: new Map(), controlButton: null }
+  },
   maxGridCells: 9,
-  gridControlButton: null,
+
+  _getGrid(gridId) {
+    return this._grids[gridId] || this._grids[1];
+  },
 
   /**
    * Create grid container and append to DOM
    */
-  createGridContainer() {
-    if (document.getElementById('camera-grid-overlay')) return;
+  createGridContainer(gridId = 1) {
+    const overlayId = `camera-grid-overlay-${gridId}`;
+    if (document.getElementById(overlayId)) return;
 
     const overlay = document.createElement('div');
-    overlay.id = 'camera-grid-overlay';
-    overlay.className = 'camera-grid-overlay';
+    overlay.id = overlayId;
+    overlay.className = `camera-grid-overlay camera-grid-instance-${gridId}`;
 
     // Header with drag + close
     const header = document.createElement('div');
     header.className = 'camera-grid-header';
     header.innerHTML = `
       <div class="camera-grid-drag-handle"></div>
-      <span class="camera-grid-title">Kamera GRID</span>
+      <span class="camera-grid-title">Kamera GRID ${gridId}</span>
       <button class="camera-grid-close" title="Kapat">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -39,7 +44,7 @@ const CameraGridMixin = {
     `;
     overlay.appendChild(header);
 
-    header.querySelector('.camera-grid-close').addEventListener('click', () => this.toggleGrid());
+    header.querySelector('.camera-grid-close').addEventListener('click', () => this.toggleGrid(gridId));
 
     const grid = document.createElement('div');
     grid.className = 'camera-grid';
@@ -48,7 +53,7 @@ const CameraGridMixin = {
     const isMobile = window.innerWidth <= 500;
     const cellCount = isMobile ? 8 : this.maxGridCells;
     for (let i = 0; i < cellCount; i++) {
-      const cell = this.createGridCell(i);
+      const cell = this.createGridCell(i, gridId);
       grid.appendChild(cell);
     }
 
@@ -65,7 +70,7 @@ const CameraGridMixin = {
   setupDragHandlers(overlay, handle) {
     let isDragging = false;
     let startX, startY, startLeft, startTop;
-    let dragRafId = null; // [MI-3] RAF throttle for smooth 120Hz dragging
+    let dragRafId = null;
 
     handle.addEventListener('mousedown', (e) => {
       isDragging = true;
@@ -133,10 +138,11 @@ const CameraGridMixin = {
   /**
    * Create a single grid cell
    */
-  createGridCell(index) {
+  createGridCell(index, gridId = 1) {
     const cell = document.createElement('div');
     cell.className = 'camera-grid-cell empty';
     cell.dataset.cellIndex = index;
+    cell.dataset.gridId = gridId;
 
     cell.innerHTML = `
       <div class="cell-add-icon">
@@ -150,7 +156,7 @@ const CameraGridMixin = {
 
     cell.addEventListener('click', (e) => {
       if (cell.classList.contains('empty')) {
-        this.openCameraSelector(index);
+        this.openCameraSelector(index, gridId);
       }
     });
 
@@ -160,73 +166,73 @@ const CameraGridMixin = {
   /**
    * Toggle grid visibility
    */
-  toggleGrid() {
-    this.gridVisible = !this.gridVisible;
+  toggleGrid(gridId = 1) {
+    const g = this._getGrid(gridId);
+    g.visible = !g.visible;
 
-    if (this.gridVisible) {
-      this.showGrid();
+    if (g.visible) {
+      this.showGrid(gridId);
     } else {
-      this.hideGrid();
+      this.hideGrid(gridId);
     }
 
     // Update button state
-    if (this.gridControlButton) {
-      if (this.gridVisible) {
-        this.gridControlButton.classList.add('active');
+    if (g.controlButton) {
+      if (g.visible) {
+        g.controlButton.classList.add('active');
       } else {
-        this.gridControlButton.classList.remove('active');
+        g.controlButton.classList.remove('active');
       }
     }
 
-    return this.gridVisible;
+    return g.visible;
   },
 
   /**
    * Show grid overlay and reconnect saved cameras
    */
-  showGrid() {
-    Analytics.event('camera_grid_open', { camera_count: this.savedGridAssignments.size });
-    this.createGridContainer();
-    const overlay = document.getElementById('camera-grid-overlay');
+  showGrid(gridId = 1) {
+    const g = this._getGrid(gridId);
+    Analytics.event('camera_grid_open', { grid_id: gridId, camera_count: g.savedAssignments.size });
+    this.createGridContainer(gridId);
+    const overlay = document.getElementById(`camera-grid-overlay-${gridId}`);
     if (overlay) {
       overlay.classList.add('visible');
     }
 
     // Reconnect all saved camera assignments
-    if (this.savedGridAssignments.size > 0) {
-      Logger.log(`[CameraGrid] Reconnecting ${this.savedGridAssignments.size} saved cameras...`);
-      for (const [cellIndex] of this.savedGridAssignments) {
-        this.reconnectGridCell(cellIndex);
+    if (g.savedAssignments.size > 0) {
+      Logger.log(`[CameraGrid${gridId}] Reconnecting ${g.savedAssignments.size} saved cameras...`);
+      for (const [cellIndex] of g.savedAssignments) {
+        this.reconnectGridCell(cellIndex, gridId);
       }
     }
 
-    Logger.log('[CameraGrid] Grid shown');
+    Logger.log(`[CameraGrid${gridId}] Grid shown`);
   },
 
   /**
    * Hide grid and cleanup streams (but preserve camera assignments)
    */
-  hideGrid() {
-    const overlay = document.getElementById('camera-grid-overlay');
+  hideGrid(gridId = 1) {
+    const overlay = document.getElementById(`camera-grid-overlay-${gridId}`);
     if (overlay) {
       overlay.classList.remove('visible');
     }
 
     // Close zoom popup if open
-    const zoomPopup = document.getElementById('camera-zoom-popup');
+    const zoomPopup = document.getElementById(`camera-zoom-popup-${gridId}`);
     if (zoomPopup) {
       zoomPopup.remove();
     }
 
-    // Disconnect all active streams but keep savedGridAssignments
+    // Disconnect all active streams but keep savedAssignments
     for (let i = 0; i < this.maxGridCells; i++) {
-      this.disconnectGridCell(i);
+      this.disconnectGridCell(i, gridId);
     }
 
-    // Note: We don't reset cells to empty - they stay as-is since overlay is hidden
-    // When showGrid() is called, it will reconnect saved cameras
-
-    Logger.log(`[CameraGrid] Grid hidden (${this.savedGridAssignments.size} cameras preserved)`);
+    const g = this._getGrid(gridId);
+    Logger.log(`[CameraGrid${gridId}] Grid hidden (${g.savedAssignments.size} cameras preserved)`);
   },
 
   /**
@@ -241,13 +247,14 @@ const CameraGridMixin = {
   /**
    * Open camera selector modal for a cell
    */
-  openCameraSelector(cellIndex) {
+  openCameraSelector(cellIndex, gridId = 1) {
+    const g = this._getGrid(gridId);
     // Get WHEP and City cameras
     const availableCameras = this.getGridCameras();
 
-    // Get already assigned device IDs
+    // Get already assigned device IDs (across this grid only)
     const assignedIds = new Set();
-    for (const [, data] of this.gridCells) {
+    for (const [, data] of g.cells) {
       if (data.deviceId) assignedIds.add(data.deviceId);
     }
 
@@ -257,12 +264,12 @@ const CameraGridMixin = {
     modal.className = 'camera-selector-modal active';
 
     const camerasHtml = availableCameras.length === 0
-      ? '<div class="camera-selector-empty">Kamera bulunamadi</div>'
+      ? '<div class="camera-selector-empty">Kamera bulunamadı</div>'
       : availableCameras.map(cam => {
           const isAssigned = assignedIds.has(cam.device_id);
           const isCity = cam.camera_type === 'city';
           const iconClass = isCity ? 'city' : 'whep';
-          const typeLabel = isAssigned ? 'Zaten atanmis' : (isCity ? 'Sehir Kamerasi' : 'WHEP Stream');
+          const typeLabel = isAssigned ? 'Zaten atanmış' : (isCity ? 'Şehir Kamerası' : 'WHEP Stream');
           return `
             <div class="camera-selector-item ${isAssigned ? 'disabled' : ''}"
                  data-device-id="${escapeHtml(cam.device_id)}"
@@ -287,7 +294,7 @@ const CameraGridMixin = {
       <div class="camera-selector-overlay"></div>
       <div class="camera-selector-content">
         <div class="camera-selector-header">
-          <h3>Kamera Sec</h3>
+          <h3>Kamera Seç — Grid ${gridId}</h3>
           <button class="camera-selector-close">&times;</button>
         </div>
         <div class="camera-selector-list">
@@ -314,7 +321,7 @@ const CameraGridMixin = {
         const hlsUrl = item.dataset.hlsUrl;
         const name = item.dataset.name;
         closeModal();
-        this.assignCameraToCell(cellIndex, deviceId, whepUrl, name, hlsUrl);
+        this.assignCameraToCell(cellIndex, deviceId, whepUrl, name, hlsUrl, gridId);
       };
     });
   },
@@ -322,8 +329,10 @@ const CameraGridMixin = {
   /**
    * Assign camera to grid cell and start stream
    */
-  async assignCameraToCell(cellIndex, deviceId, whepUrl, displayName, hlsUrl) {
-    const cell = document.querySelector(`.camera-grid-cell[data-cell-index="${cellIndex}"]`);
+  async assignCameraToCell(cellIndex, deviceId, whepUrl, displayName, hlsUrl, gridId = 1) {
+    const g = this._getGrid(gridId);
+    const overlayId = `camera-grid-overlay-${gridId}`;
+    const cell = document.querySelector(`#${overlayId} .camera-grid-cell[data-cell-index="${cellIndex}"]`);
     if (!cell) return;
 
     // Update cell to loading state
@@ -351,7 +360,7 @@ const CameraGridMixin = {
     removeBtn.innerHTML = '&times;';
     removeBtn.onclick = (e) => {
       e.stopPropagation();
-      this.removeCameraFromCell(cellIndex);
+      this.removeCameraFromCell(cellIndex, gridId);
     };
 
     // Start stream: HLS first, WHEP fallback
@@ -364,10 +373,10 @@ const CameraGridMixin = {
         hlsInstance = await this.startHlsStream(video, hlsUrl, {
           isVod,
           onReady: () => {
-            Logger.log(`[CameraGrid] HLS stream ready for cell ${cellIndex}`);
+            Logger.log(`[CameraGrid${gridId}] HLS stream ready for cell ${cellIndex}`);
           },
           onError: (data) => {
-            Logger.error(`[CameraGrid] HLS error for cell ${cellIndex}:`, data);
+            Logger.error(`[CameraGrid${gridId}] HLS error for cell ${cellIndex}:`, data);
           }
         });
       } else if (whepUrl) {
@@ -380,7 +389,7 @@ const CameraGridMixin = {
       }
 
       // Store cell data
-      this.gridCells.set(cellIndex, {
+      g.cells.set(cellIndex, {
         deviceId,
         peerConnection: pc,
         hlsInstance,
@@ -389,7 +398,7 @@ const CameraGridMixin = {
       });
 
       // Save assignment for persistence (survives grid hide/show)
-      this.savedGridAssignments.set(cellIndex, {
+      g.savedAssignments.set(cellIndex, {
         deviceId,
         whepUrl,
         hlsUrl,
@@ -406,13 +415,13 @@ const CameraGridMixin = {
       // Double-click to zoom
       video.addEventListener('dblclick', (e) => {
         e.stopPropagation();
-        this.openZoomView(cellIndex);
+        this.openZoomView(cellIndex, gridId);
       });
 
-      Logger.log(`[CameraGrid] Camera ${deviceId} assigned to cell ${cellIndex}`);
+      Logger.log(`[CameraGrid${gridId}] Camera ${deviceId} assigned to cell ${cellIndex}`);
 
     } catch (error) {
-      Logger.error('[CameraGrid] Stream error:', error);
+      Logger.error(`[CameraGrid${gridId}] Stream error:`, error);
       cell.className = 'camera-grid-cell error';
       cell.innerHTML = '';
 
@@ -423,7 +432,7 @@ const CameraGridMixin = {
       retryBtn.innerHTML = '&times;';
       retryBtn.onclick = (e) => {
         e.stopPropagation();
-        this.resetCellToEmpty(cell, cellIndex);
+        this.resetCellToEmpty(cell, cellIndex, gridId);
       };
       cell.appendChild(retryBtn);
     }
@@ -515,24 +524,26 @@ const CameraGridMixin = {
   /**
    * Remove camera from cell
    */
-  removeCameraFromCell(cellIndex) {
-    this.cleanupGridCell(cellIndex);
+  removeCameraFromCell(cellIndex, gridId = 1) {
+    this.cleanupGridCell(cellIndex, gridId);
 
     // Remove from saved assignments (user explicitly removed)
-    this.savedGridAssignments.delete(cellIndex);
+    const g = this._getGrid(gridId);
+    g.savedAssignments.delete(cellIndex);
 
-    const cell = document.querySelector(`.camera-grid-cell[data-cell-index="${cellIndex}"]`);
+    const overlayId = `camera-grid-overlay-${gridId}`;
+    const cell = document.querySelector(`#${overlayId} .camera-grid-cell[data-cell-index="${cellIndex}"]`);
     if (cell) {
-      this.resetCellToEmpty(cell, cellIndex);
+      this.resetCellToEmpty(cell, cellIndex, gridId);
     }
 
-    Logger.log(`[CameraGrid] Removed camera from cell ${cellIndex}`);
+    Logger.log(`[CameraGrid${gridId}] Removed camera from cell ${cellIndex}`);
   },
 
   /**
    * Reset cell to empty state
    */
-  resetCellToEmpty(cell, index) {
+  resetCellToEmpty(cell, index, gridId = 1) {
     cell.className = 'camera-grid-cell empty';
     cell.innerHTML = `
       <div class="cell-add-icon">
@@ -547,7 +558,7 @@ const CameraGridMixin = {
     // Re-attach click listener
     cell.onclick = (e) => {
       if (cell.classList.contains('empty')) {
-        this.openCameraSelector(index);
+        this.openCameraSelector(index, gridId);
       }
     };
   },
@@ -555,13 +566,14 @@ const CameraGridMixin = {
   /**
    * Cleanup peer connection / HLS instance for a cell
    */
-  cleanupGridCell(cellIndex) {
-    const cellData = this.gridCells.get(cellIndex);
+  cleanupGridCell(cellIndex, gridId = 1) {
+    const g = this._getGrid(gridId);
+    const cellData = g.cells.get(cellIndex);
     if (cellData) {
       // Destroy HLS instance
       if (cellData.hlsInstance) {
         cellData.hlsInstance.destroy();
-        Logger.log(`[CameraGrid] Destroyed HLS for cell ${cellIndex}`);
+        Logger.log(`[CameraGrid${gridId}] Destroyed HLS for cell ${cellIndex}`);
       }
 
       // Stop all media tracks explicitly
@@ -569,7 +581,7 @@ const CameraGridMixin = {
         const tracks = cellData.videoElement.srcObject.getTracks();
         tracks.forEach(track => {
           track.stop();
-          Logger.log(`[CameraGrid] Stopped track: ${track.kind}`);
+          Logger.log(`[CameraGrid${gridId}] Stopped track: ${track.kind}`);
         });
         cellData.videoElement.srcObject = null;
       }
@@ -578,21 +590,22 @@ const CameraGridMixin = {
       if (cellData.peerConnection) {
         try {
           cellData.peerConnection.close();
-          Logger.log(`[CameraGrid] Closed peer connection for cell ${cellIndex}`);
+          Logger.log(`[CameraGrid${gridId}] Closed peer connection for cell ${cellIndex}`);
         } catch (e) {
           // Ignore close errors
         }
       }
 
-      this.gridCells.delete(cellIndex);
+      g.cells.delete(cellIndex);
     }
   },
 
   /**
    * Disconnect stream but keep assignment saved (for hide/show persistence)
    */
-  disconnectGridCell(cellIndex) {
-    const cellData = this.gridCells.get(cellIndex);
+  disconnectGridCell(cellIndex, gridId = 1) {
+    const g = this._getGrid(gridId);
+    const cellData = g.cells.get(cellIndex);
     if (cellData) {
       // Destroy HLS instance
       if (cellData.hlsInstance) {
@@ -603,7 +616,7 @@ const CameraGridMixin = {
       if (cellData.videoElement?.srcObject) {
         cellData.videoElement.srcObject.getTracks().forEach(track => {
           track.stop();
-          Logger.log(`[CameraGrid] Stopped track: ${track.kind}`);
+          Logger.log(`[CameraGrid${gridId}] Stopped track: ${track.kind}`);
         });
         cellData.videoElement.srcObject = null;
       }
@@ -617,53 +630,52 @@ const CameraGridMixin = {
         }
       }
 
-      Logger.log(`[CameraGrid] Disconnected cell ${cellIndex} (assignment preserved)`);
+      Logger.log(`[CameraGrid${gridId}] Disconnected cell ${cellIndex} (assignment preserved)`);
 
-      // Remove from active cells but keep in savedGridAssignments
-      this.gridCells.delete(cellIndex);
+      // Remove from active cells but keep in savedAssignments
+      g.cells.delete(cellIndex);
     }
   },
 
   /**
    * Reconnect a saved camera assignment
    */
-  async reconnectGridCell(cellIndex) {
-    const saved = this.savedGridAssignments.get(cellIndex);
+  async reconnectGridCell(cellIndex, gridId = 1) {
+    const g = this._getGrid(gridId);
+    const saved = g.savedAssignments.get(cellIndex);
     if (saved) {
-      Logger.log(`[CameraGrid] Reconnecting cell ${cellIndex}: ${saved.name}`);
-      await this.assignCameraToCell(cellIndex, saved.deviceId, saved.whepUrl, saved.name, saved.hlsUrl);
+      Logger.log(`[CameraGrid${gridId}] Reconnecting cell ${cellIndex}: ${saved.name}`);
+      await this.assignCameraToCell(cellIndex, saved.deviceId, saved.whepUrl, saved.name, saved.hlsUrl, gridId);
     }
   },
 
   /**
    * Open in-place zoom view for a camera cell
-   * Zoom animates from grid center and expands to full grid size
    */
-  async openZoomView(cellIndex) {
-    const cellData = this.gridCells.get(cellIndex);
+  async openZoomView(cellIndex, gridId = 1) {
+    const g = this._getGrid(gridId);
+    const cellData = g.cells.get(cellIndex);
     if (!cellData) return;
 
+    const zoomId = `camera-zoom-popup-${gridId}`;
+
     // Remove existing zoom if any
-    const existing = document.getElementById('camera-zoom-popup');
+    const existing = document.getElementById(zoomId);
     if (existing) {
       existing.remove();
       return; // Toggle off if clicking same cell
     }
 
     // Get the grid overlay position and dimensions
-    const gridOverlay = document.getElementById('camera-grid-overlay');
+    const gridOverlay = document.getElementById(`camera-grid-overlay-${gridId}`);
     const grid = gridOverlay?.querySelector('.camera-grid');
     if (!gridOverlay || !grid) return;
 
     const gridRect = grid.getBoundingClientRect();
 
-    // Calculate grid center point
-    const gridCenterX = gridRect.left + gridRect.width / 2;
-    const gridCenterY = gridRect.top + gridRect.height / 2;
-
     // Create zoom popup
     const popup = document.createElement('div');
-    popup.id = 'camera-zoom-popup';
+    popup.id = zoomId;
     popup.className = 'camera-zoom-popup zooming-in';
 
     // Set popup size to match grid size
@@ -682,7 +694,7 @@ const CameraGridMixin = {
         <span class="live-dot"></span>
         <span>${escapeHtml(cellData.name || 'Kamera')}</span>
       </div>
-      <span class="zoom-hint">Tikla kapat</span>
+      <span class="zoom-hint">Tıkla kapat</span>
     `;
 
     // Video element - share the existing stream
@@ -697,7 +709,7 @@ const CameraGridMixin = {
       video.srcObject = cellData.videoElement.srcObject;
     } else {
       // HLS: start a new independent stream for zoom view
-      const saved = this.savedGridAssignments.get(cellIndex);
+      const saved = g.savedAssignments.get(cellIndex);
       if (saved?.hlsUrl && this.startHlsStream) {
         zoomHlsResult = await this.startHlsStream(video, saved.hlsUrl, {
           isVod: saved.hlsUrl.includes('/clips/'),
@@ -735,7 +747,7 @@ const CameraGridMixin = {
     };
     document.addEventListener('keydown', handleEsc);
 
-    Logger.log(`[CameraGrid] Zoom popup opened for cell ${cellIndex}`);
+    Logger.log(`[CameraGrid${gridId}] Zoom popup opened for cell ${cellIndex}`);
   }
 };
 

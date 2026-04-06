@@ -3,10 +3,10 @@ import { QBitmapConfig } from './config.js';
 import { AuthSystem } from './auth.js';
 
 const REASONS = [
-  { value: 'inappropriate', label: 'Uygunsuz icerik' },
+  { value: 'inappropriate', label: 'Uygunsuz İçerik' },
   { value: 'spam', label: 'Spam' },
-  { value: 'misleading', label: 'Yaniltici' },
-  { value: 'other', label: 'Diger' }
+  { value: 'misleading', label: 'Yanıltıcı' },
+  { value: 'other', label: 'Diğer' }
 ];
 
 // Warning triangle SVG icon
@@ -19,14 +19,14 @@ export const ReportSystem = {
    * Get the report button HTML for camera/broadcast popups (cam-btn style)
    */
   getCamBtnHtml() {
-    return `<button class="cam-btn report-btn" title="Uygunsuz icerigi bildir">${REPORT_ICON_SVG}</button>`;
+    return `<button class="cam-btn report-btn" title="Uygunsuz içeriği bildir">${REPORT_ICON_SVG}</button>`;
   },
 
   /**
    * Get the report button HTML for video message popup header
    */
   getMsgBtnHtml() {
-    return `<button class="video-msg-report-btn" data-action="report-content" title="Uygunsuz icerigi bildir">${REPORT_ICON_SVG}</button>`;
+    return `<button class="video-msg-report-btn" data-action="report-content" title="Uygunsuz içeriği bildir">${REPORT_ICON_SVG}</button>`;
   },
 
   /**
@@ -41,7 +41,7 @@ export const ReportSystem = {
    */
   showReportDialog(entityType, entityId) {
     if (!AuthSystem.isLoggedIn()) {
-      AuthSystem.showNotification('Bildirim yapmak icin giris yapin', 'error');
+      AuthSystem.showNotification('Bildirim yapmak için giriş yapın', 'error');
       return;
     }
 
@@ -58,16 +58,16 @@ export const ReportSystem = {
     overlay.innerHTML = `
       <div class="report-modal">
         <div class="report-modal-header">
-          <h3>Icerik Bildir</h3>
+          <h3>Sakıncalı İçerik Bildir</h3>
           <button class="report-modal-close">&times;</button>
         </div>
         <div class="report-modal-body">
-          <p class="report-modal-desc">Bu icerigin neden uygunsuz oldugunu belirtin:</p>
+          <p class="report-modal-desc">Bu içeriğin neden uygunsuz olduğunu belirtin:</p>
           ${reasonsHtml}
-          <textarea class="report-detail" placeholder="Aciklama (istege bagli)..." maxlength="500" style="display:none"></textarea>
+          <textarea class="report-detail" placeholder="Açıklama (isteğe bağlı)..." maxlength="500" style="display:none"></textarea>
         </div>
         <div class="report-modal-footer">
-          <button class="report-cancel-btn">Iptal</button>
+          <button class="report-cancel-btn">İptal</button>
           <button class="report-submit-btn" disabled>Bildir</button>
         </div>
       </div>
@@ -101,7 +101,7 @@ export const ReportSystem = {
       if (!selected) return;
 
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Gonderiliyor...';
+      submitBtn.textContent = 'Gönderiliyor...';
 
       const reason = selected.value;
       const detail = detailArea.value.trim() || null;
@@ -119,7 +119,7 @@ export const ReportSystem = {
           modal.innerHTML = `
             <div class="report-modal-already">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <p>Bu icerigi zaten bildirdiniz.</p>
+              <p>Bu içeriği zaten bildirdiniz.</p>
             </div>
           `;
           setTimeout(close, 2000);
@@ -132,14 +132,14 @@ export const ReportSystem = {
         modal.innerHTML = `
           <div class="report-modal-success">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            <p>Bildiriminiz alindi. Tesekkurler.</p>
+            <p>Bildiriminiz alındı. Teşekkürler.</p>
           </div>
         `;
         setTimeout(close, 2000);
       } catch (error) {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Bildir';
-        AuthSystem.showNotification('Bildirim gonderilemedi', 'error');
+        AuthSystem.showNotification('Bildirim gönderilemedi', 'error');
       }
     };
   }

@@ -29,7 +29,7 @@
   width: 362px;
   height: 234px;
   background: #000;
-  border-radius: 10px;
+  border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   transition: width 0.3s ease, height 0.3s ease;
@@ -57,7 +57,7 @@
   transition: opacity 0.25s ease;
   gap: 6px;
   cursor: grab;
-  border-radius: 10px 10px 0 0;
+  border-radius: 6px 6px 0 0;
 }
 
 .teslacam-live-container:hover .teslacam-live-header {
@@ -72,8 +72,10 @@
   pointer-events: none;
 }
 
-.teslacam-live-header .teslacam-live-close {
+.teslacam-live-header .teslacam-live-close,
+.teslacam-live-header .teslacam-live-badge {
   pointer-events: auto;
+  cursor: pointer;
 }
 
 .teslacam-live-title {
@@ -153,6 +155,7 @@
   height: 100%;
   object-fit: cover;
   background: #000;
+  border-radius: 6px;
 }
 
 .teslacam-live-video::-webkit-media-controls {
@@ -275,7 +278,7 @@
   flex-shrink: 0;
 }
 
-/* Dashboard position override for smaller popup */
+/* Dashboard — overlay on video */
 .teslacam-live-container .tesla-dashboard {
   bottom: 22px;
   padding: 5px 10px;
@@ -308,16 +311,6 @@
 .teslacam-live-container .tesla-dashboard .meta-brake-icon {
   width: 18px;
   height: 18px;
-}
-
-.teslacam-live-container .tesla-dashboard .meta-accelerator-icon {
-  width: 18px;
-  height: 18px;
-}
-
-.teslacam-live-container .tesla-dashboard .meta-blinker svg {
-  width: 14px;
-  height: 14px;
 }
 
 @keyframes teslacam-fade-in {
