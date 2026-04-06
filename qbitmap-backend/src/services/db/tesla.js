@@ -65,13 +65,15 @@ DatabaseService.prototype.getExpiringTeslaTokens = async function(minutesBefore 
   return rows;
 };
 
-DatabaseService.prototype.upsertTeslaVehicle = async function({ teslaAccountId, vehicleId, vin, displayName, model, color }) {
+DatabaseService.prototype.upsertTeslaVehicle = async function({ teslaAccountId, vehicleId, vin, displayName, model, carType, color, wheelType, carVersion, odometer }) {
   await this.pool.execute(
-    `INSERT INTO tesla_vehicles (tesla_account_id, vehicle_id, vin, display_name, model, color)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO tesla_vehicles (tesla_account_id, vehicle_id, vin, display_name, model, car_type, color, wheel_type, car_version, odometer)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), model = VALUES(model),
-       color = VALUES(color), updated_at = NOW()`,
-    [teslaAccountId, vehicleId, vin, displayName ?? vin, model ?? null, color ?? null]
+       car_type = COALESCE(VALUES(car_type), car_type), color = COALESCE(VALUES(color), color),
+       wheel_type = COALESCE(VALUES(wheel_type), wheel_type), car_version = COALESCE(VALUES(car_version), car_version),
+       odometer = COALESCE(VALUES(odometer), odometer), updated_at = NOW()`,
+    [teslaAccountId, vehicleId, vin, displayName ?? vin, model ?? null, carType ?? null, color ?? null, wheelType ?? null, carVersion ?? null, odometer ?? null]
   );
 };
 

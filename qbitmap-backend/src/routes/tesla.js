@@ -442,10 +442,10 @@ async function syncTeslaVehicles(teslaAccountId, accessToken, apiBase) {
       color: v.vehicle_config?.exterior_color || null,
     });
 
-    // Fetch initial vehicle data (location, charge, drive state)
+    // Fetch initial vehicle data (location, charge, drive, config, state)
     try {
       const vdRes = await fetchWithTimeout(
-        `${base}/api/1/vehicles/${v.id}/vehicle_data?endpoints=location_data%3Bcharge_state%3Bdrive_state`,
+        `${base}/api/1/vehicles/${v.id}/vehicle_data?endpoints=location_data%3Bcharge_state%3Bdrive_state%3Bvehicle_config%3Bvehicle_state%3Bclimate_state`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
         15000
       );
@@ -453,6 +453,27 @@ async function syncTeslaVehicles(teslaAccountId, accessToken, apiBase) {
         const vd = await vdRes.json();
         const ds = vd.response?.drive_state;
         const cs = vd.response?.charge_state;
+        const vc = vd.response?.vehicle_config;
+        const vs = vd.response?.vehicle_state;
+        const cl = vd.response?.climate_state;
+
+        // Update vehicle info (config + state)
+        if (vc || vs) {
+          await db.upsertTeslaVehicle({
+            teslaAccountId,
+            vehicleId: String(v.id),
+            vin: v.vin,
+            displayName: vs?.vehicle_name || v.display_name || v.vin,
+            model: inferModel(v.vin) || vc?.car_type,
+            carType: vc?.car_type || null,
+            color: vc?.exterior_color || null,
+            wheelType: vc?.wheel_type || null,
+            carVersion: vs?.car_version || null,
+            odometer: vs?.odometer || null,
+          });
+        }
+
+        // Update telemetry
         if (ds?.latitude) {
           await db.updateVehicleTelemetry({
             vin: v.vin,
@@ -462,6 +483,11 @@ async function syncTeslaVehicles(teslaAccountId, accessToken, apiBase) {
             gear: ds.shift_state || 'P',
             bearing: ds.heading || 0,
             speed: ds.speed || 0,
+            insideTemp: cl?.inside_temp,
+            outsideTemp: cl?.outside_temp,
+            estRange: cs?.est_battery_range ? Math.round(cs.est_battery_range * 1.60934) : null,
+            locked: vs?.locked ? 1 : 0,
+            sentry: vs?.sentry_mode ? 1 : 0,
           });
           logger.info({ vin: v.vin, lat: ds.latitude, lng: ds.longitude, soc: cs?.usable_battery_level }, 'Initial vehicle data fetched');
         }
