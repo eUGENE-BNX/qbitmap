@@ -41,13 +41,13 @@ async function dbWriter(update) {
   );
 }
 
-async function logTelemetry(vin, fieldId, fieldName, value, timestamp) {
+async function logTelemetry(vin, fieldId, fieldName, value, timestamp, rawHex) {
   const p = getPool();
   try {
     const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
     await p.execute(
-      'INSERT INTO tesla_telemetry_log (vin, field_id, field_name, value_raw, timestamp_unix) VALUES (?, ?, ?, ?, ?)',
-      [vin, fieldId, fieldName, valueStr, timestamp]
+      'INSERT INTO tesla_telemetry_log (vin, field_id, field_name, value_raw, timestamp_unix, raw_hex) VALUES (?, ?, ?, ?, ?, ?)',
+      [vin, fieldId, fieldName, valueStr, timestamp, rawHex ?? null]
     );
   } catch { /* don't fail telemetry processing if log write fails */ }
 }

@@ -41,10 +41,9 @@ async function handleTelemetryMessage(rawData, logger) {
     if (!vin) return;
 
     const fname = fieldName(fieldId);
-    logger.info({ vin, topic, fieldId, fieldName: fname, value, timestamp }, 'Telemetry decoded');
 
-    // Log every decoded message to DB for analysis
-    await logTelemetry(vin, fieldId, fname, value, timestamp);
+    // Log raw hex for all messages (for post-drive analysis)
+    await logTelemetry(vin, fieldId, fname, value, timestamp, buf.toString('hex'));
 
     const update = { vin };
     let hasUpdate = false;
