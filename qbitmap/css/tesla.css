@@ -237,6 +237,18 @@
   color: #555;
 }
 
+.tv-disconnect {
+  font-size: 10px;
+  color: #ef4444;
+  text-decoration: none;
+  margin-left: auto;
+}
+
+.tv-disconnect:hover {
+  color: #f87171;
+  text-decoration: underline;
+}
+
 /* Keep logo-t class for virtual key modal */
 .tesla-popup-logo-t {
   display: inline-flex;

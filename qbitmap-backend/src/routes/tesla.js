@@ -106,7 +106,8 @@ async function teslaRoutes(fastify) {
       }
 
       const tokenData = await tokenResponse.json();
-      const { access_token, refresh_token, expires_in, id_token } = tokenData;
+      const { access_token, refresh_token, expires_in, id_token, scope: grantedScopes } = tokenData;
+      logger.info({ grantedScopes }, 'Tesla OAuth scopes granted');
 
       // Decode id_token to get Tesla user info (JWT, no verification needed here since we got it from token endpoint)
       let teslaUser = {};
@@ -162,7 +163,7 @@ async function teslaRoutes(fastify) {
         accessToken: encrypt(access_token),
         refreshToken: encrypt(refresh_token),
         expiresAt,
-        scopes: config.tesla.scopes,
+        scopes: grantedScopes || config.tesla.scopes,
       });
 
       // Discover user's regional Fleet API base URL
@@ -209,10 +210,17 @@ async function teslaApiRoutes(fastify) {
   // Check if user has Tesla connected
   fastify.get('/status', async (request) => {
     const account = await db.getTeslaAccountByUserId(request.user.userId);
+    let scopes = null;
+    if (account) {
+      const tokens = await db.getTeslaTokensByAccountId(account.id);
+      scopes = tokens?.scopes || null;
+    }
     return {
       connected: !!account,
       email: account?.email || null,
       fullName: account?.full_name || null,
+      profileImage: account?.profile_image_url || null,
+      scopes,
     };
   });
 

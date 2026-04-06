@@ -1,4 +1,5 @@
-import { escapeHtml } from '../utils.js';
+import { escapeHtml, showNotification } from '../utils.js';
+import { QBitmapConfig } from '../config.js';
 
 export const TeslaPopup = {
   map: null,
@@ -38,10 +39,28 @@ export const TeslaPopup = {
       .setHTML(self._buildHTML(props))
       .addTo(self.map);
 
-      // Set battery bar width via JS (CSP)
+      // Set battery bar width via JS (CSP) + bind disconnect
       requestAnimationFrame(() => {
         const fill = self.popup?.getElement()?.querySelector('.tv-battery-fill');
         if (fill) fill.style.width = (props.soc ?? 0) + '%';
+
+        const disconnectBtn = self.popup?.getElement()?.querySelector('.tv-disconnect');
+        if (disconnectBtn) {
+          disconnectBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!confirm('Tesla hesabinizi ayirmak istediginize emin misiniz?')) return;
+            try {
+              await fetch(`${QBitmapConfig.api.base}/api/tesla/disconnect`, { method: 'POST', credentials: 'include' });
+              self.popup.remove();
+              self.popup = null;
+              showNotification('Tesla hesabi ayrildi', 'info');
+              // Reload page to reset state
+              setTimeout(() => location.reload(), 1000);
+            } catch {
+              showNotification('Baglanti kesilemedi', 'error');
+            }
+          });
+        }
       });
     });
   },
@@ -126,6 +145,7 @@ export const TeslaPopup = {
       <div class="tv-footer">
         ${odometer ? `<span class="tv-meta">${odometer} km</span>` : ''}
         ${carVersion ? `<span class="tv-meta">v${escapeHtml(carVersion)}</span>` : ''}
+        <a href="#" class="tv-disconnect">Ayir</a>
       </div>
     </div>`;
   }
