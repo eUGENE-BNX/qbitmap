@@ -55,12 +55,12 @@ module.exports = {
     cacheTTLDays: 30
   },
   tesla: {
-    clientId: requireEnv('TESLA_CLIENT_ID', 'dev-tesla-client-id'),
-    clientSecret: requireEnv('TESLA_CLIENT_SECRET', 'dev-tesla-client-secret'),
+    clientId: requireEnv('TESLA_CLIENT_ID', 'bf594e12-7ba9-4089-b263-7ce7504cf363'),
+    clientSecret: requireEnv('TESLA_CLIENT_SECRET', 'ta-secret.WzoWQa3W+1FFyc5W'),
     callbackUri: isProduction
       ? 'https://stream.qbitmap.com/auth/tesla/callback'
       : 'http://localhost:3000/auth/tesla/callback',
-    scopes: 'openid vehicle_device_data vehicle_location offline_access',
+    scopes: 'openid user_data vehicle_device_data vehicle_cmds vehicle_location vehicle_charging_cmds offline_access',
     authUrl: 'https://auth.tesla.com/oauth2/v3/authorize',
     tokenUrl: 'https://auth.tesla.com/oauth2/v3/token',
     apiBase: 'https://fleet-api.prd.eu.vn.cloud.tesla.com',

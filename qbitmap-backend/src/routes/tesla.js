@@ -124,20 +124,21 @@ async function teslaRoutes(fastify) {
         }
       }
 
-      // If no id_token, use access_token to get user info
-      if (!teslaUser.sub) {
+      // Fetch user profile from /users/me (fills email, name, picture if missing from id_token)
+      try {
         const meResponse = await fetchWithTimeout(`${config.tesla.apiBase}/api/1/users/me`, {
           headers: { Authorization: `Bearer ${access_token}` },
         }, 10000);
         if (meResponse.ok) {
           const meData = await meResponse.json();
-          teslaUser = {
-            sub: String(meData.response?.id || meData.id),
-            email: meData.response?.email || meData.email,
-            name: meData.response?.full_name || meData.full_name || meData.email,
-            picture: meData.response?.profile_image_url || null,
-          };
+          const r = meData.response || meData;
+          if (!teslaUser.sub) teslaUser.sub = String(r.vault_uuid || r.id);
+          if (!teslaUser.email) teslaUser.email = r.email;
+          if (!teslaUser.name) teslaUser.name = r.full_name || r.email;
+          if (!teslaUser.picture) teslaUser.picture = r.profile_image_url || null;
         }
+      } catch (e) {
+        logger.warn({ err: e.message }, 'Failed to fetch Tesla user profile');
       }
 
       if (!teslaUser.sub) {
