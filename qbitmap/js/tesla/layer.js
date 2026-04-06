@@ -18,7 +18,7 @@ export const TeslaLayer = {
           resolve();
         };
         img.onerror = resolve;
-        img.src = '/car4.png';
+        img.src = '/car1.png';
       });
     }
 

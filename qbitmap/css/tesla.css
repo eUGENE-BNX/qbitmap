@@ -193,12 +193,23 @@
 
 /* Temps */
 .tv-temp-row {
+  display: flex;
+  align-items: center;
   gap: 16px;
+  margin-bottom: 10px;
 }
 
 .tv-temp {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 13px;
   color: #aaa;
+}
+
+.tv-temp-icon {
+  color: #888;
+  flex-shrink: 0;
 }
 
 /* Main two-column layout */

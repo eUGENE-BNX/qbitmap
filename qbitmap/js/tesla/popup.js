@@ -40,22 +40,17 @@ export const TeslaPopup = {
         const fill = self.popup?.getElement()?.querySelector('.tv-battery-fill');
         if (fill) fill.style.width = (props.soc ?? 0) + '%';
 
-        const disconnectBtn = self.popup?.getElement()?.querySelector('.tv-disconnect');
-        if (disconnectBtn) {
-          disconnectBtn.addEventListener('click', async (ev) => {
-            ev.preventDefault();
-            if (!confirm('Tesla hesab\u0131n\u0131z\u0131 ay\u0131rmak istedi\u011finize emin misiniz?')) return;
-            try {
-              await fetch(`${QBitmapConfig.api.base}/api/tesla/disconnect`, { method: 'POST', credentials: 'include' });
-              self.popup.remove();
-              self.popup = null;
-              showNotification('Tesla hesab\u0131 ayr\u0131ld\u0131', 'info');
-              setTimeout(() => location.reload(), 1000);
-            } catch {
-              showNotification('Ba\u011flant\u0131 kesilemedi', 'error');
-            }
-          });
-        }
+        const btn = self.popup?.getElement()?.querySelector('.tv-disconnect');
+        if (btn) btn.addEventListener('click', async (ev) => {
+          ev.preventDefault();
+          if (!confirm('Tesla hesab\u0131n\u0131z\u0131 ay\u0131rmak istedi\u011finize emin misiniz?')) return;
+          try {
+            await fetch(`${QBitmapConfig.api.base}/api/tesla/disconnect`, { method: 'POST', credentials: 'include' });
+            self.popup.remove(); self.popup = null;
+            showNotification('Tesla hesab\u0131 ayr\u0131ld\u0131', 'info');
+            setTimeout(() => location.reload(), 1000);
+          } catch { showNotification('Ba\u011flant\u0131 kesilemedi', 'error'); }
+        });
       });
     });
   },
@@ -75,8 +70,8 @@ export const TeslaPopup = {
     const outsideTemp = v(p.outsideTemp) != null ? Math.round(p.outsideTemp) : null;
     const locked = v(p.locked);
     const sentry = v(p.sentry);
+    const teslaAvatar = v(p.teslaAvatar);
 
-    // Gear: if speed is 0, show Park
     const rawGear = speed === 0 ? 'P' : (p.gear || 'P');
     const gearMap = { 'P': 'Park', 'D': 'Drive', 'R': 'Reverse', 'N': 'Neutral' };
     const gearText = gearMap[rawGear] || rawGear;
@@ -89,15 +84,19 @@ export const TeslaPopup = {
     if (soc < 20) batteryClass = 'red';
     else if (soc < 50) batteryClass = 'amber';
 
-    // Version + odometer combined
     const versionOdo = [
       carVersion ? `v${escapeHtml(carVersion)}` : null,
       odometer ? `${odometer}km` : null
     ].filter(Boolean).join(' / ');
 
+    // Temperature icon SVG (thermometer)
+    const tempIcon = '<svg class="tv-temp-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v3h-2V5z"/></svg>';
+
     return `<div class="tv-card">
       <div class="tv-header">
-        <img class="tv-car-icon" src="/car1.png" alt="" />
+        ${teslaAvatar
+          ? `<img class="tv-avatar" src="${escapeHtml(teslaAvatar)}" alt="" />`
+          : `<div class="tv-logo">T</div>`}
         <div class="tv-title">
           <div class="tv-name">${name}</div>
           <div class="tv-sub">${model}${color ? ` \u00b7 ${escapeHtml(color)}` : ''}</div>
@@ -114,26 +113,25 @@ export const TeslaPopup = {
         ${estRange ? `<span class="tv-range">Menzil: ${estRange}km</span>` : ''}
       </div>
 
+      ${insideTemp != null || outsideTemp != null ? `
+      <div class="tv-temp-row">
+        ${outsideTemp != null ? `<span class="tv-temp">${tempIcon} D\u0131\u015f ${outsideTemp}\u00b0</span>` : ''}
+        ${insideTemp != null ? `<span class="tv-temp">${tempIcon} \u0130\u00e7 ${insideTemp}\u00b0</span>` : ''}
+      </div>` : ''}
+
       <div class="tv-main-row">
         <div class="tv-left">
-          <div class="tv-info-row">
-            <span class="tv-gear tv-gear-${gearClass}">${gearText}</span>
-            ${speed > 0 ? `<span class="tv-speed">${speed} km/h</span>` : ''}
-          </div>
-          ${insideTemp != null || outsideTemp != null ? `
-          <div class="tv-info-row tv-temp-row">
-            ${outsideTemp != null ? `<span class="tv-temp">D\u0131\u015f ${outsideTemp}\u00b0</span>` : ''}
-            ${insideTemp != null ? `<span class="tv-temp">\u0130\u00e7 ${insideTemp}\u00b0</span>` : ''}
-          </div>` : ''}
-        </div>
-        <div class="tv-right">
-          ${locked != null ? `<span class="tv-tag ${locked ? 'tv-tag-green' : 'tv-tag-red'}">${locked ? 'Kilitli' : 'A\u00e7\u0131k'}</span>` : ''}
-          ${sentry ? `<span class="tv-tag tv-tag-blue">N\u00f6bet\u00e7i</span>` : ''}
           ${tpms ? `
           <div class="tv-tpms-mini">
             <span>${tpms.fl}</span><span>${tpms.fr}</span>
             <span>${tpms.rl}</span><span>${tpms.rr}</span>
+            <span class="tv-tpms-unit">bar</span>
           </div>` : ''}
+        </div>
+        <div class="tv-right">
+          <span class="tv-gear tv-gear-${gearClass}">${gearText}${speed > 0 ? ` ${speed}km/h` : ''}</span>
+          ${locked != null ? `<span class="tv-tag ${locked ? 'tv-tag-green' : 'tv-tag-red'}">${locked ? 'Kilitli' : 'A\u00e7\u0131k'}</span>` : ''}
+          ${sentry ? `<span class="tv-tag tv-tag-blue">N\u00f6bet\u00e7i</span>` : ''}
         </div>
       </div>
 
