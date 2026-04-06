@@ -115,6 +115,10 @@ export const TeslaLayer = {
           estRange: v.estRange ?? -1,
           locked: v.locked != null ? (v.locked ? 1 : 0) : -1,
           sentry: v.sentry != null ? (v.sentry ? 1 : 0) : -1,
+          color: v.color || '',
+          carVersion: v.carVersion || '',
+          odometer: v.odometer || 0,
+          tpms: v.tpms ? JSON.stringify(v.tpms) : '',
         }
       }));
 

@@ -37,6 +37,15 @@ function start() {
     }
   });
 
+  // Daily TPMS sync — every day at 04:00
+  cron.schedule('0 4 * * *', async () => {
+    try {
+      await syncTpms();
+    } catch (err) {
+      logger.error({ err }, 'Daily TPMS sync failed');
+    }
+  });
+
   logger.info('Tesla token refresh service started');
 }
 
@@ -102,6 +111,59 @@ async function syncVehicleInfo() {
       }
     } catch (err) {
       logger.error({ err, accountId: acct.id }, 'Account vehicle sync failed');
+    }
+  }
+}
+
+async function syncTpms() {
+  const [accounts] = await db.pool.execute(
+    `SELECT a.id, a.user_id, t.access_token FROM tesla_accounts a
+     JOIN tesla_tokens t ON t.tesla_account_id = a.id WHERE t.expires_at > NOW()`
+  );
+
+  for (const acct of accounts) {
+    try {
+      const accessToken = decrypt(acct.access_token);
+      let apiBase = config.tesla.apiBase;
+      try {
+        const rr = await fetchWithTimeout('https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/users/region', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }, 10000);
+        if (rr.ok) {
+          const rd = await rr.json();
+          if (rd.response?.fleet_api_base_url) apiBase = rd.response.fleet_api_base_url;
+        }
+      } catch { /* use default */ }
+
+      const vRes = await fetchWithTimeout(`${apiBase}/api/1/vehicles`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }, 15000);
+      if (!vRes.ok) continue;
+      const vData = await vRes.json();
+
+      for (const v of (vData.response || [])) {
+        try {
+          const vdRes = await fetchWithTimeout(
+            `${apiBase}/api/1/vehicles/${v.id}/vehicle_data?endpoints=vehicle_state`,
+            { headers: { Authorization: `Bearer ${accessToken}` } },
+            15000
+          );
+          if (!vdRes.ok) continue;
+          const vd = await vdRes.json();
+          const vs = vd.response?.vehicle_state;
+          if (vs) {
+            await db.pool.execute(
+              `UPDATE tesla_vehicles SET last_tpms_fl = ?, last_tpms_fr = ?, last_tpms_rl = ?, last_tpms_rr = ?, odometer = ?, updated_at = NOW() WHERE vin = ?`,
+              [vs.tpms_pressure_fl, vs.tpms_pressure_fr, vs.tpms_pressure_rl, vs.tpms_pressure_rr, vs.odometer, v.vin]
+            );
+            logger.info({ vin: v.vin, fl: vs.tpms_pressure_fl, fr: vs.tpms_pressure_fr }, 'TPMS synced');
+          }
+        } catch (e) {
+          logger.warn({ vin: v.vin, err: e.message }, 'TPMS sync failed for vehicle');
+        }
+      }
+    } catch (err) {
+      logger.error({ err, accountId: acct.id }, 'TPMS sync failed for account');
     }
   }
 }

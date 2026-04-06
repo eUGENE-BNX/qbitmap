@@ -186,6 +186,49 @@
   color: #3b82f6;
 }
 
+.tv-section {
+  padding: 6px 0;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.tv-section:last-of-type {
+  border-bottom: none;
+}
+
+.tv-tpms {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tv-tpms-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 12px;
+}
+
+.tv-tpms-val {
+  font-size: 11px;
+  color: #aaa;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-tpms-unit {
+  font-size: 10px;
+  color: #666;
+}
+
+.tv-footer {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 8px;
+}
+
+.tv-meta {
+  font-size: 10px;
+  color: #555;
+}
+
 /* Keep logo-t class for virtual key modal */
 .tesla-popup-logo-t {
   display: inline-flex;
