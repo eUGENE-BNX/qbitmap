@@ -39,18 +39,6 @@ export const TeslaPopup = {
       requestAnimationFrame(() => {
         const fill = self.popup?.getElement()?.querySelector('.tv-battery-fill');
         if (fill) fill.style.width = (props.soc ?? 0) + '%';
-
-        const btn = self.popup?.getElement()?.querySelector('.tv-disconnect');
-        if (btn) btn.addEventListener('click', async (ev) => {
-          ev.preventDefault();
-          if (!confirm('Tesla hesab\u0131n\u0131z\u0131 ay\u0131rmak istedi\u011finize emin misiniz?')) return;
-          try {
-            await fetch(`${QBitmapConfig.api.base}/api/tesla/disconnect`, { method: 'POST', credentials: 'include' });
-            self.popup.remove(); self.popup = null;
-            showNotification('Tesla hesab\u0131 ayr\u0131ld\u0131', 'info');
-            setTimeout(() => location.reload(), 1000);
-          } catch { showNotification('Ba\u011flant\u0131 kesilemedi', 'error'); }
-        });
       });
     });
   },
@@ -83,11 +71,6 @@ export const TeslaPopup = {
     let batteryClass = 'green';
     if (soc < 20) batteryClass = 'red';
     else if (soc < 50) batteryClass = 'amber';
-
-    const versionOdo = [
-      carVersion ? `v${escapeHtml(carVersion)}` : null,
-      odometer ? `${odometer}km` : null
-    ].filter(Boolean).join(' / ');
 
     // Temperature icon SVG (thermometer)
     const tempIcon = '<svg class="tv-temp-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v3h-2V5z"/></svg>';
@@ -135,8 +118,8 @@ export const TeslaPopup = {
       </div>
 
       <div class="tv-footer">
-        ${versionOdo ? `<span class="tv-footer-info">${versionOdo}</span>` : ''}
-        <a href="#" class="tv-disconnect">\u00c7\u0131k\u0131\u015f</a>
+        ${odometer ? `<span class="tv-footer-odo">odometer:${odometer}km</span>` : ''}
+        ${carVersion ? `<span class="tv-footer-version">v${escapeHtml(carVersion)}</span>` : ''}
       </div>
     </div>`;
   }

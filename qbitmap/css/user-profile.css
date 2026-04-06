@@ -193,6 +193,200 @@
 }
 
 /* ===============================
+   Tesla Vehicle Section
+   =============================== */
+
+.profile-tesla-section {
+  background: #f7f9fb;
+  border: 1px solid #e8eaed;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.profile-tesla-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.profile-tesla-logo {
+  width: 28px;
+  height: 28px;
+  background: #e31937;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.profile-tesla-title {
+  font-size: 14px;
+  color: #202124;
+}
+
+.profile-tesla-model {
+  font-weight: 600;
+}
+
+.profile-tesla-color {
+  color: #5f6368;
+  font-size: 12px;
+}
+
+/* Battery */
+.profile-tesla-battery {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.profile-tesla-battery-bar {
+  flex: 1;
+  height: 6px;
+  background: #e8eaed;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.profile-tesla-battery-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.profile-tesla-battery-green { background: #34a853; }
+.profile-tesla-battery-amber { background: #f9ab00; }
+.profile-tesla-battery-red { background: #ea4335; }
+
+.profile-tesla-battery-pct {
+  font-size: 13px;
+  font-weight: 700;
+  color: #202124;
+  min-width: 32px;
+  text-align: right;
+}
+
+.profile-tesla-range {
+  font-size: 11px;
+  color: #80868b;
+  white-space: nowrap;
+}
+
+/* Status row */
+.profile-tesla-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.profile-tesla-temp {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: #5f6368;
+}
+
+.profile-tesla-temp svg {
+  color: #80868b;
+  flex-shrink: 0;
+}
+
+.profile-tesla-gear {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.profile-tesla-gear-parked {
+  background: #f1f3f4;
+  color: #80868b;
+}
+
+.profile-tesla-gear-driving {
+  background: #e6f4ea;
+  color: #1e8e3e;
+}
+
+.profile-tesla-gear-reverse {
+  background: #fce8e6;
+  color: #d93025;
+}
+
+.profile-tesla-tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.profile-tesla-tag-green {
+  background: #e6f4ea;
+  color: #1e8e3e;
+}
+
+.profile-tesla-tag-red {
+  background: #fce8e6;
+  color: #d93025;
+}
+
+.profile-tesla-tag-blue {
+  background: #e8f0fe;
+  color: #1a73e8;
+}
+
+/* TPMS grid */
+.profile-tesla-tpms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 12px;
+  font-size: 11px;
+  color: #80868b;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 10px;
+}
+
+/* Footer (odo + version) */
+.profile-tesla-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #80868b;
+  margin-bottom: 10px;
+}
+
+/* Disconnect button */
+.profile-tesla-disconnect {
+  width: 100%;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #d93025;
+  color: #d93025;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.profile-tesla-disconnect:hover {
+  background: #d93025;
+  color: #fff;
+}
+
+/* ===============================
    Info Row (Location + Face chips)
    =============================== */
 
@@ -587,6 +781,10 @@
   .profile-user-avatar {
     width: 40px;
     height: 40px;
+  }
+
+  .profile-tesla-section {
+    padding: 10px 12px;
   }
 
   .profile-info-row {

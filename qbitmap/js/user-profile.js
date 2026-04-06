@@ -79,13 +79,14 @@ const UserProfileSystem = {
       this.hasFaceRegistered = user.hasFaceRegistered;
 
       // Fetch extra stats in parallel
-      const [cameraStats, recentMessages, landStats] = await Promise.all([
+      const [cameraStats, recentMessages, landStats, teslaVehicle] = await Promise.all([
         this.fetchCameraStats(),
         this.fetchRecentMessages(),
-        this.fetchLandStats(user.id)
+        this.fetchLandStats(user.id),
+        this.fetchTeslaVehicle()
       ]);
 
-      this.renderProfile(user, { cameraStats, recentMessages, landStats });
+      this.renderProfile(user, { cameraStats, recentMessages, landStats, teslaVehicle });
     } catch (error) {
       Logger.error('[Profile] Load error:', error);
       content.innerHTML = '<div class="profile-face-error"><p>Profil yüklenemedi</p></div>';
@@ -113,6 +114,15 @@ const UserProfileSystem = {
     } catch { return null; }
   },
 
+  async fetchTeslaVehicle() {
+    try {
+      const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles`, { credentials: 'include' });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.vehicles && data.vehicles.length > 0 ? data.vehicles[0] : null;
+    } catch { return null; }
+  },
+
   async checkFaceStatus() {
     try {
       const response = await fetch(`${this.apiBase}/me`, { credentials: 'include' });
@@ -127,16 +137,18 @@ const UserProfileSystem = {
 
   renderProfile(user, extras) {
     const content = document.querySelector('.profile-panel-content');
-    const { cameraStats, recentMessages, landStats } = extras;
+    const { cameraStats, recentMessages, landStats, teslaVehicle } = extras;
 
     content.innerHTML = `
       ${this.renderHeaderCard(user, cameraStats, landStats)}
       ${this.renderInfoRow(user.location, user.hasFaceRegistered)}
       ${this.renderRecentMessages(recentMessages)}
+      ${teslaVehicle ? this.renderTeslaSection(teslaVehicle) : ''}
     `;
 
     this.setupEventListeners();
     this.setupLocationListeners(user.location);
+    this.setupTeslaListeners(content);
 
     // Bind media card click handlers
     content.querySelectorAll('.media-card[data-message-id]').forEach(card => {
@@ -171,6 +183,102 @@ const UserProfileSystem = {
         </div>
       </div>
     `;
+  },
+
+  renderTeslaSection(vehicle) {
+    const v = (x) => (x != null && x !== 'null' && x !== '' && x !== -999 && x !== -1) ? x : null;
+
+    const model = escapeHtml(vehicle.model || 'Tesla');
+    const color = v(vehicle.color);
+    const soc = vehicle.soc ?? 0;
+    const estRange = v(vehicle.estRange) ? Math.round(vehicle.estRange) : null;
+    const insideTemp = v(vehicle.insideTemp) != null ? Math.round(vehicle.insideTemp) : null;
+    const outsideTemp = v(vehicle.outsideTemp) != null ? Math.round(vehicle.outsideTemp) : null;
+    const locked = v(vehicle.locked);
+    const sentry = v(vehicle.sentry);
+    const carVersion = v(vehicle.carVersion);
+    const odometer = v(vehicle.odometer) ? Math.round(vehicle.odometer).toLocaleString('tr-TR') : null;
+    const speed = Math.round(vehicle.speed || 0);
+
+    const rawGear = speed === 0 ? 'P' : (vehicle.gear || 'P');
+    const gearMap = { 'P': 'Park', 'D': 'Drive', 'R': 'Reverse', 'N': 'Neutral' };
+    const gearText = gearMap[rawGear] || rawGear;
+    const gearClass = rawGear === 'D' ? 'driving' : rawGear === 'R' ? 'reverse' : 'parked';
+
+    let tpms = null;
+    try {
+      const raw = vehicle.tpms;
+      tpms = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (tpms && !tpms.fl) tpms = null;
+    } catch { tpms = null; }
+
+    let batteryClass = 'green';
+    if (soc < 20) batteryClass = 'red';
+    else if (soc < 50) batteryClass = 'amber';
+
+    const tempIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v3h-2V5z"/></svg>';
+
+    return `
+      <div class="profile-tesla-section">
+        <div class="profile-tesla-header">
+          <div class="profile-tesla-logo">T</div>
+          <div class="profile-tesla-title">
+            <span class="profile-tesla-model">${model}</span>
+            ${color ? `<span class="profile-tesla-color"> · ${escapeHtml(color)}</span>` : ''}
+          </div>
+        </div>
+
+        <div class="profile-tesla-battery">
+          <div class="profile-tesla-battery-bar">
+            <div class="profile-tesla-battery-fill profile-tesla-battery-${batteryClass}" style="width:${soc}%"></div>
+          </div>
+          <span class="profile-tesla-battery-pct">${soc}%</span>
+          ${estRange ? `<span class="profile-tesla-range">${estRange}km</span>` : ''}
+        </div>
+
+        <div class="profile-tesla-status">
+          ${outsideTemp != null || insideTemp != null ? `
+            <span class="profile-tesla-temp">
+              ${tempIcon}
+              ${outsideTemp != null ? `Dış ${outsideTemp}°` : ''}${outsideTemp != null && insideTemp != null ? ' / ' : ''}${insideTemp != null ? `İç ${insideTemp}°` : ''}
+            </span>
+          ` : ''}
+          <span class="profile-tesla-gear profile-tesla-gear-${gearClass}">${gearText}${speed > 0 ? ` ${speed}km/h` : ''}</span>
+          ${locked != null ? `<span class="profile-tesla-tag ${locked ? 'profile-tesla-tag-green' : 'profile-tesla-tag-red'}">${locked ? 'Kilitli' : 'Açık'}</span>` : ''}
+          ${sentry ? `<span class="profile-tesla-tag profile-tesla-tag-blue">Nöbetçi</span>` : ''}
+        </div>
+
+        ${tpms ? `
+        <div class="profile-tesla-tpms">
+          <span>${tpms.fl} bar</span><span>${tpms.fr} bar</span>
+          <span>${tpms.rl} bar</span><span>${tpms.rr} bar</span>
+        </div>` : ''}
+
+        <div class="profile-tesla-footer">
+          ${odometer ? `<span class="profile-tesla-odo">odometer:${odometer}km</span>` : ''}
+          ${carVersion ? `<span class="profile-tesla-version">v${escapeHtml(carVersion)}</span>` : ''}
+        </div>
+
+        <button class="profile-tesla-disconnect">Tesla Bağlantısını Kes</button>
+      </div>
+    `;
+  },
+
+  setupTeslaListeners(content) {
+    const btn = content.querySelector('.profile-tesla-disconnect');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      if (!confirm('Tesla hesabınızı ayırmak istediğinize emin misiniz?')) return;
+      try {
+        await fetch(`${QBitmapConfig.api.base}/api/tesla/disconnect`, {
+          method: 'POST', credentials: 'include'
+        });
+        AuthSystem.showNotification('Tesla hesabı ayrıldı', 'info');
+        setTimeout(() => location.reload(), 1000);
+      } catch {
+        AuthSystem.showNotification('Bağlantı kesilemedi', 'error');
+      }
+    });
   },
 
   renderInfoRow(location, hasFaceRegistered) {

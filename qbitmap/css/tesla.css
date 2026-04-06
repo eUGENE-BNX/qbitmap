@@ -260,20 +260,15 @@
   color: #999;
 }
 
-.tv-footer-info {
+.tv-footer-odo {
   font-size: 11px;
   color: #999;
 }
 
-.tv-disconnect {
+.tv-footer-version {
   font-size: 11px;
-  color: #ef4444;
-  text-decoration: none;
-}
-
-.tv-disconnect:hover {
-  color: #f87171;
-  text-decoration: underline;
+  color: #999;
+  margin-left: auto;
 }
 
 /* Keep logo-t class for virtual key modal */
