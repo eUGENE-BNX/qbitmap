@@ -6,19 +6,21 @@
 
 /* Tesla Vehicle Popup */
 .tesla-vehicle-popup .maplibregl-popup-content {
-  background: #1a1a2e;
-  border-radius: 12px;
+  background: rgba(15, 15, 30, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 14px;
   padding: 0;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  border: 1px solid #2a2a4a;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
 .tesla-vehicle-popup .maplibregl-popup-close-button {
-  color: #888;
-  font-size: 18px;
-  right: 8px;
-  top: 6px;
+  color: #666;
+  font-size: 20px;
+  right: 10px;
+  top: 8px;
 }
 
 .tesla-vehicle-popup .maplibregl-popup-close-button:hover {
@@ -26,30 +28,31 @@
 }
 
 .tesla-vehicle-popup .maplibregl-popup-tip {
-  border-top-color: #1a1a2e;
+  border-top-color: rgba(15, 15, 30, 0.88);
 }
 
 .tv-card {
-  padding: 14px 16px;
-  min-width: 200px;
+  padding: 16px 18px 12px;
+  min-width: 220px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* Header */
 .tv-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .tv-logo {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   background: #e31937;
   color: #fff;
   font-weight: 700;
-  font-size: 16px;
-  border-radius: 8px;
+  font-size: 18px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -57,58 +60,51 @@
 }
 
 .tv-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   object-fit: cover;
   flex-shrink: 0;
 }
 
-.tv-title {
-  flex: 1;
-  min-width: 0;
-}
+.tv-title { flex: 1; min-width: 0; }
 
 .tv-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 16px;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.tv-model {
-  font-size: 11px;
-  color: #888;
+.tv-sub {
+  font-size: 12px;
+  color: #777;
+  margin-top: 1px;
 }
 
-.tv-row {
+/* Battery */
+.tv-battery-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
-.tv-battery {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-}
+.tv-battery { flex: 1; }
 
 .tv-battery-bar {
-  flex: 1;
-  min-width: 80px;
+  width: 100%;
   height: 8px;
-  background: #2a2a4a;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .tv-battery-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 4px;
   transition: width 0.3s ease;
 }
 
@@ -117,23 +113,36 @@
 .tv-battery-red { background: #ef4444; }
 
 .tv-battery-pct {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: #fff;
-  min-width: 32px;
+  min-width: 36px;
   text-align: right;
 }
 
+.tv-range {
+  font-size: 13px;
+  color: #888;
+}
+
+/* Info row */
+.tv-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
 .tv-gear {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 3px 10px;
-  border-radius: 4px;
-  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 6px;
 }
 
 .tv-gear-parked {
-  background: #2a2a4a;
+  background: rgba(255, 255, 255, 0.06);
   color: #888;
 }
 
@@ -148,100 +157,90 @@
 }
 
 .tv-speed {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: #22c55e;
 }
 
-.tv-range {
-  font-size: 12px;
-  color: #888;
-  margin-left: auto;
-}
-
-.tv-temps {
-  gap: 12px;
-}
-
-.tv-temp-item {
-  font-size: 12px;
-  color: #aaa;
-}
-
-.tv-status {
-  gap: 6px;
-}
-
-.tv-badge {
-  font-size: 10px;
+.tv-tag {
+  font-size: 11px;
   font-weight: 500;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 4px;
 }
 
-.tv-badge-ok {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
+.tv-tag-green {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
 }
 
-.tv-badge-warn {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+.tv-tag-red {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
 }
 
-.tv-badge-blue {
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
+.tv-tag-blue {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
 }
 
-.tv-section {
-  padding: 6px 0;
-  border-bottom: 1px solid #2a2a4a;
+/* Temps */
+.tv-temp-row {
+  gap: 16px;
 }
 
-.tv-section:last-of-type {
-  border-bottom: none;
+.tv-temp {
+  font-size: 13px;
+  color: #aaa;
 }
 
-.tv-tpms {
+/* TPMS */
+.tv-tpms-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.tv-tpms-label {
+  font-size: 11px;
+  color: #555;
 }
 
 .tv-tpms-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2px 12px;
-}
-
-.tv-tpms-val {
-  font-size: 11px;
+  gap: 1px 14px;
+  font-size: 12px;
   color: #aaa;
   font-variant-numeric: tabular-nums;
 }
 
 .tv-tpms-unit {
-  font-size: 10px;
-  color: #666;
+  font-size: 11px;
+  color: #555;
 }
 
+/* Footer */
 .tv-footer {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  padding-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.tv-meta {
-  font-size: 10px;
+.tv-footer-left {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
   color: #555;
 }
 
 .tv-disconnect {
-  font-size: 10px;
+  font-size: 11px;
   color: #ef4444;
   text-decoration: none;
-  margin-left: auto;
 }
 
 .tv-disconnect:hover {
