@@ -503,6 +503,90 @@
 }
 .profile-tesla-mesh-toggle:disabled { opacity: 0.6; cursor: wait; }
 
+/* Empty-state CTA (no vehicle connected) */
+.profile-tesla-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.profile-tesla-cta-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.profile-tesla-cta-text {
+  flex: 1;
+  min-width: 0;
+}
+.profile-tesla-cta-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #24292f;
+  margin-bottom: 4px;
+}
+.profile-tesla-cta-desc {
+  font-size: 12px;
+  color: #57606a;
+  line-height: 1.4;
+}
+.profile-tesla-connect-btn {
+  width: 100%;
+  padding: 10px;
+  background: #e32d2d;
+  border: 1px solid #c0252a;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.profile-tesla-connect-btn:hover { background: #c0252a; }
+
+/* Telemetry-off banner inside existing Tesla section */
+.profile-tesla-banner {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: #fff4e5;
+  border: 1px solid #f0b36b;
+  border-radius: 8px;
+}
+.profile-tesla-banner-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.profile-tesla-banner-text strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: #a04d00;
+}
+.profile-tesla-banner-text span {
+  font-size: 11px;
+  color: #7a4a00;
+  line-height: 1.3;
+}
+.profile-tesla-show-qr {
+  padding: 7px 12px;
+  background: #fff;
+  border: 1px solid #d0752c;
+  color: #d0752c;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.profile-tesla-show-qr:hover { background: #d0752c; color: #fff; }
+
 /* Disconnect button */
 .profile-tesla-disconnect {
   width: 100%;

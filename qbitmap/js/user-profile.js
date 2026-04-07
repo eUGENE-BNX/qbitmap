@@ -143,7 +143,7 @@ const UserProfileSystem = {
       ${this.renderHeaderCard(user, cameraStats, landStats)}
       ${this.renderInfoRow(user.location, user.hasFaceRegistered)}
       ${this.renderRecentMessages(recentMessages)}
-      ${teslaVehicle ? this.renderTeslaSection(teslaVehicle) : ''}
+      ${teslaVehicle ? this.renderTeslaSection(teslaVehicle) : this.renderTeslaConnectCard()}
     `;
 
     this.setupEventListeners();
@@ -181,6 +181,21 @@ const UserProfileSystem = {
           <div class="profile-stat-mini"><span class="stat-value">${camShared}</span><span class="stat-label">Paylaşılan</span></div>
           <div class="profile-stat-mini"><span class="stat-value">${areaM2}</span><span class="stat-label">Arazi</span></div>
         </div>
+      </div>
+    `;
+  },
+
+  renderTeslaConnectCard() {
+    return `
+      <div class="profile-tesla-section profile-tesla-cta">
+        <div class="profile-tesla-cta-row">
+          <div class="profile-tesla-logo">T</div>
+          <div class="profile-tesla-cta-text">
+            <div class="profile-tesla-cta-title">Tesla Aracını Bağla</div>
+            <div class="profile-tesla-cta-desc">Aracının canlı konumunu haritada paylaş, fleet'e katıl, lastik basıncı/menzil/şarj seviyesini buradan takip et.</div>
+          </div>
+        </div>
+        <button class="profile-tesla-connect-btn">Tesla'yı Bağla</button>
       </div>
     `;
   },
@@ -223,8 +238,19 @@ const UserProfileSystem = {
     const batteryIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="18" height="12" rx="2" ry="2"/><line x1="23" y1="13" x2="23" y2="11"/></svg>';
     const rangeIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
 
+    const telemetryOff = vehicle.telemetryEnabled === false;
+
     return `
       <div class="profile-tesla-section">
+        ${telemetryOff ? `
+          <div class="profile-tesla-banner" data-vehicle-id="${escapeHtml(vehicleId)}">
+            <div class="profile-tesla-banner-text">
+              <strong>Telemetry henüz aktif değil</strong>
+              <span>Aracın konumu paylaşılmıyor. QR kodu okutarak virtual key onayla.</span>
+            </div>
+            <button class="profile-tesla-show-qr">QR Kodu Göster</button>
+          </div>
+        ` : ''}
         ${outsideTemp != null || insideTemp != null ? `
           <span class="profile-tesla-temp-corner">
             ${tempIcon}
@@ -295,6 +321,35 @@ const UserProfileSystem = {
   },
 
   setupTeslaListeners(content) {
+    // Connect CTA (empty state)
+    const connectBtn = content.querySelector('.profile-tesla-connect-btn');
+    if (connectBtn) {
+      connectBtn.addEventListener('click', () => {
+        window.location.href = `${QBitmapConfig.api.base}/auth/tesla`;
+      });
+    }
+
+    // Re-show QR modal (telemetry-off banner)
+    const showQrBtn = content.querySelector('.profile-tesla-show-qr');
+    if (showQrBtn) {
+      showQrBtn.addEventListener('click', async () => {
+        try {
+          const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles`, { credentials: 'include' });
+          const data = await res.json();
+          const noTelemetry = (data.vehicles || []).filter(v => !v.telemetryEnabled);
+          if (noTelemetry.length === 0) {
+            AuthSystem.showNotification('Telemetry zaten aktif', 'info');
+            return;
+          }
+          const teslaModule = await import('./tesla/index.js');
+          teslaModule.TeslaSystem.showTelemetryPrompt(noTelemetry);
+        } catch (err) {
+          Logger.error('[Profile] Show QR failed:', err);
+          AuthSystem.showNotification('QR gösterilemedi', 'error');
+        }
+      });
+    }
+
     // Disconnect
     const disconnectBtn = content.querySelector('.profile-tesla-disconnect');
     if (disconnectBtn) {

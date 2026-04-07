@@ -86,7 +86,7 @@ export const TeslaSystem = {
         // Check for vehicles without Fleet Telemetry
         const noTelemetry = data.vehicles.filter(v => !v.telemetryEnabled);
         if (noTelemetry.length > 0) {
-          this._showTelemetryPrompt(noTelemetry);
+          this.showTelemetryPrompt(noTelemetry);
         }
       } else {
         showNotification('Herhangi bir Tesla aracınız bağlı değil.', 'info');
@@ -104,7 +104,7 @@ export const TeslaSystem = {
     TeslaWebSocket.unsubscribe();
   },
 
-  _showTelemetryPrompt(vehicles) {
+  showTelemetryPrompt(vehicles) {
     // Remove existing modal
     const existing = document.getElementById('tesla-vk-modal');
     if (existing) existing.remove();
