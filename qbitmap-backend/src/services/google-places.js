@@ -104,7 +104,7 @@ async function getNearbyPlaces(lat, lng) {
 
   // 2. Cache miss or expired - call Google Places API
   const apiKey = config.googlePlaces?.apiKey;
-  if (!apiKey || apiKey === 'dev-google-places-key') {
+  if (!apiKey) {
     logger.warn('Google Places API key not configured');
     return cached ? await db.getPlacesForCell(cached.id) : [];
   }

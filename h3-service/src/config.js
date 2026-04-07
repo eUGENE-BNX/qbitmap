@@ -20,8 +20,8 @@ module.exports = {
   },
   serviceKey: (() => {
     if (process.env.SERVICE_KEY) return process.env.SERVICE_KEY;
-    if (isProduction) { console.error('FATAL: SERVICE_KEY required in production'); process.exit(1); }
-    return 'dev-service-key';
+    console.error('\n❌ FATAL: Missing required environment variable: SERVICE_KEY\n');
+    process.exit(1);
   })(),
   qbitmap: {
     apiUrl: process.env.QBITMAP_API_URL || 'https://stream.qbitmap.com'

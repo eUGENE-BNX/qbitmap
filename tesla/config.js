@@ -1,5 +1,13 @@
 require('dotenv').config();
 
+// Crash at boot if a required secret is missing — no string fallbacks.
+function requireEnv(name) {
+  const v = process.env[name];
+  if (v) return v;
+  console.error(`\n❌ FATAL: Missing required environment variable: ${name}\n`);
+  process.exit(1);
+}
+
 module.exports = {
   server: {
     port: process.env.TELEMETRY_PORT || 4443,
@@ -20,6 +28,6 @@ module.exports = {
   },
   backend: {
     webhookUrl: process.env.BACKEND_WEBHOOK_URL || 'http://localhost:3000/api/tesla/telemetry-event',
-    webhookSecret: process.env.TESLA_TELEMETRY_WEBHOOK_SECRET || 'dev-telemetry-secret',
+    webhookSecret: requireEnv('TESLA_TELEMETRY_WEBHOOK_SECRET'),
   },
 };

@@ -1,18 +1,13 @@
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Helper: Require env var in production, allow fallback in development
-function requireEnv(name, devFallback) {
+// Helper: Required env var. Crashes at boot if missing — no string fallback,
+// ever, for secrets/keys/tokens. Dev environments must populate .env.
+function requireEnv(name) {
   const value = process.env[name];
   if (value) return value;
-
-  if (isProduction) {
-    console.error(`\n❌ FATAL: Missing required environment variable: ${name}`);
-    console.error(`   Set it in your .env file or environment.\n`);
-    process.exit(1);
-  }
-
-  console.warn(`⚠️  DEV MODE: Using fallback for ${name}`);
-  return devFallback;
+  console.error(`\n❌ FATAL: Missing required environment variable: ${name}`);
+  console.error(`   Set it in your .env file or environment.\n`);
+  process.exit(1);
 }
 
 module.exports = {
@@ -31,32 +26,32 @@ module.exports = {
   },
   oauth: {
     google: {
-      clientId: requireEnv('GOOGLE_CLIENT_ID', 'dev-google-client-id'),
-      clientSecret: requireEnv('GOOGLE_CLIENT_SECRET', 'dev-google-client-secret'),
+      clientId: requireEnv('GOOGLE_CLIENT_ID'),
+      clientSecret: requireEnv('GOOGLE_CLIENT_SECRET'),
       callbackUri: isProduction
         ? 'https://stream.qbitmap.com/auth/google/callback'
         : 'http://localhost:3000/auth/google/callback'
     }
   },
   jwt: {
-    secret: requireEnv('JWT_SECRET', 'dev-jwt-secret-not-for-production'),
+    secret: requireEnv('JWT_SECRET'),
     expiresIn: '7d'
   },
   auth: {
-    sharedSecret: requireEnv('DEVICE_SHARED_SECRET', 'dev-shared-secret')
+    sharedSecret: requireEnv('DEVICE_SHARED_SECRET')
   },
   frontend: {
     url: process.env.FRONTEND_URL || (isProduction ? 'https://qbitmap.com' : 'http://localhost:8080')
   },
   googlePlaces: {
-    apiKey: requireEnv('GOOGLE_PLACES_API_KEY', 'dev-google-places-key'),
+    apiKey: requireEnv('GOOGLE_PLACES_API_KEY'),
     defaultRadius: 30,
     maxResultCount: 10,
     cacheTTLDays: 30
   },
   tesla: {
-    clientId: requireEnv('TESLA_CLIENT_ID', 'bf594e12-7ba9-4089-b263-7ce7504cf363'),
-    clientSecret: requireEnv('TESLA_CLIENT_SECRET', 'ta-secret.WzoWQa3W+1FFyc5W'),
+    clientId: requireEnv('TESLA_CLIENT_ID'),
+    clientSecret: requireEnv('TESLA_CLIENT_SECRET'),
     callbackUri: isProduction
       ? 'https://stream.qbitmap.com/auth/tesla/callback'
       : 'http://localhost:3000/auth/tesla/callback',
@@ -64,7 +59,7 @@ module.exports = {
     authUrl: 'https://auth.tesla.com/oauth2/v3/authorize',
     tokenUrl: 'https://auth.tesla.com/oauth2/v3/token',
     apiBase: 'https://fleet-api.prd.eu.vn.cloud.tesla.com',
-    telemetryWebhookSecret: requireEnv('TESLA_TELEMETRY_WEBHOOK_SECRET', 'dev-telemetry-secret'),
+    telemetryWebhookSecret: requireEnv('TESLA_TELEMETRY_WEBHOOK_SECRET'),
   },
   services: (() => {
     const mtxHost = process.env.MEDIAMTX_HOST || '91.98.90.57';
