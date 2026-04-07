@@ -214,4 +214,4 @@ function stop() {
   }
 }
 
-module.exports = { start, stop };
+module.exports = { start, stop, syncTpms, syncVehicleInfo };
