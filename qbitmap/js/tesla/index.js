@@ -89,7 +89,7 @@ export const TeslaSystem = {
           this._showTelemetryPrompt(noTelemetry);
         }
       } else {
-        showNotification('Henüz Tesla aracı bulunamadı', 'info');
+        showNotification('Herhangi bir Tesla aracınız bağlı değil.', 'info');
       }
     } catch (err) {
       console.error('Tesla vehicles fetch error:', err);

@@ -280,7 +280,16 @@ const UserProfileSystem = {
           ${carVersion ? `<span class="profile-tesla-version">v${escapeHtml(carVersion)}</span>` : ''}
         </div>
 
-        <button class="profile-tesla-disconnect">Tesla Bağlantısını Kes</button>
+        <div class="profile-tesla-actions">
+          <button class="profile-tesla-disconnect">Tesla Bağlantısını Kes</button>
+          <button class="profile-tesla-mesh-toggle ${vehicle.meshVisible === false ? 'is-offline' : 'is-online'}"
+                  data-vehicle-id="${escapeHtml(vehicleId)}"
+                  data-visible="${vehicle.meshVisible === false ? '0' : '1'}"
+                  title="Aracın haritada diğer kullanıcılara görünürlüğü">
+            <span class="profile-tesla-mesh-dot"></span>
+            <span class="profile-tesla-mesh-label">${vehicle.meshVisible === false ? 'Offline' : 'Online'}</span>
+          </button>
+        </div>
       </div>
     `;
   },
@@ -299,6 +308,35 @@ const UserProfileSystem = {
           setTimeout(() => location.reload(), 1000);
         } catch {
           AuthSystem.showNotification('Bağlantı kesilemedi', 'error');
+        }
+      });
+    }
+
+    // Mesh visibility toggle
+    const meshBtn = content.querySelector('.profile-tesla-mesh-toggle');
+    if (meshBtn) {
+      meshBtn.addEventListener('click', async () => {
+        const vid = meshBtn.dataset.vehicleId;
+        const newVisible = meshBtn.dataset.visible !== '1';
+        meshBtn.disabled = true;
+        try {
+          const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${vid}/mesh-visible`, {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ visible: newVisible }),
+          });
+          if (!res.ok) throw new Error('http ' + res.status);
+          meshBtn.dataset.visible = newVisible ? '1' : '0';
+          meshBtn.classList.toggle('is-online', newVisible);
+          meshBtn.classList.toggle('is-offline', !newVisible);
+          const lbl = meshBtn.querySelector('.profile-tesla-mesh-label');
+          if (lbl) lbl.textContent = newVisible ? 'Online' : 'Offline';
+          AuthSystem.showNotification(newVisible ? 'Aracınız haritada görünür' : 'Aracınız haritada gizli', 'info');
+        } catch {
+          AuthSystem.showNotification('Görünürlük değiştirilemedi', 'error');
+        } finally {
+          meshBtn.disabled = false;
         }
       });
     }

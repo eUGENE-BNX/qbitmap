@@ -247,6 +247,7 @@ async function teslaApiRoutes(fastify) {
         odometer: v.odometer ? Math.round(v.odometer) : null,
         isOnline: !!v.is_online,
         telemetryEnabled: !!v.telemetry_enabled,
+        meshVisible: v.mesh_visible == null ? true : !!v.mesh_visible,
         insideTemp: v.last_inside_temp,
         outsideTemp: v.last_outside_temp,
         estRange: v.last_est_range,
@@ -260,6 +261,23 @@ async function teslaApiRoutes(fastify) {
         teslaAvatar: v.owner_profile_image || null,
       }))
     };
+  });
+
+  // Toggle mesh visibility (whether other users see this vehicle on the map)
+  fastify.patch('/vehicles/:vehicleId/mesh-visible', async (request, reply) => {
+    const { vehicleId } = request.params;
+    const { visible } = request.body || {};
+    const ok = await db.setTeslaVehicleMeshVisible(vehicleId, request.user.userId, !!visible);
+    if (!ok) return reply.code(404).send({ error: 'Vehicle not found' });
+
+    // Re-broadcast mesh to all subscribed clients so they add/remove the vehicle live
+    try {
+      const wsService = require('../services/websocket');
+      wsService.broadcastTeslaMesh();
+    } catch (err) {
+      logger.warn({ err }, 'broadcastTeslaMesh failed');
+    }
+    return { status: 'ok', meshVisible: !!visible };
   });
 
   // Update vehicle license plate
@@ -362,6 +380,7 @@ async function teslaApiRoutes(fastify) {
           InsideTemp: { interval_seconds: 600 },
           OutsideTemp: { interval_seconds: 600 },
           Locked: { interval_seconds: 600 },
+          Odometer: { interval_seconds: 3600 },
         },
         alert_types: [],
       },
@@ -406,12 +425,12 @@ async function teslaTelemetryRoutes(fastify) {
       return reply.code(401).send({ error: 'Invalid webhook secret' });
     }
 
-    const { vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry } = request.body;
+    const { vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry, odometer } = request.body;
     if (!vin) {
       return reply.code(400).send({ error: 'VIN required' });
     }
 
-    await db.updateVehicleTelemetry({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry });
+    await db.updateVehicleTelemetry({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry, odometer });
 
     // Broadcast via WebSocket if available
     const vehicle = await db.getTeslaVehicleByVin(vin);
@@ -492,7 +511,8 @@ async function syncTeslaVehicles(teslaAccountId, accessToken, apiBase) {
             color: vc?.exterior_color || null,
             wheelType: vc?.wheel_type || null,
             carVersion: vs?.car_version || null,
-            odometer: vs?.odometer || null,
+            // Tesla returns odometer in miles — store as km
+            odometer: vs?.odometer != null ? vs.odometer * 1.60934 : null,
           });
         }
 

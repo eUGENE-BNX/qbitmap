@@ -77,7 +77,7 @@ DatabaseService.prototype.upsertTeslaVehicle = async function({ teslaAccountId, 
   );
 };
 
-DatabaseService.prototype.updateVehicleTelemetry = async function({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry }) {
+DatabaseService.prototype.updateVehicleTelemetry = async function({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry, odometer }) {
   const fields = [];
   const values = [];
   if (lat != null) { fields.push('last_lat = ?'); values.push(lat); }
@@ -92,6 +92,7 @@ DatabaseService.prototype.updateVehicleTelemetry = async function({ vin, lat, ln
   if (chargeLimit != null) { fields.push('last_charge_limit = ?'); values.push(chargeLimit); }
   if (locked != null) { fields.push('last_locked = ?'); values.push(locked); }
   if (sentry != null) { fields.push('last_sentry = ?'); values.push(sentry); }
+  if (odometer != null) { fields.push('odometer = ?'); values.push(odometer); }
   if (fields.length === 0) return;
 
   fields.push('last_telemetry_at = NOW()', 'is_online = 1', 'updated_at = NOW()');
@@ -136,6 +137,29 @@ DatabaseService.prototype.getAllOnlineTeslaVehicles = async function() {
      WHERE v.is_online = 1 AND v.last_lat IS NOT NULL AND v.last_lng IS NOT NULL`
   );
   return rows;
+};
+
+DatabaseService.prototype.getMeshVisibleTeslaVehicles = async function() {
+  const [rows] = await this.pool.execute(
+    `SELECT v.*, a.user_id, a.full_name AS owner_full_name, a.profile_image_url AS owner_profile_image,
+            u.display_name, u.avatar_url
+     FROM tesla_vehicles v
+     JOIN tesla_accounts a ON a.id = v.tesla_account_id
+     JOIN users u ON u.id = a.user_id
+     WHERE v.mesh_visible = 1`
+  );
+  return rows;
+};
+
+DatabaseService.prototype.setTeslaVehicleMeshVisible = async function(vehicleId, userId, visible) {
+  const [res] = await this.pool.execute(
+    `UPDATE tesla_vehicles v
+     JOIN tesla_accounts a ON a.id = v.tesla_account_id
+     SET v.mesh_visible = ?, v.updated_at = NOW()
+     WHERE v.vehicle_id = ? AND a.user_id = ?`,
+    [visible ? 1 : 0, vehicleId, userId]
+  );
+  return res.affectedRows > 0;
 };
 
 DatabaseService.prototype.setTeslaVehicleOffline = async function(vin) {

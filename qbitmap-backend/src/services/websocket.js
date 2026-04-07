@@ -561,52 +561,102 @@ class WebSocketService {
   }
 
   /**
-   * Send current Tesla vehicles to a client
+   * Build the mesh payload (all vehicles whose owners opted in)
+   */
+  async _buildTeslaMeshPayload() {
+    const vehicles = await db.getMeshVisibleTeslaVehicles();
+    return vehicles.map(v => ({
+      vin: v.vin,
+      vehicleId: v.vehicle_id,
+      displayName: v.display_name,
+      model: v.model,
+      lat: v.last_lat,
+      lng: v.last_lng,
+      soc: v.last_soc,
+      gear: v.last_gear,
+      bearing: v.last_bearing,
+      speed: v.last_speed,
+      isOnline: !!v.is_online,
+      insideTemp: v.last_inside_temp,
+      outsideTemp: v.last_outside_temp,
+      estRange: v.last_est_range,
+      locked: v.last_locked != null ? !!v.last_locked : null,
+      sentry: v.last_sentry != null ? !!v.last_sentry : null,
+      color: v.color,
+      carVersion: v.car_version,
+      odometer: v.odometer ? Math.round(v.odometer) : null,
+      tpms: v.last_tpms_fl != null ? { fl: v.last_tpms_fl, fr: v.last_tpms_fr, rl: v.last_tpms_rl, rr: v.last_tpms_rr } : null,
+      ownerUserId: v.user_id,
+      ownerName: v.display_name,
+      ownerAvatar: v.avatar_url,
+      teslaAvatar: v.owner_profile_image || null,
+    }));
+  }
+
+  /**
+   * Send current Tesla mesh to a client (all mesh-visible vehicles)
    */
   async sendTeslaVehicles(ws) {
     try {
       if (!ws.userId) return;
-      const vehicles = await db.getTeslaVehiclesByUserId(ws.userId);
-      ws.send(JSON.stringify({
-        type: 'tesla_vehicles',
-        payload: vehicles.map(v => ({
-          vin: v.vin,
-          vehicleId: v.vehicle_id,
-          displayName: v.display_name,
-          model: v.model,
-          lat: v.last_lat,
-          lng: v.last_lng,
-          soc: v.last_soc,
-          gear: v.last_gear,
-          bearing: v.last_bearing,
-          speed: v.last_speed,
-          isOnline: !!v.is_online,
-          insideTemp: v.last_inside_temp,
-          outsideTemp: v.last_outside_temp,
-          estRange: v.last_est_range,
-          locked: v.last_locked != null ? !!v.last_locked : null,
-          sentry: v.last_sentry != null ? !!v.last_sentry : null,
-          color: v.color,
-          carVersion: v.car_version,
-          odometer: v.odometer ? Math.round(v.odometer) : null,
-          tpms: v.last_tpms_fl != null ? { fl: v.last_tpms_fl, fr: v.last_tpms_fr, rl: v.last_tpms_rl, rr: v.last_tpms_rr } : null,
-          ownerName: v.display_name,
-          ownerAvatar: v.avatar_url,
-          teslaAvatar: v.owner_profile_image || null,
-        }))
-      }));
+      const payload = await this._buildTeslaMeshPayload();
+      ws.send(JSON.stringify({ type: 'tesla_vehicles', payload }));
     } catch (err) {
       logger.error({ err }, 'Error sending Tesla vehicles');
     }
   }
 
   /**
-   * Broadcast Tesla vehicle update to the owning user's connections
+   * Broadcast the full mesh snapshot to every subscribed client
+   * (used after a user toggles mesh_visible so others add/remove the vehicle live)
    */
-  broadcastTeslaUpdate(userId, vehicleData) {
+  async broadcastTeslaMesh() {
+    try {
+      const payload = await this._buildTeslaMeshPayload();
+      const msg = JSON.stringify({ type: 'tesla_vehicles', payload });
+      for (const userClients of this.clients.values()) {
+        for (const ws of userClients) {
+          if (ws.readyState === WebSocket.OPEN && ws.subscribedTesla) {
+            ws.send(msg);
+          }
+        }
+      }
+    } catch (err) {
+      logger.error({ err }, 'broadcastTeslaMesh failed');
+    }
+  }
+
+  /**
+   * Broadcast Tesla vehicle telemetry update.
+   * If the vehicle is mesh_visible, fan out to ALL subscribed clients;
+   * otherwise only to the owning user's connections.
+   */
+  async broadcastTeslaUpdate(userId, vehicleData) {
+    const payload = JSON.stringify({ type: 'tesla_vehicle_update', payload: vehicleData });
+
+    let isMesh = false;
+    try {
+      if (vehicleData.vin) {
+        const v = await db.getTeslaVehicleByVin(vehicleData.vin);
+        isMesh = !!(v && v.mesh_visible);
+      }
+    } catch (err) {
+      logger.warn({ err }, 'mesh_visible lookup failed');
+    }
+
+    if (isMesh) {
+      for (const userClients of this.clients.values()) {
+        for (const ws of userClients) {
+          if (ws.readyState === WebSocket.OPEN && ws.subscribedTesla) {
+            ws.send(payload);
+          }
+        }
+      }
+      return;
+    }
+
     const userClients = this.clients.get(userId);
     if (!userClients) return;
-    const payload = JSON.stringify({ type: 'tesla_vehicle_update', payload: vehicleData });
     for (const ws of userClients) {
       if (ws.readyState === WebSocket.OPEN && ws.subscribedTesla) {
         ws.send(payload);

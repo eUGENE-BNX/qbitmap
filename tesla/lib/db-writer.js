@@ -11,7 +11,7 @@ function getPool() {
 }
 
 async function dbWriter(update) {
-  const { vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry } = update;
+  const { vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry, odometer } = update;
   const p = getPool();
 
   const fields = [];
@@ -29,6 +29,7 @@ async function dbWriter(update) {
   if (chargeLimit != null) { fields.push('last_charge_limit = ?'); values.push(chargeLimit); }
   if (locked != null) { fields.push('last_locked = ?'); values.push(locked); }
   if (sentry != null) { fields.push('last_sentry = ?'); values.push(sentry); }
+  if (odometer != null) { fields.push('odometer = ?'); values.push(odometer); }
 
   if (fields.length === 0) return;
 

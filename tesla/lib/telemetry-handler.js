@@ -7,6 +7,7 @@ const prevLocations = new Map();
 // Tesla Fleet Telemetry field IDs (from vehicle_data.proto)
 const FIELD = {
   VEHICLE_SPEED: 4,
+  ODOMETER: 5,
   SOC: 8,
   GEAR: 10,
   LOCATION: 21,
@@ -81,6 +82,14 @@ async function handleTelemetryMessage(rawData, logger) {
       case FIELD.GEAR:
         if (value != null) {
           update.gear = normalizeGear(value);
+          hasUpdate = true;
+        }
+        break;
+
+      case FIELD.ODOMETER:
+        if (typeof value === 'number') {
+          // Tesla sends miles, store as km
+          update.odometer = Math.round(value * 1.60934 * 100) / 100;
           hasUpdate = true;
         }
         break;
@@ -338,7 +347,7 @@ function readVarint(data, pos) {
 }
 
 function fieldName(id) {
-  const names = { 4: 'VehicleSpeed', 8: 'Soc', 10: 'Gear', 21: 'Location', 23: 'GpsHeading', 38: 'ChargeLimitSoc', 40: 'EstBatteryRange', 42: 'BatteryLevel', 59: 'Locked', 65: 'SentryMode', 85: 'InsideTemp', 86: 'OutsideTemp' };
+  const names = { 4: 'VehicleSpeed', 5: 'Odometer', 8: 'Soc', 10: 'Gear', 21: 'Location', 23: 'GpsHeading', 38: 'ChargeLimitSoc', 40: 'EstBatteryRange', 42: 'BatteryLevel', 59: 'Locked', 65: 'SentryMode', 85: 'InsideTemp', 86: 'OutsideTemp' };
   return names[id] || `Field_${id}`;
 }
 
