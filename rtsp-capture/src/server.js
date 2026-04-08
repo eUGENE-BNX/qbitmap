@@ -60,6 +60,11 @@ async function createServer() {
     const rtspUrl = providedUrl || `${config.capture.rtspBase}/${streamId}`;
 
     try {
+      // SSRF guard: only enforce private-host deny on caller-supplied URLs.
+      // The default rtspBase is server-controlled and intentionally loopback.
+      if (providedUrl) {
+        captureManager.assertPublicRtspUrl(providedUrl);
+      }
       const result = captureManager.start(streamId, rtspUrl, interval);
       return result;
     } catch (err) {

@@ -2,7 +2,7 @@ const db = require('../services/database');
 const { authHook } = require('../utils/jwt');
 const frameCache = require('../services/frame-cache');
 const mediamtx = require('../services/mediamtx');
-const { validateBody, addRtspCameraSchema, safePath } = require('../utils/validation');
+const { validateBody, addRtspCameraSchema, safePath, parseId } = require('../utils/validation');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const { checkFeatureLimit } = require('../middleware/limits');
 const path = require('path');
@@ -540,7 +540,8 @@ async function userRoutes(fastify, options) {
 
   // Update a camera
   fastify.put('/me/cameras/:cameraId', async (request, reply) => {
-    const cameraId = parseInt(request.params.cameraId);
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
     const { name, lng, lat, is_public, whep_url } = request.body;
 
     try {
@@ -578,7 +579,8 @@ async function userRoutes(fastify, options) {
 
   // Get single camera details (must be owner)
   fastify.get('/me/cameras/:cameraId', async (request, reply) => {
-    const cameraId = parseInt(request.params.cameraId);
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
 
     if (!await db.isUserCameraOwner(request.user.userId, cameraId)) {
       return reply.code(403).send({ error: 'You do not own this camera' });
@@ -614,7 +616,8 @@ async function userRoutes(fastify, options) {
 
   // Release camera ownership
   fastify.delete('/me/cameras/:cameraId', async (request, reply) => {
-    const cameraId = parseInt(request.params.cameraId);
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
 
     const result = await db.releaseCamera(cameraId, request.user.userId);
 
@@ -636,7 +639,8 @@ async function userRoutes(fastify, options) {
    * Share a camera with another user by email
    */
   fastify.post('/me/cameras/:cameraId/share', async (request, reply) => {
-    const cameraId = parseInt(request.params.cameraId);
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
     const { email } = request.body;
 
     if (!email) {
@@ -663,7 +667,8 @@ async function userRoutes(fastify, options) {
    * Get all shares for a camera
    */
   fastify.get('/me/cameras/:cameraId/shares', async (request, reply) => {
-    const cameraId = parseInt(request.params.cameraId);
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
 
     // Check ownership
     if (!await db.isUserCameraOwner(request.user.userId, cameraId)) {
@@ -679,7 +684,8 @@ async function userRoutes(fastify, options) {
    * Remove a camera share
    */
   fastify.delete('/me/cameras/:cameraId/shares/:shareId', async (request, reply) => {
-    const shareId = parseInt(request.params.shareId);
+    const shareId = parseId(request.params.shareId);
+    if (shareId === null) return reply.code(400).send({ error: 'Invalid shareId' });
 
     const result = await db.removeCameraShare(shareId, request.user.userId);
 
@@ -734,7 +740,8 @@ async function userRoutes(fastify, options) {
   // Delete camera permanently (with full cleanup: ONVIF → MediaMTX → DB)
   // Order matters: delete from external services FIRST, then database LAST
   fastify.delete("/me/cameras/:cameraId/delete", async (request, reply) => {
-    const cameraId = parseInt(request.params.cameraId);
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
     const { deleteRecordings = true } = request.body || {};
 
     // Check ownership

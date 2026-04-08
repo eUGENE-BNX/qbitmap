@@ -3,7 +3,7 @@ const wsService = require('../services/websocket');
 const voiceCallService = require('../services/voice-call');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const { authHook } = require('../utils/jwt');
-const { validateBody, addOnvifCameraSchema, linkCameraSchema, webhookEventSchema } = require('../utils/validation');
+const { validateBody, addOnvifCameraSchema, linkCameraSchema, webhookEventSchema, parseId } = require('../utils/validation');
 const logger = require('../utils/logger').child({ module: 'onvif' });
 const { TIMEOUTS } = require('../config/constants');
 const { services } = require('../config');
@@ -156,10 +156,11 @@ async function onvifRoutes(fastify, options) {
    * Get ONVIF link for a QBitmap camera
    */
   fastify.get('/link/:cameraId', async (request, reply) => {
-    const { cameraId } = request.params;
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
 
     try {
-      const link = await db.getOnvifLink(parseInt(cameraId));
+      const link = await db.getOnvifLink(cameraId);
 
       if (!link) {
         // Return 200 with null link instead of 404 to avoid console errors
@@ -187,7 +188,8 @@ async function onvifRoutes(fastify, options) {
    * Body: { templateId }
    */
   fastify.put('/link/:cameraId', async (request, reply) => {
-    const { cameraId } = request.params;
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
     const { templateId } = request.body;
 
     if (!templateId) {
@@ -202,7 +204,7 @@ async function onvifRoutes(fastify, options) {
       }
 
       // Get existing link to find onvifCameraId
-      const link = await db.getOnvifLink(parseInt(cameraId));
+      const link = await db.getOnvifLink(cameraId);
       if (!link) {
         return reply.code(404).send({ error: 'ONVIF link not found' });
       }

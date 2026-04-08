@@ -293,16 +293,20 @@ DatabaseService.prototype.getPublicCamerasByBbox = async function(bbox, page = 1
   ({ page, limit } = this._safePagination(page, limit));
   const offset = (page - 1) * limit;
 
+  // Exclude city cameras: served via /city-cameras to keep payloads disjoint
   const [items] = await this.pool.execute(`
     SELECT id, device_id, name, lng, lat, stream_mode, last_seen, created_at, camera_type, whep_url, rtsp_source_url, mediamtx_path
     FROM cameras
-    WHERE is_public = 1 AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ?
+    WHERE is_public = 1 AND camera_type <> 'city'
+      AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ?
     ORDER BY last_seen DESC
     LIMIT ${limit} OFFSET ${offset}
   `, [bbox.west, bbox.east, bbox.south, bbox.north]);
 
   const [countRows] = await this.pool.execute(
-    'SELECT COUNT(*) as count FROM cameras WHERE is_public = 1 AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ?',
+    `SELECT COUNT(*) as count FROM cameras
+     WHERE is_public = 1 AND camera_type <> 'city'
+       AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ?`,
     [bbox.west, bbox.east, bbox.south, bbox.north]
   );
   const total = countRows[0].count;
@@ -317,15 +321,16 @@ DatabaseService.prototype.getPublicCamerasPaginated = async function(page = 1, l
   ({ page, limit } = this._safePagination(page, limit));
   const offset = (page - 1) * limit;
 
+  // Exclude city cameras: served via /city-cameras to keep payloads disjoint
   const [items] = await this.pool.query(`
     SELECT id, device_id, name, lng, lat, stream_mode, last_seen, created_at, camera_type, whep_url, rtsp_source_url, mediamtx_path
     FROM cameras
-    WHERE is_public = 1
+    WHERE is_public = 1 AND camera_type <> 'city'
     ORDER BY last_seen DESC
     LIMIT ${limit} OFFSET ${offset}
   `);
 
-  const [countRows] = await this.pool.execute('SELECT COUNT(*) as count FROM cameras WHERE is_public = 1');
+  const [countRows] = await this.pool.execute("SELECT COUNT(*) as count FROM cameras WHERE is_public = 1 AND camera_type <> 'city'");
   const total = countRows[0].count;
 
   return {

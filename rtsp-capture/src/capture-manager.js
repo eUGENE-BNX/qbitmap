@@ -3,7 +3,70 @@ const config = require('./config');
 const frameStore = require('./frame-store');
 
 const MAX_CONCURRENT_CAPTURES = 50;
-const RTSP_URL_REGEX = /^rtsp:\/\/[\da-zA-Z.\-_:@/?=&%]+$/;
+
+// Reject loopback, RFC1918, link-local, CGNAT, multicast, broadcast.
+// rtsp-capture runs in the cloud and must never be tricked into probing
+// internal services or co-located infrastructure (SSRF guard).
+function isPrivateOrReservedHost(hostname) {
+  if (!hostname) return true;
+  const h = hostname.toLowerCase();
+  if (h === 'localhost' || h.endsWith('.localhost')) return true;
+  if (h === '0.0.0.0' || h === '::' || h === '::1') return true;
+  // Strip IPv6 brackets if present
+  const bare = h.startsWith('[') && h.endsWith(']') ? h.slice(1, -1) : h;
+  // IPv4 dotted-quad?
+  const m = bare.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [parseInt(m[1], 10), parseInt(m[2], 10)];
+    if (a === 10) return true;                       // 10.0.0.0/8
+    if (a === 127) return true;                      // loopback
+    if (a === 169 && b === 254) return true;         // link-local
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a === 192 && b === 168) return true;         // 192.168.0.0/16
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT 100.64.0.0/10
+    if (a >= 224) return true;                       // multicast/reserved
+    if (a === 0) return true;                        // 0.0.0.0/8
+    return false;
+  }
+  // IPv6 — block loopback, link-local (fe80::/10), ULA (fc00::/7)
+  if (bare.includes(':')) {
+    if (bare === '::1') return true;
+    if (bare.startsWith('fe8') || bare.startsWith('fe9') || bare.startsWith('fea') || bare.startsWith('feb')) return true;
+    if (bare.startsWith('fc') || bare.startsWith('fd')) return true;
+    return false;
+  }
+  // Hostname (DNS) — allow; resolution happens in ffmpeg. Could still
+  // resolve to a private IP, but DNS rebinding is out of scope here.
+  return false;
+}
+
+function parseRtspUrl(rtspUrl) {
+  if (!rtspUrl || typeof rtspUrl !== 'string' || rtspUrl.length > 500) {
+    throw new Error('Invalid RTSP URL format');
+  }
+  let parsed;
+  try {
+    parsed = new URL(rtspUrl);
+  } catch {
+    throw new Error('Invalid RTSP URL format');
+  }
+  if (parsed.protocol !== 'rtsp:') {
+    throw new Error('Invalid RTSP URL format: protocol must be rtsp');
+  }
+  if (!parsed.hostname) {
+    throw new Error('Invalid RTSP URL format: missing host');
+  }
+  return parsed;
+}
+
+// SSRF guard for caller-provided URLs. Default rtspBase (loopback MediaMTX)
+// is exempt because it is server-controlled, not user input.
+function assertPublicRtspUrl(rtspUrl) {
+  const parsed = parseRtspUrl(rtspUrl);
+  if (isPrivateOrReservedHost(parsed.hostname)) {
+    throw new Error('Invalid RTSP URL: private/reserved host not allowed');
+  }
+}
 
 class CaptureManager {
   constructor() {
@@ -15,10 +78,8 @@ class CaptureManager {
    * Start capturing frames from an RTSP stream
    */
   start(streamId, rtspUrl, interval = config.capture.defaultInterval) {
-    // Validate RTSP URL format
-    if (!rtspUrl || !RTSP_URL_REGEX.test(rtspUrl)) {
-      throw new Error(`Invalid RTSP URL format`);
-    }
+    // Always parse + protocol/host check (server-controlled default ok)
+    parseRtspUrl(rtspUrl);
 
     // Enforce concurrent capture limit
     if (!this.captures.has(streamId) && this.captures.size >= MAX_CONCURRENT_CAPTURES) {
@@ -233,4 +294,6 @@ class CaptureManager {
   }
 }
 
-module.exports = new CaptureManager();
+const instance = new CaptureManager();
+instance.assertPublicRtspUrl = assertPublicRtspUrl;
+module.exports = instance;

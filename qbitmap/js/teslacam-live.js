@@ -681,6 +681,7 @@ var TeslaCamLive = {
     // Drag
     var header = popup.querySelector('.teslacam-live-header');
     var dragging = false, dragX = 0, dragY = 0;
+    var dragRaf = 0, dragLastX = 0, dragLastY = 0;
 
     function startDrag(clientX, clientY, e) {
       if (e.target.closest('.teslacam-live-close')) return;
@@ -692,12 +693,22 @@ var TeslaCamLive = {
     }
     function moveDrag(clientX, clientY) {
       if (!dragging) return;
-      popup.style.right = 'auto';
-      popup.style.bottom = 'auto';
-      popup.style.left = (clientX - dragX) + 'px';
-      popup.style.top = (clientY - dragY) + 'px';
+      dragLastX = clientX;
+      dragLastY = clientY;
+      if (dragRaf) return;
+      dragRaf = requestAnimationFrame(function () {
+        dragRaf = 0;
+        if (!dragging) return;
+        popup.style.right = 'auto';
+        popup.style.bottom = 'auto';
+        popup.style.left = (dragLastX - dragX) + 'px';
+        popup.style.top = (dragLastY - dragY) + 'px';
+      });
     }
-    function endDrag() { dragging = false; }
+    function endDrag() {
+      dragging = false;
+      if (dragRaf) { cancelAnimationFrame(dragRaf); dragRaf = 0; }
+    }
 
     header.addEventListener('mousedown', function(e) { startDrag(e.clientX, e.clientY, e); });
     document.addEventListener('mousemove', function(e) { moveDrag(e.clientX, e.clientY); });

@@ -206,7 +206,7 @@ const CommentWidget = {
     div.dataset.commentId = comment.id;
 
     div.innerHTML = `
-      <img class="comment-avatar" src="${escapeHtml(comment.user_avatar || '')}" alt="" onerror="this.style.display='none'" />
+      <img class="comment-avatar" src="${escapeHtml(comment.user_avatar || '')}" alt="" />
       <div class="comment-body">
         <div class="comment-meta">
           <span class="comment-author">${escapeHtml(comment.user_name || 'Kullanici')}</span>
@@ -217,6 +217,12 @@ const CommentWidget = {
         <div class="comment-text">${escapeHtml(comment.content)}</div>
       </div>
     `;
+
+    // CSP: replace inline onerror on avatar
+    const avatarImg = div.querySelector('.comment-avatar');
+    if (avatarImg) {
+      avatarImg.addEventListener('error', () => { avatarImg.style.display = 'none'; });
+    }
 
     // Wire delete button
     if (isOwn) {

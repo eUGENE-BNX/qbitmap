@@ -5,7 +5,7 @@
 
 const db = require('../services/database');
 const { authHook } = require('../utils/jwt');
-const { validateBody, userOverridesSchema, adminUpdateUserSchema, adminPlanSchema, safePath } = require('../utils/validation');
+const { validateBody, userOverridesSchema, adminUpdateUserSchema, adminPlanSchema, safePath, parseId } = require('../utils/validation');
 const fs = require('fs');
 
 async function adminRoutes(fastify, options) {
@@ -518,7 +518,8 @@ async function adminRoutes(fastify, options) {
    * Delete a city camera
    */
   fastify.delete('/cameras/city/:cameraId', async (request, reply) => {
-    const cameraId = parseInt(request.params.cameraId);
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
 
     const camera = await db.getCameraById(cameraId);
     if (!camera) {
@@ -549,7 +550,8 @@ async function adminRoutes(fastify, options) {
    * Body: { name?, lat?, lng?, ai_confidence_threshold?, ai_consecutive_frames?, ai_capture_interval_ms? }
    */
   fastify.put('/cameras/city/:cameraId', async (request, reply) => {
-    const cameraId = parseInt(request.params.cameraId);
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
     const { name, lat, lng, hls_url, ai_confidence_threshold, ai_consecutive_frames, ai_capture_interval_ms,
       ai_vision_model, ai_monitoring_prompt, ai_search_prompt, ai_max_tokens, ai_temperature } = request.body;
 
@@ -831,7 +833,8 @@ async function adminRoutes(fastify, options) {
    * Update a place (icon_url)
    */
   fastify.put('/places/:placeId', async (request, reply) => {
-    const placeId = parseInt(request.params.placeId);
+    const placeId = parseId(request.params.placeId);
+    if (placeId === null) return reply.code(400).send({ error: 'Invalid placeId' });
     const { icon_url } = request.body || {};
 
     const place = await db.getPlaceById(placeId);
@@ -849,7 +852,8 @@ async function adminRoutes(fastify, options) {
    * Delete a cached place
    */
   fastify.delete('/places/:placeId', async (request, reply) => {
-    const placeId = parseInt(request.params.placeId);
+    const placeId = parseId(request.params.placeId);
+    if (placeId === null) return reply.code(400).send({ error: 'Invalid placeId' });
     const place = await db.getPlaceById(placeId);
     if (!place) {
       return reply.status(404).send({ error: 'Place not found' });
@@ -882,7 +886,8 @@ async function adminRoutes(fastify, options) {
    * Resolve or dismiss a report
    */
   fastify.put('/reports/:reportId', async (request, reply) => {
-    const reportId = parseInt(request.params.reportId);
+    const reportId = parseId(request.params.reportId);
+    if (reportId === null) return reply.code(400).send({ error: 'Invalid reportId' });
     const { action } = request.body || {};
 
     if (!action || !['resolve', 'dismiss'].includes(action)) {
@@ -903,7 +908,8 @@ async function adminRoutes(fastify, options) {
    * Delete the reported content and resolve the report
    */
   fastify.delete('/reports/:reportId/content', async (request, reply) => {
-    const reportId = parseInt(request.params.reportId);
+    const reportId = parseId(request.params.reportId);
+    if (reportId === null) return reply.code(400).send({ error: 'Invalid reportId' });
 
     const report = await db.getReportById(reportId);
     if (!report) {

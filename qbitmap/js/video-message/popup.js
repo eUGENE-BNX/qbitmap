@@ -364,11 +364,16 @@ const PopupMixin = {
       img.style.cursor = 'grabbing';
       e.preventDefault();
     });
+    let panRaf = 0;
     document.addEventListener('mousemove', function handler(e) {
       if (!isPanning) return;
       panX = e.clientX - startX;
       panY = e.clientY - startY;
-      applyTransform();
+      if (panRaf) return;
+      panRaf = requestAnimationFrame(() => {
+        panRaf = 0;
+        if (isPanning) applyTransform();
+      });
     });
     document.addEventListener('mouseup', function handler() {
       isPanning = false;

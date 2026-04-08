@@ -28,10 +28,22 @@ const AiSearchMixin = {
     overlay.innerHTML = '<div class="ai-search-rect"></div>';
     frameContainer.appendChild(overlay);
 
-    // Mouse handlers
+    // Mouse handlers (mousemove rAF-coalesced to one DOM update per frame)
     this._aiSearchMouseDown = (e) => this.handleBroadcastAiMouseDown(popupEl, e);
-    this._aiSearchMouseMove = (e) => this.handleBroadcastAiMouseMove(popupEl, e);
-    this._aiSearchMouseUp = (e) => this.handleBroadcastAiMouseUp(popupEl, e);
+    let aiMoveRaf = 0;
+    let aiLastMoveEvt = null;
+    this._aiSearchMouseMove = (e) => {
+      aiLastMoveEvt = e;
+      if (aiMoveRaf) return;
+      aiMoveRaf = requestAnimationFrame(() => {
+        aiMoveRaf = 0;
+        if (aiLastMoveEvt) this.handleBroadcastAiMouseMove(popupEl, aiLastMoveEvt);
+      });
+    };
+    this._aiSearchMouseUp = (e) => {
+      if (aiMoveRaf) { cancelAnimationFrame(aiMoveRaf); aiMoveRaf = 0; }
+      this.handleBroadcastAiMouseUp(popupEl, e);
+    };
 
     videoEl.addEventListener('mousedown', this._aiSearchMouseDown);
     document.addEventListener('mousemove', this._aiSearchMouseMove);

@@ -159,7 +159,7 @@ const FaceRecognitionMixin = {
     const displayFaces = faces.slice(-8);
     grid.innerHTML = displayFaces.map(face => `
       <div class="face-thumbnail ${face.trigger_alarm ? 'alarm-active' : ''}" data-face-id="${face.id}">
-        <img src="${escapeHtml(face.face_image_url || '')}" alt="${escapeHtml(face.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+        <img src="${escapeHtml(face.face_image_url || '')}" alt="${escapeHtml(face.name)}">
         <div class="face-placeholder" style="display:none;">👤</div>
         <span class="face-name">${escapeHtml(face.name)}</span>
         <label class="face-alarm-toggle" title="Alarm Ver">
@@ -169,6 +169,14 @@ const FaceRecognitionMixin = {
         <button class="face-remove-btn" data-face-id="${face.id}" title="Sil">&times;</button>
       </div>
     `).join('');
+
+    // Image error fallback (CSP: replaces inline onerror)
+    grid.querySelectorAll('.face-thumbnail > img').forEach(img => {
+      img.addEventListener('error', () => {
+        img.style.display = 'none';
+        if (img.nextElementSibling) img.nextElementSibling.style.display = 'flex';
+      });
+    });
 
     // Bind dynamic handlers
     grid.querySelectorAll('.face-alarm-toggle input').forEach(cb => {
@@ -198,7 +206,7 @@ const FaceRecognitionMixin = {
       const dateStr = date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
       const name = log.person_name || log.name || 'Bilinmeyen';
       const thumbHtml = log.face_image_url
-        ? `<img src="${escapeHtml(log.face_image_url)}" alt="${escapeHtml(name)}" class="detection-thumb" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="detection-thumb-placeholder" style="display:none;">👤</div>`
+        ? `<img src="${escapeHtml(log.face_image_url)}" alt="${escapeHtml(name)}" class="detection-thumb"><div class="detection-thumb-placeholder" style="display:none;">👤</div>`
         : `<div class="detection-thumb-placeholder">👤</div>`;
       return `
         <div class="detection-item">
@@ -211,6 +219,14 @@ const FaceRecognitionMixin = {
         </div>
       `;
     }).join('');
+
+    // Image error fallback (CSP: replaces inline onerror)
+    logEl.querySelectorAll('img.detection-thumb').forEach(img => {
+      img.addEventListener('error', () => {
+        img.style.display = 'none';
+        if (img.nextElementSibling) img.nextElementSibling.style.display = 'flex';
+      });
+    });
   },
 
   /**

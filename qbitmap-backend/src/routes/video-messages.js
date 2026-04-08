@@ -120,19 +120,19 @@ async function videoMessageRoutes(fastify, options) {
 
       // Check if file was truncated (exceeded size limit)
       if (data.file.truncated) {
-        fs.unlinkSync(filePath);
+        await fs.promises.unlink(filePath);
         return reply.code(413).send({ error: 'File too large (max 20MB)' });
       }
 
-      const stats = fs.statSync(filePath);
+      const stats = await fs.promises.stat(filePath);
       const fileSize = stats.size;
 
       // Validate actual file content matches declared MIME type
       const headBuf = Buffer.alloc(12);
-      const fd = fs.openSync(filePath, 'r');
-      try { fs.readSync(fd, headBuf, 0, 12, 0); } finally { fs.closeSync(fd); }
+      const fh = await fs.promises.open(filePath, 'r');
+      try { await fh.read(headBuf, 0, 12, 0); } finally { await fh.close(); }
       if (!validateMagicBytes(headBuf, mimeType)) {
-        fs.unlinkSync(filePath);
+        await fs.promises.unlink(filePath);
         return reply.code(400).send({ error: 'File content does not match declared type' });
       }
 

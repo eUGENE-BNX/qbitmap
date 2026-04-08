@@ -408,7 +408,7 @@ const H3Grid = {
   _showOwnerTooltip(x, y, h3Index, owner) {
     const userColor = this._getUserColor(owner.userId);
     const avatarHtml = owner.avatarUrl
-      ? `<img src="${this._escapeHtml(owner.avatarUrl)}" style="width:40px;height:40px;border-radius:10px;flex-shrink:0;border:2px solid ${userColor.hex};" onerror="this.style.display='none'" />`
+      ? `<img src="${this._escapeHtml(owner.avatarUrl)}" style="width:40px;height:40px;border-radius:10px;flex-shrink:0;border:2px solid ${userColor.hex};" />`
       : `<div style="width:40px;height:40px;border-radius:10px;flex-shrink:0;background:${userColor.hex};opacity:0.5;"></div>`;
     const cellArea = h3.cellArea(h3Index, 'm2');
     const areaStr = this._formatArea(cellArea);
@@ -430,6 +430,10 @@ const H3Grid = {
       ${this._statRow('Pop\u00fclerlik', cellViews)}
       ${this._statRow('Video', videos)}
       ${this._statRow('Foto\u011fraf', photos)}`;
+    // CSP: replace inline onerror on avatar img
+    this._tooltip.querySelectorAll('img').forEach(img => {
+      img.addEventListener('error', () => { img.style.display = 'none'; });
+    });
     this._animateTooltipIn(x, y);
   },
 
@@ -564,7 +568,7 @@ const H3Grid = {
       const medal = i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'transparent';
       const userColor = this._getUserColor(u.userId);
       const avatarHtml = u.avatarUrl
-        ? `<img src="${this._escapeHtml(u.avatarUrl)}" style="width:32px;height:32px;border-radius:50%;flex-shrink:0;border:2px solid ${userColor.hex};" onerror="this.style.display='none'" />`
+        ? `<img src="${this._escapeHtml(u.avatarUrl)}" style="width:32px;height:32px;border-radius:50%;flex-shrink:0;border:2px solid ${userColor.hex};" />`
         : `<div style="width:32px;height:32px;border-radius:50%;background:${userColor.hex};opacity:0.5;flex-shrink:0;"></div>`;
       const totalArea = this._formatArea(u.cellCount * res13Area);
       return `
@@ -578,6 +582,10 @@ const H3Grid = {
           <div style="font-weight:600;font-size:13px;color:${userColor.hex};">${u.totalPoints} qbits</div>
         </div>`;
     }).join('');
+    // CSP: replace inline onerror on leaderboard avatars
+    list.querySelectorAll('img').forEach(img => {
+      img.addEventListener('error', () => { img.style.display = 'none'; });
+    });
   }
 };
 

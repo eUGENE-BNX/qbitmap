@@ -230,7 +230,7 @@ const CleanupMixin = {
                data-lng="${m.lng}" data-lat="${m.lat}">
             <div class="vmsg-search-thumb">
               ${thumbUrl
-                ? `<img src="${thumbUrl}" alt="" loading="lazy" onerror="this.parentElement.classList.add('no-thumb')">`
+                ? `<img src="${thumbUrl}" alt="" loading="lazy">`
                 : '<div class="vmsg-search-thumb-placeholder"><svg width="20" height="16" viewBox="0 0 36 28"><rect x="1" y="2" width="24" height="24" rx="4" fill="#e67e22"/><polygon points="28,8 35,4 35,24 28,20" fill="#e67e22"/></svg></div>'}
             </div>
             <div class="vmsg-search-info">
@@ -241,6 +241,13 @@ const CleanupMixin = {
           </div>
         `;
       }).join('');
+
+      // CSP: replace inline onerror on thumb images
+      resultsEl.querySelectorAll('.vmsg-search-thumb img').forEach(img => {
+        img.addEventListener('error', () => {
+          if (img.parentElement) img.parentElement.classList.add('no-thumb');
+        });
+      });
 
       // Click handler for results
       resultsEl.querySelectorAll('.vmsg-search-result').forEach(el => {

@@ -170,6 +170,21 @@ function safePath(relativePath, allowedSubdir = '') {
   return resolved;
 }
 
+/**
+ * Parse and validate a positive integer route param.
+ * Returns the integer or null if invalid.
+ * Use: const id = parseId(request.params.cameraId);
+ *      if (id === null) return reply.code(400).send({ error: 'Invalid id' });
+ */
+function parseId(v) {
+  if (v === undefined || v === null || v === '') return null;
+  // Reject anything that isn't pure digits to avoid '12abc' → 12 quirk
+  if (typeof v === 'string' && !/^\d+$/.test(v)) return null;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n <= 0 || n > Number.MAX_SAFE_INTEGER) return null;
+  return n;
+}
+
 module.exports = {
   // Schemas
   userOverridesSchema,
@@ -187,5 +202,6 @@ module.exports = {
   // Helpers
   validate,
   validateBody,
-  safePath
+  safePath,
+  parseId
 };

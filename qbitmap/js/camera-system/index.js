@@ -354,12 +354,20 @@ const CameraSystem = {
       const publicData = publicResponse.ok ? await publicResponse.json() : { cameras: [] };
       const cityData = cityResponse.ok ? await cityResponse.json() : { cameras: [] };
 
-      // Merge cameras - city cameras come first
+      // Merge cameras with dedup by device_id.
+      // /cameras endpoint already includes is_public=1 city cameras, so the
+      // same device_id appears in both responses. Without dedup, every city
+      // camera gets rendered twice and the cluster reports "2 cameras here".
       const cityCameras = (cityData.cameras || []).map(c => ({ ...c, camera_type: 'city' }));
       const regularCameras = publicData.cameras || [];
 
-      this.cameras = [...cityCameras, ...regularCameras];
-      Logger.log(`[Cameras] Loaded ${regularCameras.length} public + ${cityCameras.length} city cameras`);
+      const cameraMap = new Map();
+      for (const cam of regularCameras) cameraMap.set(cam.device_id, cam);
+      // City entries override regulars (they carry hls_url etc.)
+      for (const cam of cityCameras) cameraMap.set(cam.device_id, cam);
+
+      this.cameras = Array.from(cameraMap.values());
+      Logger.log(`[Cameras] Loaded ${this.cameras.length} cameras (${regularCameras.length} public + ${cityCameras.length} city, deduped)`);
 
       // Refresh the map layer
       this.refreshCameraLayer();

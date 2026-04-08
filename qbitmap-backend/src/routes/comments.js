@@ -1,6 +1,7 @@
 const db = require('../services/database');
 const wsService = require('../services/websocket');
 const { authHook, optionalAuthHook } = require('../utils/jwt');
+const { parseId } = require('../utils/validation');
 const logger = require('../utils/logger').child({ module: 'comments' });
 
 const ALLOWED_ENTITY_TYPES = ['video_message', 'camera'];
@@ -96,8 +97,8 @@ async function commentRoutes(fastify, options) {
   // DELETE /:commentId - Delete own comment
   fastify.delete('/:commentId', { preHandler: authHook }, async (request, reply) => {
     try {
-      const commentId = parseInt(request.params.commentId);
-      if (!commentId) {
+      const commentId = parseId(request.params.commentId);
+      if (commentId === null) {
         return reply.code(400).send({ error: 'Invalid comment ID' });
       }
 

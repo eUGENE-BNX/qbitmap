@@ -328,7 +328,6 @@ const StatusSystem = {
     statusEl.textContent = service.status.toUpperCase();
     statusEl.className = `detail-value ${service.status}`;
 
-    document.getElementById('modal-host').textContent = service.host;
     document.getElementById('modal-response-time').textContent =
       service.responseTime ? `${service.responseTime}ms` : 'N/A';
     document.getElementById('modal-last-check').textContent =
