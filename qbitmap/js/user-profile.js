@@ -302,7 +302,7 @@ const UserProfileSystem = {
         </div>
 
         <div class="profile-tesla-footer">
-          ${odometer ? `<span class="profile-tesla-odo">odometer:${odometer}km</span>` : ''}
+          ${odometer ? `<span class="profile-tesla-odo">Odometer: ${odometer} km</span>` : ''}
           ${carVersion ? `<span class="profile-tesla-version">v${escapeHtml(carVersion)}</span>` : ''}
         </div>
 

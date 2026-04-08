@@ -106,8 +106,8 @@ export const TeslaPopup = {
         <div class="tv-left">
           ${tpms ? `
           <div class="tv-tpms-mini">
-            <span>${tpms.fl} bar</span><span>${tpms.fr} bar</span>
-            <span>${tpms.rl} bar</span><span>${tpms.rr} bar</span>
+            <span>FL: ${tpms.fl} bar</span><span>FR: ${tpms.fr} bar</span>
+            <span>RL: ${tpms.rl} bar</span><span>RR: ${tpms.rr} bar</span>
           </div>` : ''}
         </div>
         <div class="tv-right">
@@ -118,7 +118,7 @@ export const TeslaPopup = {
       </div>
 
       <div class="tv-footer">
-        ${odometer ? `<span class="tv-footer-odo">odometer:${odometer}km</span>` : ''}
+        ${odometer ? `<span class="tv-footer-odo">Odometer: ${odometer} km</span>` : ''}
         ${carVersion ? `<span class="tv-footer-version">v${escapeHtml(carVersion)}</span>` : ''}
       </div>
     </div>`;

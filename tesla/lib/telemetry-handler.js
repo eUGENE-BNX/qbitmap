@@ -143,14 +143,17 @@ async function handleTelemetryMessage(rawData, logger) {
 
       case FIELD.LOCKED:
         if (value != null) {
-          update.locked = value === 1 || value === true ? 1 : 0;
+          // Tesla may send number, bool, or string ("1"/"0"/"true"/"false")
+          const truthy = value === 1 || value === true || value === '1' || value === 'true' || value === 'True';
+          update.locked = truthy ? 1 : 0;
           hasUpdate = true;
         }
         break;
 
       case FIELD.SENTRY_MODE:
         if (value != null) {
-          update.sentry = value === 1 || value === true || value === 'Active' ? 1 : 0;
+          const truthy = value === 1 || value === true || value === '1' || value === 'true' || value === 'Active';
+          update.sentry = truthy ? 1 : 0;
           hasUpdate = true;
         }
         break;
