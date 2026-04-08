@@ -802,7 +802,8 @@
   margin-bottom: 0;
 }
 
-.profile-recent-section h4 {
+.profile-recent-section h4,
+.profile-section-title {
   margin: 0 0 8px 0;
   font-size: 13px;
   font-weight: 600;
