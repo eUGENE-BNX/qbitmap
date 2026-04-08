@@ -192,11 +192,11 @@ const UserProfileSystem = {
         <div class="profile-tesla-cta-row">
           <div class="profile-tesla-logo">T</div>
           <div class="profile-tesla-cta-text">
-            <div class="profile-tesla-cta-title">Tesla Aracını Bağla</div>
-            <div class="profile-tesla-cta-desc">Aracının canlı konumunu haritada paylaş, fleet'e katıl, lastik basıncı/menzil/şarj seviyesini buradan takip et.</div>
+            <div class="profile-tesla-cta-title">Tesla Connect</div>
+            <div class="profile-tesla-cta-desc">Aracını "Tesla Community"'e dahil et. Diğer Tesla kullanıcıları ile bir araya gel.</div>
           </div>
         </div>
-        <button class="profile-tesla-connect-btn">Tesla'yı Bağla</button>
+        <button class="profile-tesla-connect-btn">Tesla Connect</button>
       </div>
     `;
   },
@@ -522,30 +522,21 @@ const UserProfileSystem = {
   },
 
   renderRecentMessages(messages) {
-    const header = `
-      <h4>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="2" y="2" width="20" height="20" rx="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
-        Son Paylaşımlar
-      </h4>
-    `;
+    const header = `<h4>Son Paylaşımlar</h4>`;
 
     if (!messages || messages.length === 0) {
       return `<div class="profile-recent-section">${header}<div class="profile-recent-empty">Henüz paylaşım yok</div></div>`;
     }
 
     const thumbs = messages.map(msg => {
-      const badge = msg.media_type === 'video' ? '▶' : '📷';
+      const isVideo = msg.media_type === 'video';
       const thumbUrl = `${QBitmapConfig.api.base}/api/video-messages/${encodeURIComponent(msg.message_id)}/thumbnail`;
       const timeAgo = this.formatTimeAgo(msg.created_at);
       return `
         <div class="media-card" data-message-id="${escapeHtml(msg.message_id)}">
           <div class="media-card-thumb">
             <img src="${thumbUrl}" alt="" loading="lazy">
-            <span class="media-type-badge">${badge}</span>
+            ${isVideo ? '<span class="media-type-badge">▶</span>' : ''}
           </div>
           <span class="media-card-time">${timeAgo}</span>
         </div>
