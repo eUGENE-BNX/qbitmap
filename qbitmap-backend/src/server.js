@@ -238,8 +238,10 @@ async function buildServer() {
       logger.error({ err }, 'Initial MediaMTX sync failed (will retry in 2 minutes)')
     );
 
-    // Periodic sync every 2 minutes (in case MediaMTX restarts)
-    fastify.mediamtxSyncInterval = setInterval(syncRtspCamerasWithMediamtx, 2 * 60 * 1000);
+    // Periodic reconciliation once a day. On-demand addPath() in routes
+    // handles immediate needs; this is just a safety net for the rare case
+    // where MediaMTX restarts and loses its in-memory path config.
+    fastify.mediamtxSyncInterval = setInterval(syncRtspCamerasWithMediamtx, 24 * 60 * 60 * 1000);
   });
 
   // Cleanup interval on server close
@@ -287,10 +289,12 @@ async function syncRtspCamerasWithMediamtx() {
     for (let i = 0; i < syncTasks.length; i += BATCH_SIZE) {
       const batch = syncTasks.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map(async (task) => {
+        // If path already exists in MediaMTX, leave it alone — removing and
+        // re-adding tears down active WHEP/HLS viewers. Periodic sync only
+        // needs to (re)create paths that are missing (e.g. after MediaMTX restart).
         const exists = await mediamtx.pathExists(task.path);
         if (exists.exists) {
-          // Remove stale path and re-add with correct source config
-          await mediamtx.removePath(task.path);
+          return { status: 'skipped', task };
         }
         const result = await task.sync();
         return { status: result.success ? 'synced' : 'failed', task, error: result.error };
