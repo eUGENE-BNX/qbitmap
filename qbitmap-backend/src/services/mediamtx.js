@@ -87,7 +87,7 @@ async function addPath(pathName, rtspUrl, options = {}) {
       sourceProtocol: 'tcp',
       sourceOnDemand: true,
       sourceOnDemandStartTimeout: '10s',
-      sourceOnDemandCloseAfter: '10s',
+      sourceOnDemandCloseAfter: '60s',
       // Recording options (disabled by default, can be enabled via API)
       record: false,
       recordPath: '/recordings/%path/%Y-%m-%d_%H-%M-%S-%f',

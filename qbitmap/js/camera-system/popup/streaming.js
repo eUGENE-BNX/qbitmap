@@ -92,6 +92,44 @@ const StreamingMixin = {
 
             this.startAdaptivePolling(popupData, updateStats);
           }
+
+          // Frame-freeze watchdog: detect stalled video without waiting for ICE failure
+          if (popupData.whepWatchdog) clearInterval(popupData.whepWatchdog);
+          let lastFramesDecoded = 0;
+          let stallTicks = 0;
+          popupData.whepWatchdog = setInterval(async () => {
+            if (!popupData.peerConnection || popupData.peerConnection !== pc) {
+              clearInterval(popupData.whepWatchdog);
+              popupData.whepWatchdog = null;
+              return;
+            }
+            try {
+              const stats = await pc.getStats();
+              let framesDecoded = 0;
+              stats.forEach(r => {
+                if (r.type === 'inbound-rtp' && r.kind === 'video') {
+                  framesDecoded = r.framesDecoded || 0;
+                }
+              });
+              if (framesDecoded > lastFramesDecoded) {
+                lastFramesDecoded = framesDecoded;
+                stallTicks = 0;
+              } else if (lastFramesDecoded > 0) {
+                stallTicks++;
+                // 3 ticks * 3s = 9s without a new decoded frame → reconnect
+                if (stallTicks >= 3) {
+                  Logger.log('[WHEP] Frame freeze detected, reconnecting', deviceId);
+                  clearInterval(popupData.whepWatchdog);
+                  popupData.whepWatchdog = null;
+                  if (this.popups.has(deviceId)) {
+                    this.reconnectWhepStream(deviceId);
+                  }
+                }
+              }
+            } catch (e) {
+              // Silent fail
+            }
+          }, 3000);
         }
       };
 
@@ -188,6 +226,10 @@ const StreamingMixin = {
           // Ignore close errors
         }
         popupData.peerConnection = null;
+      }
+      if (popupData.whepWatchdog) {
+        clearInterval(popupData.whepWatchdog);
+        popupData.whepWatchdog = null;
       }
 
       frameContainer.classList.remove('loading', 'loaded');
@@ -321,6 +363,10 @@ const StreamingMixin = {
         videoEl.srcObject.getTracks().forEach(t => t.stop());
         videoEl.srcObject = null;
       }
+    }
+    if (popupData.whepWatchdog) {
+      clearInterval(popupData.whepWatchdog);
+      popupData.whepWatchdog = null;
     }
     if (popupData.clockInterval) {
       clearInterval(popupData.clockInterval);

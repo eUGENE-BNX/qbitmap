@@ -559,6 +559,11 @@ const PopupCoreMixin = {
       Logger.log('[WHEP] Peer connection closed for', deviceId);
     }
 
+    if (popupData.whepWatchdog) {
+      clearInterval(popupData.whepWatchdog);
+      popupData.whepWatchdog = null;
+    }
+
     // Note: AI monitoring continues globally even when popup is closed
     // Interval keeps running for WHEP cameras (capture service)
     // For device cameras, interval will pause until popup reopens (needs video element)
