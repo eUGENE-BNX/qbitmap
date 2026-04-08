@@ -1,3 +1,9 @@
+// SECURITY INVARIANT: this module MUST use child_process.execFile (not exec
+// or spawn-with-shell) and MUST pass arguments as an array. ffmpeg is
+// invoked with caller-supplied filesystem paths; if those ever flowed into
+// a shell-interpreted string, an attacker controlling a filename could
+// inject arbitrary commands. Keep argv-array form. Do not refactor to
+// `exec(\`ffmpeg ${args.join(' ')}\`)` or template literals.
 const { execFile } = require('child_process');
 const fs = require('fs');
 const logger = require('./logger').child({ module: 'thumbnail' });

@@ -1,4 +1,4 @@
-import { Logger } from "../utils.js";
+import { Logger, escapeHtml } from "../utils.js";
 import { Analytics } from "../analytics.js";
 import * as AppState from '../state.js';
 
@@ -216,17 +216,15 @@ const CleanupMixin = {
         return;
       }
 
-      const esc = (t) => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
-
       resultsEl.innerHTML = messages.map(m => {
-        const tags = (m.tags || []).map(t => `<span class="vmsg-search-tag">${esc(t)}</span>`).join('');
+        const tags = (m.tags || []).map(t => `<span class="vmsg-search-tag">${escapeHtml(t)}</span>`).join('');
         const thumbUrl = m.thumbnail_path
           ? `${this.apiBase}/${encodeURIComponent(m.message_id)}/thumbnail`
           : '';
         const timeAgo = this.formatTimeAgo(m.created_at);
 
         return `
-          <div class="vmsg-search-result" data-msg-id="${esc(m.message_id)}"
+          <div class="vmsg-search-result" data-msg-id="${escapeHtml(m.message_id)}"
                data-lng="${m.lng}" data-lat="${m.lat}">
             <div class="vmsg-search-thumb">
               ${thumbUrl
@@ -234,8 +232,8 @@ const CleanupMixin = {
                 : '<div class="vmsg-search-thumb-placeholder"><svg width="20" height="16" viewBox="0 0 36 28"><rect x="1" y="2" width="24" height="24" rx="4" fill="#e67e22"/><polygon points="28,8 35,4 35,24 28,20" fill="#e67e22"/></svg></div>'}
             </div>
             <div class="vmsg-search-info">
-              <div class="vmsg-search-sender">${esc(m.sender_name || 'Kullanıcı')} <span class="vmsg-search-time">${esc(timeAgo)}</span></div>
-              ${m.description ? `<div class="vmsg-search-desc">${esc(m.description)}</div>` : ''}
+              <div class="vmsg-search-sender">${escapeHtml(m.sender_name || 'Kullanıcı')} <span class="vmsg-search-time">${escapeHtml(timeAgo)}</span></div>
+              ${m.description ? `<div class="vmsg-search-desc">${escapeHtml(m.description)}</div>` : ''}
               <div class="vmsg-search-tags">${tags}</div>
             </div>
           </div>

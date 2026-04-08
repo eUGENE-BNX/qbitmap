@@ -10,7 +10,7 @@ const photoAiQueue = require('../services/photo-ai-queue');
 const { safePath } = require('../utils/validation');
 const { validateMagicBytes } = require('../utils/file-validation');
 
-const UPLOADS_DIR = path.join(__dirname, '../../uploads/video-messages');
+const UPLOADS_DIR = path.resolve(__dirname, '../../uploads/video-messages');
 const ALLOWED_MIME_TYPES = ['video/mp4', 'video/webm', 'image/jpeg', 'image/png', 'image/webp'];
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const EXT_MAP = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
@@ -111,7 +111,12 @@ async function videoMessageRoutes(fastify, options) {
     const messageId = `${isPhoto ? 'pmsg' : 'vmsg'}_${userId}_${Date.now().toString(36)}`;
     const ext = EXT_MAP[mimeType] || 'bin';
     const fileName = `${messageId}.${ext}`;
-    const filePath = path.join(UPLOADS_DIR, fileName);
+    const filePath = path.resolve(UPLOADS_DIR, fileName);
+    // Defense in depth: fileName is server-generated, but block any future
+    // refactor that might let the resolved path escape UPLOADS_DIR.
+    if (!filePath.startsWith(UPLOADS_DIR + path.sep)) {
+      return reply.code(400).send({ error: 'Invalid filename' });
+    }
 
     try {
       // Save file to disk
@@ -138,7 +143,7 @@ async function videoMessageRoutes(fastify, options) {
 
       // Generate thumbnail (fire-and-forget, don't block upload response)
       const thumbFileName = `${messageId}_thumb.webp`;
-      const thumbFilePath = path.join(UPLOADS_DIR, thumbFileName);
+      const thumbFilePath = path.resolve(UPLOADS_DIR, thumbFileName);
       const thumbRelPath = `uploads/video-messages/${thumbFileName}`;
       if (isPhoto) {
         const { generatePhotoThumbnail } = require('../utils/thumbnail');

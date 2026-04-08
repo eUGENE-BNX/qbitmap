@@ -185,11 +185,17 @@ async function faceDetectionRoutes(fastify, options) {
       }
 
       // Save face image locally
-      const uploadsDir = path.join(__dirname, "../../uploads/camera-faces");
+      const uploadsDir = path.resolve(__dirname, "../../uploads/camera-faces");
       await fs.promises.mkdir(uploadsDir, { recursive: true });
       const ext = data.mimetype === "image/png" ? "png" : "jpg";
       const filename = camera.id + "_" + personId + "_" + crypto.randomUUID() + "." + ext;
-      const filePath = path.join(uploadsDir, filename);
+      const filePath = path.resolve(uploadsDir, filename);
+      // Defense in depth: filename is server-generated today, but reject any
+      // future change that lets the resolved path escape uploadsDir.
+      if (!filePath.startsWith(uploadsDir + path.sep)) {
+        logger.error({ filename, filePath, uploadsDir }, "Path traversal attempt blocked");
+        return reply.code(400).send({ error: "Invalid filename" });
+      }
       await fs.promises.writeFile(filePath, buffer);
 
       // Save to database

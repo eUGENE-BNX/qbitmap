@@ -1,5 +1,5 @@
 import { QBitmapConfig } from './config.js';
-import { Logger } from './utils.js';
+import { Logger, escapeHtml } from './utils.js';
 import { Analytics } from './analytics.js';
 import { H3TronTrails } from './h3-tron-trails.js';
 import { loadDeckAndH3 } from './vendor-loader.js';
@@ -408,7 +408,7 @@ const H3Grid = {
   _showOwnerTooltip(x, y, h3Index, owner) {
     const userColor = this._getUserColor(owner.userId);
     const avatarHtml = owner.avatarUrl
-      ? `<img src="${this._escapeHtml(owner.avatarUrl)}" style="width:40px;height:40px;border-radius:10px;flex-shrink:0;border:2px solid ${userColor.hex};" />`
+      ? `<img src="${escapeHtml(owner.avatarUrl)}" style="width:40px;height:40px;border-radius:10px;flex-shrink:0;border:2px solid ${userColor.hex};" />`
       : `<div style="width:40px;height:40px;border-radius:10px;flex-shrink:0;background:${userColor.hex};opacity:0.5;"></div>`;
     const cellArea = h3.cellArea(h3Index, 'm2');
     const areaStr = this._formatArea(cellArea);
@@ -420,7 +420,7 @@ const H3Grid = {
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:2px;">
         ${avatarHtml}
         <div>
-          <div style="font-weight:600;font-size:14px;">${this._escapeHtml(owner.displayName)}</div>
+          <div style="font-weight:600;font-size:14px;">${escapeHtml(owner.displayName)}</div>
           <div style="font-size:11px;opacity:0.5;margin-top:2px;">Qbitscore: ${owner.points.toLocaleString('tr-TR')}</div>
         </div>
       </div>
@@ -473,12 +473,6 @@ const H3Grid = {
     const km2 = m2 / 1000000;
     if (km2 >= 10) return km2.toFixed(1) + 'km\u00B2';
     return km2.toFixed(2) + 'km\u00B2';
-  },
-
-  _escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str || '';
-    return div.innerHTML;
   },
 
   // ==================== LEADERBOARD ====================
@@ -568,7 +562,7 @@ const H3Grid = {
       const medal = i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'transparent';
       const userColor = this._getUserColor(u.userId);
       const avatarHtml = u.avatarUrl
-        ? `<img src="${this._escapeHtml(u.avatarUrl)}" style="width:32px;height:32px;border-radius:50%;flex-shrink:0;border:2px solid ${userColor.hex};" />`
+        ? `<img src="${escapeHtml(u.avatarUrl)}" style="width:32px;height:32px;border-radius:50%;flex-shrink:0;border:2px solid ${userColor.hex};" />`
         : `<div style="width:32px;height:32px;border-radius:50%;background:${userColor.hex};opacity:0.5;flex-shrink:0;"></div>`;
       const totalArea = this._formatArea(u.cellCount * res13Area);
       return `
@@ -576,7 +570,7 @@ const H3Grid = {
           <span style="width:22px;text-align:center;font-weight:700;font-size:13px;color:${medal !== 'transparent' ? medal : 'rgba(255,255,255,0.4)'};">${i + 1}</span>
           ${avatarHtml}
           <div style="flex:1;min-width:0;">
-            <div style="font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._escapeHtml(u.displayName)}</div>
+            <div style="font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(u.displayName)}</div>
             <div style="font-size:11px;opacity:0.5;">${u.cellCount} grid (${totalArea})</div>
           </div>
           <div style="font-weight:600;font-size:13px;color:${userColor.hex};">${u.totalPoints} qbits</div>

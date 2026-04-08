@@ -46,6 +46,9 @@ qbitmap.com {
 	encode @not3d gzip zstd
 
 	header {
+		# HSTS — 1y, includeSubDomains. NO `preload` yet (it's permanent &
+		# hstspreload.org submission is a separate decision).
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "SAMEORIGIN"
 		Referrer-Policy "strict-origin-when-cross-origin"
@@ -100,11 +103,14 @@ stream.qbitmap.com {
 	header Alt-Svc "clear"
 
 	# WHEP endpoint - MediaMTX WebRTC (must be before catch-all)
+	# NOTE: MediaMTX routes WHEP purely by URL path and ignores the Host
+	# header (verified 2026-04-08). We deliberately do NOT forward the
+	# client-controlled Host upstream — Caddy will use the upstream URL's
+	# host instead, so even if a future MediaMTX version adds Host-based
+	# routing, this proxy won't pass through attacker-controlled values.
 	@whep path_regexp whep ^/([^/]+)/whep$
 	handle @whep {
-		reverse_proxy http://91.98.90.57:8889 {
-			header_up Host {http.request.host}
-		}
+		reverse_proxy http://91.98.90.57:8889
 	}
 
 	# All other requests go to backend
@@ -113,6 +119,7 @@ stream.qbitmap.com {
 	}
 
 	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}
