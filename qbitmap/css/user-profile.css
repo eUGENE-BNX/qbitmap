@@ -111,9 +111,9 @@
 }
 
 .profile-user-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
   object-fit: cover;
   flex-shrink: 0;
 }
@@ -947,8 +947,9 @@
   }
 
   .profile-user-avatar {
-    width: 48px;
-    height: 48px;
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
   }
 
   .profile-user-details p {
@@ -1009,8 +1010,9 @@
   }
 
   .profile-user-avatar {
-    width: 40px;
-    height: 40px;
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
   }
 
   .profile-tesla-section {
