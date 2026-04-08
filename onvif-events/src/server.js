@@ -2,6 +2,16 @@ const Fastify = require('fastify');
 const config = require('./config');
 const cameraManager = require('./camera-manager');
 const eventStore = require('./event-store');
+const { getKey } = require('./crypto');
+
+// Fail fast if the credential encryption key is missing/invalid.
+// Better to refuse to start than to silently write plaintext to disk.
+try {
+  getKey();
+} catch (e) {
+  console.error('[ONVIF]', e.message);
+  process.exit(1);
+}
 
 async function createServer() {
   const fastify = Fastify({
@@ -15,6 +25,12 @@ async function createServer() {
         }
       }
     }
+  });
+
+  // Global rate limit (loose) + per-route tightening below
+  await fastify.register(require('@fastify/rate-limit'), {
+    max: 300,
+    timeWindow: '1 minute'
   });
 
   // Health check
@@ -37,8 +53,10 @@ async function createServer() {
     };
   });
 
-  // Add a new camera
-  fastify.post('/cameras', async (request, reply) => {
+  // Add a new camera — credential-bearing, state-changing: tight limit.
+  fastify.post('/cameras', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
     const { id, name, host, port, username, password } = request.body || {};
 
     // Validation
@@ -85,7 +103,9 @@ async function createServer() {
   });
 
   // Remove a camera
-  fastify.delete('/cameras/:id', async (request, reply) => {
+  fastify.delete('/cameras/:id', {
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
     const { id } = request.params;
 
     try {

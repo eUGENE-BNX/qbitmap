@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const eventStore = require('./event-store');
 const config = require('./config');
+const { encrypt, decrypt, isEncrypted } = require('./crypto');
 
 const CAMERAS_FILE = path.join(__dirname, '..', 'cameras.json');
 const EVENT_DEBOUNCE_MS = 3000; // 3 seconds debounce per event type per camera
@@ -25,16 +26,31 @@ class CameraManager {
         const cameras = JSON.parse(data);
         console.log(`[ONVIF] Loading ${cameras.length} cameras from file...`);
 
+        let needsResave = false;
         for (const cam of cameras) {
           if (!this.cameras.has(cam.id)) {
+            // Decrypt password from disk; legacy plaintext is accepted then
+            // re-saved encrypted at the end of this load.
+            let plainPassword = cam.password;
+            try {
+              if (isEncrypted(cam.password)) {
+                plainPassword = decrypt(cam.password);
+              } else if (cam.password) {
+                needsResave = true; // legacy plaintext, upgrade on next save
+              }
+            } catch (e) {
+              console.error(`[ONVIF] Failed to decrypt credentials for ${cam.id}:`, e.message);
+              continue;
+            }
+
             this.cameras.set(cam.id, {
-              config: { id: cam.id, name: cam.name, host: cam.host, port: cam.port, username: cam.username, password: cam.password },
+              config: { id: cam.id, name: cam.name, host: cam.host, port: cam.port, username: cam.username, password: plainPassword },
               cam: null,
               connected: false,
               connecting: false
             });
 
-            if (cam.username && cam.password) {
+            if (cam.username && plainPassword) {
               // Connect in background — don't block startup
               this.connect(cam.id).catch(err => {
                 console.error(`[ONVIF] Failed to load camera ${cam.id}:`, err.message);
@@ -43,6 +59,10 @@ class CameraManager {
               console.log(`[ONVIF] Loaded stub for ${cam.id} (${cam.host}:${cam.port}) — no credentials`);
             }
           }
+        }
+        if (needsResave) {
+          console.log('[ONVIF] Upgrading legacy plaintext credentials to encrypted format');
+          this.saveToFile();
         }
       } else {
         console.log('[ONVIF] No cameras.json found, starting with empty list');
@@ -59,10 +79,18 @@ class CameraManager {
     try {
       const cameras = [];
       for (const [id, camera] of this.cameras) {
-        cameras.push({ ...camera.config });
+        const c = { ...camera.config };
+        // Encrypt password at rest. In-memory config keeps the plaintext
+        // because the ONVIF client needs it on every reconnect.
+        if (c.password) {
+          c.password = encrypt(c.password);
+        }
+        cameras.push(c);
       }
-      fs.writeFileSync(CAMERAS_FILE, JSON.stringify(cameras, null, 2));
-      console.log(`[ONVIF] Saved ${cameras.length} cameras to file`);
+      // Restrictive perms — credentials file must not be world-readable.
+      fs.writeFileSync(CAMERAS_FILE, JSON.stringify(cameras, null, 2), { mode: 0o600 });
+      try { fs.chmodSync(CAMERAS_FILE, 0o600); } catch (_) {}
+      console.log(`[ONVIF] Saved ${cameras.length} cameras to file (encrypted)`);
     } catch (err) {
       console.error('[ONVIF] Failed to save cameras to file:', err.message);
     }

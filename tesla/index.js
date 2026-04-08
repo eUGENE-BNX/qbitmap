@@ -53,11 +53,42 @@ wss.on('connection', (ws, request) => {
 // Also accept HTTP POST for telemetry (alternative delivery method)
 server.on('request', (req, res) => {
   if (req.method === 'POST' && req.url === '/telemetry') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
+    const MAX_BODY = 1_000_000; // 1 MB hard cap
+
+    // Reject early if Content-Length is set and over the cap.
+    const declared = parseInt(req.headers['content-length'], 10);
+    if (Number.isFinite(declared) && declared > MAX_BODY) {
+      res.writeHead(413, { 'Content-Type': 'application/json' });
+      res.end('{"error":"payload too large"}');
+      req.destroy();
+      return;
+    }
+
+    // Stream into a Buffer array; abort if streamed bytes exceed the cap
+    // (covers chunked / missing Content-Length).
+    const chunks = [];
+    let received = 0;
+    let aborted = false;
+
+    req.on('data', chunk => {
+      if (aborted) return;
+      received += chunk.length;
+      if (received > MAX_BODY) {
+        aborted = true;
+        try {
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          res.end('{"error":"payload too large"}');
+        } catch (_) {}
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+
     req.on('end', async () => {
+      if (aborted) return;
       try {
-        await handleTelemetryMessage(Buffer.from(body), logger);
+        await handleTelemetryMessage(Buffer.concat(chunks, received), logger);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end('{"status":"ok"}');
       } catch (err) {
@@ -65,6 +96,10 @@ server.on('request', (req, res) => {
         res.writeHead(500);
         res.end('{"error":"internal"}');
       }
+    });
+
+    req.on('error', (err) => {
+      logger.warn({ err }, 'HTTP telemetry request error');
     });
   } else if (req.method === 'GET' && req.url === '/.well-known/appspecific/com.tesla.3p.public-key.pem') {
     try {

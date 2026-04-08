@@ -433,9 +433,10 @@ async function onvifRoutes(fastify, options) {
    */
   fastify.get('/events', async (request, reply) => {
     const { limit = 50 } = request.query;
+    const safeLimit = Math.min(parseInt(limit) || 50, 100);
 
     try {
-      const events = await db.getAllRecentOnvifEvents(parseInt(limit));
+      const events = await db.getAllRecentOnvifEvents(safeLimit);
 
       return {
         events: events.map(e => ({

@@ -3,6 +3,7 @@ const frameCache = require('../services/frame-cache');
 const streamCache = require('../services/stream-cache');
 const { authHook, optionalAuthHook } = require('../utils/jwt');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
+const { safeProxyFetch, SafeProxyError } = require('../utils/safe-proxy-fetch');
 const { validateBody, cameraSettingsSchema } = require('../utils/validation');
 const logger = require('../utils/logger').child({ module: 'public' });
 const { services } = require('../config');
@@ -57,7 +58,8 @@ async function publicRoutes(fastify, options) {
 
     try {
       // Forward the SDP offer to the WHEP server (10s timeout)
-      const response = await fetchWithTimeout(targetUrl, {
+      // safeProxyFetch resolves DNS itself + checks IP + per-host rate limit
+      const response = await safeProxyFetch(targetUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/sdp'
@@ -76,6 +78,10 @@ async function publicRoutes(fastify, options) {
       return answerSdp;
 
     } catch (error) {
+      if (error instanceof SafeProxyError) {
+        logger.warn({ err: error.message }, 'WHEP proxy blocked');
+        return reply.code(error.status).send({ error: error.message });
+      }
       logger.error({ err: error }, 'WHEP proxy error');
       return reply.code(502).send({ error: 'Failed to connect to WHEP server' });
     }
@@ -111,7 +117,7 @@ async function publicRoutes(fastify, options) {
     }
 
     try {
-      const response = await fetchWithTimeout(targetUrl, {
+      const response = await safeProxyFetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/sdp' },
         body: request.body
@@ -134,6 +140,10 @@ async function publicRoutes(fastify, options) {
       return answerSdp;
 
     } catch (error) {
+      if (error instanceof SafeProxyError) {
+        logger.warn({ err: error.message }, 'WHIP proxy blocked');
+        return reply.code(error.status).send({ error: error.message });
+      }
       logger.error({ err: error }, 'WHIP proxy error');
       return reply.code(502).send({ error: 'Failed to connect to WHIP server' });
     }
@@ -149,6 +159,9 @@ async function publicRoutes(fastify, options) {
 
     try {
       const url = new URL(targetUrl);
+      if (isPrivateIP(url.hostname)) {
+        return reply.code(403).send({ error: 'Access to internal networks is not allowed' });
+      }
       if (!ALLOWED_WHEP_HOSTS.includes(url.hostname)) {
         return reply.code(403).send({ error: 'Server not in allowed list' });
       }
@@ -157,9 +170,12 @@ async function publicRoutes(fastify, options) {
     }
 
     try {
-      const response = await fetchWithTimeout(targetUrl, { method: 'DELETE' }, 10000);
+      const response = await safeProxyFetch(targetUrl, { method: 'DELETE' }, 10000);
       return reply.code(response.status).send();
     } catch (error) {
+      if (error instanceof SafeProxyError) {
+        return reply.code(error.status).send({ error: error.message });
+      }
       logger.error({ err: error }, 'WHIP DELETE proxy error');
       return reply.code(502).send({ error: 'Failed to teardown WHIP session' });
     }

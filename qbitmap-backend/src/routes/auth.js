@@ -41,8 +41,13 @@ async function authRoutes(fastify, options) {
     callbackUri: config.oauth.google.callbackUri
   });
 
-  // Google OAuth callback
-  fastify.get('/auth/google/callback', async (request, reply) => {
+  // Google OAuth callback — tight per-IP limit to slow brute-forced
+  // callback replays / state-token guessing.
+  fastify.get('/auth/google/callback', {
+    config: {
+      rateLimit: { max: 10, timeWindow: '1 minute' }
+    }
+  }, async (request, reply) => {
     try {
       // Get token from Google
       const { token } = await fastify.googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(request);

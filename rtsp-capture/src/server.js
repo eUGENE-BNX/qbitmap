@@ -17,6 +17,13 @@ async function createServer() {
     }
   });
 
+  // Global rate limit (frame fetches can be hot, so generous default).
+  // Per-route capture endpoints get tighter caps below.
+  await fastify.register(require('@fastify/rate-limit'), {
+    max: 600,
+    timeWindow: '1 minute'
+  });
+
   // Service key auth hook for state-changing endpoints
   const serviceKeyHook = async (request, reply) => {
     if (!config.serviceKey) return; // No key configured = skip auth (dev mode)
@@ -44,6 +51,7 @@ async function createServer() {
   // Start capture
   fastify.post('/capture/start', {
     preHandler: serviceKeyHook,
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -75,6 +83,7 @@ async function createServer() {
   // Stop capture
   fastify.post('/capture/stop', {
     preHandler: serviceKeyHook,
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -96,6 +105,7 @@ async function createServer() {
   // Update interval
   fastify.put('/capture/interval', {
     preHandler: serviceKeyHook,
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',

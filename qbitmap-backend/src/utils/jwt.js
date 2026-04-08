@@ -1,29 +1,24 @@
 const jwt = require('jsonwebtoken');
+const { LRUCache } = require('lru-cache');
 const config = require('../config');
 
-// Token verification cache for performance (80-90% faster auth)
-const tokenCache = new Map();
-const TOKEN_CACHE_TTL = 60000; // 1 minute cache
-const TOKEN_CACHE_MAX_SIZE = 10000; // Prevent memory leak
+// Token verification cache for performance (80-90% faster auth).
+// LRU + TTL: bursts of unique tokens evict cold entries instead of warm ones.
+const TOKEN_CACHE_TTL = 60_000;     // 1 minute
+const TOKEN_CACHE_MAX_SIZE = 10_000;
 
-// Cleanup stale tokens every 5 minutes
-let cleanupInterval = setInterval(() => {
-  const now = Date.now();
-  for (const [token, entry] of tokenCache.entries()) {
-    if (now - entry.time > TOKEN_CACHE_TTL) {
-      tokenCache.delete(token);
-    }
-  }
-}, 5 * 60 * 1000);
+const tokenCache = new LRUCache({
+  max: TOKEN_CACHE_MAX_SIZE,
+  ttl: TOKEN_CACHE_TTL,
+  // Don't extend TTL on each get — JWT freshness is what matters, not recency.
+  updateAgeOnGet: false,
+  updateAgeOnHas: false
+});
 
 /**
- * Cleanup token cache and stop interval (call on server shutdown)
+ * Cleanup token cache (call on server shutdown)
  */
 function cleanupTokenCache() {
-  if (cleanupInterval) {
-    clearInterval(cleanupInterval);
-    cleanupInterval = null;
-  }
   tokenCache.clear();
 }
 
@@ -92,10 +87,10 @@ async function authHook(request, reply) {
     return reply.code(401).send({ error: 'No token provided' });
   }
 
-  // Check cache first
+  // Check cache first (LRU handles TTL + size eviction internally)
   const cached = tokenCache.get(token);
-  if (cached && Date.now() - cached.time < TOKEN_CACHE_TTL) {
-    request.user = cached.data;
+  if (cached) {
+    request.user = cached;
     return;
   }
 
@@ -104,24 +99,7 @@ async function authHook(request, reply) {
     return reply.code(401).send({ error: 'Invalid or expired token' });
   }
 
-  // Cache the result (with size limit and eviction)
-  const now = Date.now();
-  if (tokenCache.size >= TOKEN_CACHE_MAX_SIZE) {
-    // Evict expired entries first
-    for (const [key, entry] of tokenCache.entries()) {
-      if (now - entry.time > TOKEN_CACHE_TTL) tokenCache.delete(key);
-    }
-    // If still full, evict the oldest entry
-    if (tokenCache.size >= TOKEN_CACHE_MAX_SIZE) {
-      let oldestKey = null, oldestTime = Infinity;
-      for (const [key, entry] of tokenCache.entries()) {
-        if (entry.time < oldestTime) { oldestTime = entry.time; oldestKey = key; }
-      }
-      if (oldestKey) tokenCache.delete(oldestKey);
-    }
-  }
-  tokenCache.set(token, { data: decoded, time: now });
-
+  tokenCache.set(token, decoded);
   request.user = decoded;
 }
 

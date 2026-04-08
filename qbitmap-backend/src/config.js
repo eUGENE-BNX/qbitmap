@@ -10,6 +10,20 @@ function requireEnv(name) {
   process.exit(1);
 }
 
+// Like requireEnv, but in non-production allows a dev fallback with a loud
+// warning. In production it crashes hard — no silent IP defaults shipped to
+// prod, since those defaults double as SSRF allowlist seeds.
+function requireEnvWithDevFallback(name, devFallback) {
+  const value = process.env[name];
+  if (value) return value;
+  if (isProduction) {
+    console.error(`\n❌ FATAL: ${name} must be set in production.\n`);
+    process.exit(1);
+  }
+  console.warn(`⚠️  ${name} not set, using dev fallback: ${devFallback}`);
+  return devFallback;
+}
+
 module.exports = {
   server: {
     host: '0.0.0.0',
@@ -62,7 +76,11 @@ module.exports = {
     telemetryWebhookSecret: requireEnv('TESLA_TELEMETRY_WEBHOOK_SECRET'),
   },
   services: (() => {
-    const mtxHost = process.env.MEDIAMTX_HOST || '91.98.90.57';
+    // Hard-required in production, dev gets a loud-warning fallback.
+    const mtxHost = requireEnvWithDevFallback('MEDIAMTX_HOST', '91.98.90.57');
+    const qHost = requireEnvWithDevFallback('QBITMAP_HOST', '91.99.219.248');
+    const allowedWhep = requireEnvWithDevFallback('ALLOWED_WHEP_HOSTS', mtxHost);
+    const webhookIps = requireEnvWithDevFallback('ONVIF_WEBHOOK_IPS', `${mtxHost},127.0.0.1,::1`);
     return {
       mediamtxHost: mtxHost,
       mediamtxApi: process.env.MEDIAMTX_API || `http://${mtxHost}:9997`,
@@ -73,9 +91,9 @@ module.exports = {
       mediamtxServer: process.env.MEDIAMTX_SERVER || mtxHost,
       onvifServiceUrl: process.env.ONVIF_SERVICE_URL || `http://${mtxHost}:3003`,
       captureServiceUrl: process.env.CAPTURE_SERVICE_URL || `http://${mtxHost}:3002`,
-      qbitmapHost: process.env.QBITMAP_HOST || '91.99.219.248',
-      allowedWhepHosts: (process.env.ALLOWED_WHEP_HOSTS || mtxHost).split(',').map(s => s.trim()),
-      webhookAllowedIps: (process.env.ONVIF_WEBHOOK_IPS || `${mtxHost},127.0.0.1,::1`).split(',').map(s => s.trim()),
+      qbitmapHost: qHost,
+      allowedWhepHosts: allowedWhep.split(',').map(s => s.trim()),
+      webhookAllowedIps: webhookIps.split(',').map(s => s.trim()),
     };
   })()
 };

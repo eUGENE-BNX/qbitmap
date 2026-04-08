@@ -1,20 +1,31 @@
 const config = require('./config');
 
+// Hard caps to keep heap bounded under long uptime / many cameras.
+const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1000; // 24h absolute TTL
+const MAX_TOTAL_EVENTS = 5000;                // global cap, LRU-evict cameras
+
 class EventStore {
   constructor() {
-    // Map<cameraId, Event[]>
+    // Map<cameraId, Event[]>  — Map iteration order = insertion order,
+    // and we re-insert on add() so the oldest-touched camera is the LRU head.
     this.events = new Map();
+
+    // Periodic absolute-age sweep.
+    this._sweepTimer = setInterval(() => this._sweep(), 10 * 60 * 1000).unref();
   }
 
   /**
    * Add event for a camera
    */
   add(cameraId, event) {
-    if (!this.events.has(cameraId)) {
-      this.events.set(cameraId, []);
+    let cameraEvents = this.events.get(cameraId);
+    if (!cameraEvents) {
+      cameraEvents = [];
+    } else {
+      // Re-insert to move this camera to the MRU end of the Map.
+      this.events.delete(cameraId);
     }
-
-    const cameraEvents = this.events.get(cameraId);
+    this.events.set(cameraId, cameraEvents);
 
     // Add new event at the beginning
     cameraEvents.unshift({
@@ -26,9 +37,38 @@ class EventStore {
       timestamp: new Date().toISOString()
     });
 
-    // Keep only last N events
+    // Keep only last N events per camera
     if (cameraEvents.length > config.events.maxPerCamera) {
-      cameraEvents.pop();
+      cameraEvents.length = config.events.maxPerCamera;
+    }
+
+    // Global cap: drop the LRU camera (oldest in Map iteration order)
+    // until total events fit. Cheap because Map keys are insertion-ordered.
+    let total = this._countTotal();
+    while (total > MAX_TOTAL_EVENTS) {
+      const oldestKey = this.events.keys().next().value;
+      if (oldestKey === undefined || oldestKey === cameraId) break;
+      const dropped = this.events.get(oldestKey).length;
+      this.events.delete(oldestKey);
+      total -= dropped;
+    }
+  }
+
+  _countTotal() {
+    let n = 0;
+    for (const arr of this.events.values()) n += arr.length;
+    return n;
+  }
+
+  _sweep() {
+    const cutoff = Date.now() - MAX_EVENT_AGE_MS;
+    for (const [cameraId, arr] of this.events) {
+      const kept = arr.filter(e => new Date(e.timestamp).getTime() >= cutoff);
+      if (kept.length === 0) {
+        this.events.delete(cameraId);
+      } else if (kept.length !== arr.length) {
+        this.events.set(cameraId, kept);
+      }
     }
   }
 
