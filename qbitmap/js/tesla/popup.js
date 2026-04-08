@@ -80,15 +80,15 @@ export const TeslaPopup = {
 
     return `<div class="tv-card">
       <div class="tv-header">
+        <div class="tv-title">
+          <div class="tv-name">${name}</div>
+          <div class="tv-sub">${model}${color ? ` \u00b7 ${escapeHtml(color)}` : ''}</div>
+        </div>
         ${carIcon
           ? `<img class="tv-car-icon" src="${escapeHtml(carIcon)}" alt="${escapeHtml(p.color || '')}" />`
           : (teslaAvatar
             ? `<img class="tv-avatar" src="${escapeHtml(teslaAvatar)}" alt="" />`
             : `<div class="tv-logo">T</div>`)}
-        <div class="tv-title">
-          <div class="tv-name">${name}</div>
-          <div class="tv-sub">${model}${color ? ` \u00b7 ${escapeHtml(color)}` : ''}</div>
-        </div>
       </div>
 
       <div class="tv-battery-row">

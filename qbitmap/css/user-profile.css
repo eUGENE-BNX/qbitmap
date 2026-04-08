@@ -319,6 +319,8 @@
 .profile-tesla-title {
   font-size: 14px;
   color: #202124;
+  flex: 1;
+  min-width: 0;
 }
 
 .profile-tesla-model {

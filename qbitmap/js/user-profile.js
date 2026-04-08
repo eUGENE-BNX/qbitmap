@@ -259,9 +259,6 @@ const UserProfileSystem = {
           </span>
         ` : ''}
         <div class="profile-tesla-header">
-          ${(() => { const u = getTeslaIconUrl(vehicle); return u
-            ? `<img class="profile-tesla-car-icon" src="${escapeHtml(u)}" alt="${escapeHtml(vehicle.color || '')}" />`
-            : `<div class="profile-tesla-logo">T</div>`; })()}
           <div class="profile-tesla-title">
             <div class="profile-tesla-plate-row" data-vehicle-id="${escapeHtml(vehicleId)}">
               ${licensePlate
@@ -280,6 +277,9 @@ const UserProfileSystem = {
               ${color ? `<span class="profile-tesla-color"> · ${escapeHtml(color)}</span>` : ''}
             </div>
           </div>
+          ${(() => { const u = getTeslaIconUrl(vehicle); return u
+            ? `<img class="profile-tesla-car-icon" src="${escapeHtml(u)}" alt="${escapeHtml(vehicle.color || '')}" />`
+            : `<div class="profile-tesla-logo">T</div>`; })()}
         </div>
 
         <div class="profile-tesla-battery">
