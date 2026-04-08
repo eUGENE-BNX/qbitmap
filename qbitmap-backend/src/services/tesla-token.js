@@ -101,7 +101,8 @@ async function syncVehicleInfo() {
             color: vc?.exterior_color || null,
             wheelType: vc?.wheel_type || null,
             carVersion: vs?.car_version || null,
-            odometer: vs?.odometer || null,
+            // Tesla returns odometer in miles — store as km
+            odometer: vs?.odometer != null ? vs.odometer * 1.60934 : null,
           });
 
           logger.info({ vin: v.vin, color: vc?.exterior_color, version: vs?.car_version }, 'Vehicle info synced');
@@ -152,9 +153,11 @@ async function syncTpms() {
           const vd = await vdRes.json();
           const vs = vd.response?.vehicle_state;
           if (vs) {
+            // Tesla returns odometer in miles — convert to km
+            const odoKm = vs.odometer != null ? vs.odometer * 1.60934 : null;
             await db.pool.execute(
               `UPDATE tesla_vehicles SET last_tpms_fl = ?, last_tpms_fr = ?, last_tpms_rl = ?, last_tpms_rr = ?, odometer = ?, updated_at = NOW() WHERE vin = ?`,
-              [vs.tpms_pressure_fl, vs.tpms_pressure_fr, vs.tpms_pressure_rl, vs.tpms_pressure_rr, vs.odometer, v.vin]
+              [vs.tpms_pressure_fl, vs.tpms_pressure_fr, vs.tpms_pressure_rl, vs.tpms_pressure_rr, odoKm, v.vin]
             );
             logger.info({ vin: v.vin, fl: vs.tpms_pressure_fl, fr: vs.tpms_pressure_fr }, 'TPMS synced');
           }
