@@ -813,6 +813,15 @@
   gap: 6px;
 }
 
+.profile-section-title {
+  margin: 8px 0 4px 2px;
+  letter-spacing: 0.5px;
+}
+
+.profile-section-title + .profile-tesla-section {
+  margin-top: 0;
+}
+
 .profile-media-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -995,18 +1004,25 @@
   }
 
   .profile-header-card {
-    flex-direction: column;
+    flex-direction: row;
+    align-items: flex-start;
     gap: 10px;
+  }
+
+  .profile-header-left {
+    flex-shrink: 0;
   }
 
   .profile-header-stats {
     margin-left: 0;
-    justify-content: flex-start;
-    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
   }
 
   .profile-stat-mini {
-    flex: 1;
     min-width: 0;
   }
 
@@ -1018,6 +1034,26 @@
 
   .profile-tesla-section {
     padding: 10px 12px;
+  }
+
+  .profile-tesla-temp-corner {
+    position: static;
+    margin-bottom: 6px;
+  }
+
+  .profile-tesla-header {
+    flex-wrap: nowrap;
+  }
+
+  .profile-tesla-title {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .profile-tesla-car-icon {
+    width: 56px;
+    height: 38px;
+    display: block;
   }
 
   .profile-info-row {

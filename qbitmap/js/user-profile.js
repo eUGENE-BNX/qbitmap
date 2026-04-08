@@ -188,7 +188,7 @@ const UserProfileSystem = {
 
   renderTeslaConnectCard() {
     return `
-      <h4 class="profile-section-title">Tesla</h4>
+      <h4 class="profile-section-title">TESLA</h4>
       <div class="profile-tesla-section profile-tesla-cta">
         <div class="profile-tesla-cta-row">
           <div class="profile-tesla-logo">T</div>
@@ -243,7 +243,7 @@ const UserProfileSystem = {
     const telemetryOff = vehicle.telemetryEnabled === false;
 
     return `
-      <h4 class="profile-section-title">Tesla</h4>
+      <h4 class="profile-section-title">TESLA</h4>
       <div class="profile-tesla-section">
         ${telemetryOff ? `
           <div class="profile-tesla-banner" data-vehicle-id="${escapeHtml(vehicleId)}">
