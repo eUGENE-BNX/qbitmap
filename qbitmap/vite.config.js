@@ -42,7 +42,7 @@ export default defineConfig({
         const outDir = options.dir || resolve(__dirname, 'dist');
 
         // Large dirs (3d, model, videos) are deployed separately via rsync
-        const staticDirs = ['vendor'];
+        const staticDirs = ['vendor', 'modely'];
         for (const dir of staticDirs) {
           const src = resolve(__dirname, dir);
           if (existsSync(src)) {

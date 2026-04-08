@@ -309,6 +309,13 @@
   flex-shrink: 0;
 }
 
+.profile-tesla-car-icon {
+  width: 72px;
+  height: 48px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .profile-tesla-title {
   font-size: 14px;
   color: #202124;

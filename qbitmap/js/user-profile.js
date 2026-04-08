@@ -6,6 +6,7 @@ import { Analytics } from './analytics.js';
 import { UserLocationSystem } from './user-location.js';
 import { VideoMessage } from './video-message/index.js';
 import * as AppState from './state.js';
+import { getTeslaIconUrl } from './tesla/icon.js';
 
 /**
  * QBitmap User Profile Panel
@@ -258,7 +259,9 @@ const UserProfileSystem = {
           </span>
         ` : ''}
         <div class="profile-tesla-header">
-          <div class="profile-tesla-logo">T</div>
+          ${(() => { const u = getTeslaIconUrl(vehicle); return u
+            ? `<img class="profile-tesla-car-icon" src="${escapeHtml(u)}" alt="${escapeHtml(vehicle.color || '')}" />`
+            : `<div class="profile-tesla-logo">T</div>`; })()}
           <div class="profile-tesla-title">
             <div class="profile-tesla-plate-row" data-vehicle-id="${escapeHtml(vehicleId)}">
               ${licensePlate

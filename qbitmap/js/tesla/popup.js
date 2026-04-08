@@ -1,5 +1,6 @@
 import { escapeHtml, showNotification } from '../utils.js';
 import { QBitmapConfig } from '../config.js';
+import { getTeslaIconUrl } from './icon.js';
 
 export const TeslaPopup = {
   map: null,
@@ -75,11 +76,15 @@ export const TeslaPopup = {
     // Temperature icon SVG (thermometer)
     const tempIcon = '<svg class="tv-temp-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v3h-2V5z"/></svg>';
 
+    const carIcon = getTeslaIconUrl(p);
+
     return `<div class="tv-card">
       <div class="tv-header">
-        ${teslaAvatar
-          ? `<img class="tv-avatar" src="${escapeHtml(teslaAvatar)}" alt="" />`
-          : `<div class="tv-logo">T</div>`}
+        ${carIcon
+          ? `<img class="tv-car-icon" src="${escapeHtml(carIcon)}" alt="${escapeHtml(p.color || '')}" />`
+          : (teslaAvatar
+            ? `<img class="tv-avatar" src="${escapeHtml(teslaAvatar)}" alt="" />`
+            : `<div class="tv-logo">T</div>`)}
         <div class="tv-title">
           <div class="tv-name">${name}</div>
           <div class="tv-sub">${model}${color ? ` \u00b7 ${escapeHtml(color)}` : ''}</div>
