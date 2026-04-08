@@ -231,15 +231,24 @@ var TeslaCamLive = {
       }
     });
 
-    var seg = this.segments.get(latestId);
-    if (seg && seg.summary) {
-      var gps = seg.summary.start_gps;
-      if (gps && gps[0] !== null) {
-        this.vehicleCoord = [gps[1], gps[0]];
-        this._updateVehicle();
-        this.map.flyTo({ center: this.vehicleCoord, zoom: 16, duration: 1500 });
-      }
+    var coord = this._findLatestValidGps();
+    if (coord) {
+      this.vehicleCoord = coord;
+      this._updateVehicle();
+      this.map.flyTo({ center: coord, zoom: 16, duration: 1500 });
     }
+  },
+
+  _findLatestValidGps: function() {
+    for (var i = 0; i < this.segmentOrder.length; i++) {
+      var s = this.segments.get(this.segmentOrder[i]);
+      if (!s || !s.summary) continue;
+      var g = s.summary.start_gps || s.summary.end_gps;
+      if (g && g[0] != null && g[1] != null) return [g[1], g[0]];
+      var g2 = s.summary.end_gps;
+      if (g2 && g2[0] != null && g2[1] != null) return [g2[1], g2[0]];
+    }
+    return null;
   },
 
   _switchToArchive: function() {
@@ -249,17 +258,11 @@ var TeslaCamLive = {
 
     if (this.popupEl) this._updateBadge('archive');
 
-    if (this.segmentOrder.length > 0) {
-      var latestId = this.segmentOrder[0];
-      var seg = this.segments.get(latestId);
-      if (seg && seg.summary) {
-        var gps = seg.summary.start_gps;
-        if (gps && gps[0] !== null) {
-          this.vehicleCoord = [gps[1], gps[0]];
-          this._updateVehicle();
-          this.map.flyTo({ center: this.vehicleCoord, zoom: 15, duration: 1500 });
-        }
-      }
+    var coord = this._findLatestValidGps();
+    if (coord) {
+      this.vehicleCoord = coord;
+      this._updateVehicle();
+      this.map.flyTo({ center: coord, zoom: 15, duration: 1500 });
     }
   },
 
@@ -348,10 +351,18 @@ var TeslaCamLive = {
   _onVideoEnded: function() {
     var self = this;
     if (this.mode === 'live') {
-      if (this.nextSegmentReady) {
-        var nextId = this.nextSegmentReady;
-        this.nextSegmentReady = null;
-        this._playVideo(nextId);
+      var nextId = this.nextSegmentReady;
+      this.nextSegmentReady = null;
+      // Fallback: pick newest segment in list that is newer than current
+      if (!nextId) {
+        var curIdx = this.segmentOrder.indexOf(this.activeSegmentId);
+        // segmentOrder is newest-first, so newer = curIdx - 1
+        if (curIdx > 0) nextId = this.segmentOrder[curIdx - 1];
+      }
+      if (nextId) {
+        this._preloadSegment(nextId).then(function() {
+          self._playVideo(nextId);
+        });
       } else {
         this._showWaiting(true);
         if (this._pendingArchiveSwitch) {

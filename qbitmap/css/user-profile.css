@@ -310,8 +310,8 @@
 }
 
 .profile-tesla-car-icon {
-  width: 72px;
-  height: 48px;
+  width: 113px;
+  height: 75px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -465,10 +465,25 @@
 .profile-tesla-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   font-size: 11px;
   color: #80868b;
   margin-bottom: 10px;
+}
+
+.profile-tesla-footer .profile-tesla-version {
+  margin-left: auto;
+}
+
+.profile-tesla-temp {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.profile-tesla-temp svg {
+  color: #80868b;
+  flex-shrink: 0;
 }
 
 /* Actions row (disconnect + mesh visibility toggle) */
@@ -949,7 +964,7 @@
 
 @media (min-width: 601px) {
   .profile-panel {
-    width: 520px;
+    width: 580px;
   }
 
   .profile-panel-content {
@@ -1036,11 +1051,6 @@
     padding: 10px 12px;
   }
 
-  .profile-tesla-temp-corner {
-    position: static;
-    margin-bottom: 6px;
-  }
-
   .profile-tesla-header {
     flex-wrap: nowrap;
   }
@@ -1051,8 +1061,8 @@
   }
 
   .profile-tesla-car-icon {
-    width: 56px;
-    height: 38px;
+    width: 95px;
+    height: 65px;
     display: block;
   }
 

@@ -94,7 +94,11 @@ async function pollVehicle(vehicle, accessToken, userId) {
 
   // For parked vehicles, just check gear to detect drive start
   const endpoints = ['drive_state'];
-  if (needBattery || state.isParked) endpoints.push('charge_state');
+  if (needBattery || state.isParked) {
+    endpoints.push('charge_state');
+    endpoints.push('vehicle_state');
+    endpoints.push('climate_state');
+  }
 
   try {
     const url = `${config.tesla.apiBase}/api/1/vehicles/${vehicle.vehicle_id}/vehicle_data?endpoints=${endpoints.join('%3B')}`;
@@ -118,6 +122,8 @@ async function pollVehicle(vehicle, accessToken, userId) {
     const data = await res.json();
     const ds = data.response?.drive_state;
     const cs = data.response?.charge_state;
+    const vs = data.response?.vehicle_state;
+    const cl = data.response?.climate_state;
     if (!ds) return;
 
     const update = { vin };
@@ -149,8 +155,23 @@ async function pollVehicle(vehicle, accessToken, userId) {
     // Battery
     if (cs) {
       update.soc = cs.usable_battery_level ?? cs.battery_level;
+      if (cs.est_battery_range != null) update.estRange = Math.round(cs.est_battery_range * 1.60934);
       state.lastBattery = now;
       fields.push('battery');
+    }
+
+    // Vehicle state (locked, sentry)
+    if (vs) {
+      update.locked = vs.locked ? 1 : 0;
+      update.sentry = vs.sentry_mode ? 1 : 0;
+      fields.push('vehicle_state');
+    }
+
+    // Climate (inside/outside temp)
+    if (cl) {
+      if (cl.inside_temp != null) update.insideTemp = cl.inside_temp;
+      if (cl.outside_temp != null) update.outsideTemp = cl.outside_temp;
+      fields.push('climate');
     }
 
     await db.updateVehicleTelemetry(update);

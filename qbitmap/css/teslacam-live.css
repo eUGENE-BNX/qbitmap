@@ -27,17 +27,17 @@
 .teslacam-live-container {
   position: relative;
   width: 362px;
-  height: 234px;
+  max-width: calc(100vw - 20px);
+  aspect-ratio: 724 / 468;
   background: #000;
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-  transition: width 0.3s ease, height 0.3s ease;
+  transition: width 0.3s ease;
 }
 
 .teslacam-live-container.native {
   width: 724px;
-  height: 469px;
 }
 
 /* Header — blur bar, hover to show */
@@ -324,8 +324,8 @@
 
 @media (max-width: 768px) {
   .teslacam-live-container {
-    width: 280px;
-    height: 181px;
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
   }
 
   .teslacam-live-container .tesla-dashboard .meta-speed-value {
