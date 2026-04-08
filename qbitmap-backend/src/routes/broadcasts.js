@@ -41,7 +41,7 @@ async function broadcastRoutes(fastify, options) {
   // POST /start - Start a live broadcast (requires auth)
   fastify.post('/start', { preHandler: authHook }, async (request, reply) => {
     const userId = request.user.userId;
-    const { lng, lat, orientation } = request.body || {};
+    const { lng, lat, orientation, accuracy_radius_m, source } = request.body || {};
 
     // Validate coordinates
     if (!Number.isFinite(lng) || !Number.isFinite(lat) ||
@@ -89,6 +89,8 @@ async function broadcastRoutes(fastify, options) {
         whepUrl,
         lng,
         lat,
+        accuracyRadiusM: Number.isFinite(accuracy_radius_m) ? accuracy_radius_m : null,
+        locationSource: typeof source === 'string' ? source.slice(0, 16) : null,
         orientation: orient
       });
     } catch (dbError) {

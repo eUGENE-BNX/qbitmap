@@ -44,10 +44,10 @@ DatabaseService.prototype.getUserByDisplayName = async function(displayName) {
   return rows[0];
 };
 
-DatabaseService.prototype.updateUserLocation = async function(userId, lat, lng, accuracy) {
+DatabaseService.prototype.updateUserLocation = async function(userId, lat, lng, accuracy, source) {
   await this.pool.execute(
-    'UPDATE users SET last_lat = ?, last_lng = ?, last_location_accuracy = ?, last_location_updated = NOW() WHERE id = ?',
-    [lat, lng, accuracy, userId]
+    'UPDATE users SET last_lat = ?, last_lng = ?, last_location_accuracy = ?, last_location_source = ?, last_location_updated = NOW() WHERE id = ?',
+    [lat, lng, accuracy, source || null, userId]
   );
   return this.getUserById(userId);
 };
@@ -62,7 +62,7 @@ DatabaseService.prototype.updateUserLocationVisibility = async function(userId, 
 
 DatabaseService.prototype.getUserLocation = async function(userId) {
   const [rows] = await this.pool.execute(
-    'SELECT id, last_lat, last_lng, last_location_accuracy, last_location_updated, show_location_on_map FROM users WHERE id = ?',
+    'SELECT id, last_lat, last_lng, last_location_accuracy, last_location_source, last_location_updated, show_location_on_map FROM users WHERE id = ?',
     [userId]
   );
   const user = rows[0];

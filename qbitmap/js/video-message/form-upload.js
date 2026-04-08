@@ -4,6 +4,7 @@ import { AuthSystem } from "../auth.js";
 import { Analytics } from "../analytics.js";
 import { _haptic } from "./photo-capture.js";
 import * as AppState from '../state.js';
+import { LocationService } from '../services/location-service.js';
 
 const FormUploadMixin = {
   showPreview() {
@@ -162,23 +163,20 @@ const FormUploadMixin = {
   },
 
   _tryAutoLocation(btn) {
-    if (!navigator.geolocation) {
-      // No geolocation support - show map picker
-      btn.disabled = false;
-      btn.textContent = 'Konumu Seç';
-      this._bindLocationBtn(btn);
-      return;
-    }
-
-    const GPS_ACCURACY_THRESHOLD = 25; // meters
-    const GPS_TIMEOUT = 8000; // ms
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        if (accuracy <= GPS_ACCURACY_THRESHOLD) {
-          // Good GPS - auto-set location and show Send button
-          this.selectedLocation = { lng: longitude, lat: latitude };
+    LocationService.get({
+      purpose: 'video-upload',
+      acceptThresholdM: 25,
+      approximateMaxM: 100
+    })
+      .then((loc) => {
+        if (loc.quality === 'precise') {
+          // Good GPS — auto-set and show Send
+          this.selectedLocation = {
+            lng: loc.lng,
+            lat: loc.lat,
+            accuracy_radius_m: loc.accuracy_radius_m,
+            source: loc.source
+          };
           btn.disabled = false;
           btn.textContent = 'Gönder';
           btn.onclick = () => {
@@ -188,23 +186,19 @@ const FormUploadMixin = {
             }
             this.uploadMessage();
           };
-          // Fetch nearby places asynchronously
-          this.fetchNearbyPlaces(latitude, longitude);
+          this.fetchNearbyPlaces(loc.lat, loc.lng);
         } else {
-          // Poor GPS accuracy - show map picker
+          // Approximate / coarse → make user pick on map
           btn.disabled = false;
           btn.textContent = 'Konumu Seç';
           this._bindLocationBtn(btn);
         }
-      },
-      () => {
-        // GPS failed - show map picker
+      })
+      .catch(() => {
         btn.disabled = false;
         btn.textContent = 'Konumu Seç';
         this._bindLocationBtn(btn);
-      },
-      { enableHighAccuracy: true, timeout: GPS_TIMEOUT, maximumAge: 10000 }
-    );
+      });
   },
 
   _bindLocationBtn(btn) {
@@ -319,7 +313,7 @@ const FormUploadMixin = {
 
     // One-time map click handler
     this._locationClickHandler = (e) => {
-      this.selectedLocation = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+      this.selectedLocation = { lng: e.lngLat.lng, lat: e.lngLat.lat, source: 'manual' };
       this.exitLocationSelection();
       // Show modal again with Send button and fetch nearby places
       if (this._modalEl) {
@@ -483,6 +477,12 @@ const FormUploadMixin = {
     // Fields MUST come before file for @fastify/multipart request.file() to parse them
     formData.append('lng', this.selectedLocation.lng);
     formData.append('lat', this.selectedLocation.lat);
+    if (Number.isFinite(this.selectedLocation.accuracy_radius_m)) {
+      formData.append('accuracy_radius_m', String(this.selectedLocation.accuracy_radius_m));
+    }
+    if (this.selectedLocation.source) {
+      formData.append('location_source', this.selectedLocation.source);
+    }
     if (!this.isPhotoMode) {
       formData.append('duration_ms', this._durationMs);
     }

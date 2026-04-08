@@ -64,6 +64,9 @@ async function videoMessageRoutes(fastify, options) {
     const fields = data.fields;
     const lng = parseFloat(fields.lng?.value);
     const lat = parseFloat(fields.lat?.value);
+    const accuracyRadiusMRaw = fields.accuracy_radius_m?.value ? parseInt(fields.accuracy_radius_m.value) : null;
+    const accuracyRadiusM = Number.isFinite(accuracyRadiusMRaw) ? accuracyRadiusMRaw : null;
+    const locationSource = (fields.location_source?.value || '').slice(0, 16) || null;
     const durationMs = isPhoto ? null : parseInt(fields.duration_ms?.value);
     const recipientEmail = fields.recipient_email?.value || null;
     const description = (fields.description?.value || '').trim().substring(0, 200) || null;
@@ -174,6 +177,8 @@ async function videoMessageRoutes(fastify, options) {
         recipientId,
         lng,
         lat,
+        accuracyRadiusM,
+        locationSource,
         filePath: `uploads/video-messages/${fileName}`,
         fileSize,
         durationMs,

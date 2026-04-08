@@ -5,6 +5,7 @@ import { AuthSystem } from '../auth.js';
 import { Analytics } from '../analytics.js';
 import * as AppState from '../state.js';
 import { applyAutofocus, getSavedCameraId, saveCameraId } from '../video-message/media.js';
+import { LocationService } from '../services/location-service.js';
 
 function _hapticBroadcast(style) {
   if (!navigator.vibrate) return;
@@ -157,19 +158,26 @@ const CoreMixin = {
       applyAutofocus(this.mediaStream);
       saveCameraId(this.mediaStream.getVideoTracks()[0]?.getSettings()?.deviceId);
 
-      // 2. Get accurate geolocation
-      let lng, lat;
+      // 2. Get geolocation via unified LocationService
+      let lng, lat, accuracyRadiusM = null, locationSource = null;
       let locationResolved = false;
 
       try {
-        const position = await this._getAccurateLocation();
-        lng = position.coords.longitude;
-        lat = position.coords.latitude;
+        const loc = await LocationService.get({
+          purpose: 'broadcast',
+          acceptThresholdM: 25,
+          approximateMaxM: 100
+        });
+        lng = loc.lng;
+        lat = loc.lat;
+        accuracyRadiusM = loc.accuracy_radius_m;
+        locationSource = loc.source;
 
-        if (position.coords.accuracy <= 25) {
+        if (loc.quality === 'precise') {
           locationResolved = true;
         } else {
-          const choice = await this._showLocationDialog(position.coords.accuracy, lng, lat);
+          // Approximate GPS or coarse IP — let user confirm or pick on map
+          const choice = await this._showLocationDialog(loc.accuracy_radius_m, lng, lat);
           if (choice) {
             lng = choice.lng;
             lat = choice.lat;
@@ -177,7 +185,7 @@ const CoreMixin = {
           }
         }
       } catch {
-        // Geolocation failed, will try map pick
+        // Both GPS and IP fallback failed; user must pick on map
       }
 
       if (!locationResolved) {
@@ -185,6 +193,8 @@ const CoreMixin = {
           const picked = await this._pickLocationFromMap();
           lng = picked.lng;
           lat = picked.lat;
+          accuracyRadiusM = null;
+          locationSource = 'manual';
         } catch {
           this.cleanupMediaResources();
           return;
@@ -196,7 +206,7 @@ const CoreMixin = {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lng, lat })
+        body: JSON.stringify({ lng, lat, accuracy_radius_m: accuracyRadiusM, source: locationSource })
       });
 
       if (!startResponse.ok) {

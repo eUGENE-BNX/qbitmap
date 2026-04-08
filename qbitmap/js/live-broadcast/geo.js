@@ -1,58 +1,9 @@
 import * as AppState from '../state.js';
 
+// NOTE: GPS sampling moved to services/location-service.js (LocationService.get()).
+// This mixin now only owns the UX bits — accuracy confirmation dialog and map picker.
+
 const GeoMixin = {
-  /**
-   * Get accurate location using watchPosition (progressive accuracy)
-   * Resolves immediately when accuracy <= 25m, or after 8s with best result
-   */
-  _getAccurateLocation() {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        return reject(new Error('Geolocation not supported'));
-      }
-
-      let bestPosition = null;
-      const ACCURACY_THRESHOLD = 25;
-      const TIMEOUT = 8000;
-
-      const watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
-            bestPosition = position;
-          }
-          if (position.coords.accuracy <= ACCURACY_THRESHOLD) {
-            navigator.geolocation.clearWatch(watchId);
-            clearTimeout(timer);
-            resolve(bestPosition);
-          }
-        },
-        (error) => {
-          navigator.geolocation.clearWatch(watchId);
-          clearTimeout(timer);
-          if (bestPosition) {
-            resolve(bestPosition);
-          } else {
-            reject(error);
-          }
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: TIMEOUT,
-          maximumAge: 0
-        }
-      );
-
-      const timer = setTimeout(() => {
-        navigator.geolocation.clearWatch(watchId);
-        if (bestPosition) {
-          resolve(bestPosition);
-        } else {
-          reject(new Error('Location timeout'));
-        }
-      }, TIMEOUT);
-    });
-  },
-
   /**
    * Show dialog when GPS accuracy is poor (> 25m)
    * Returns { lng, lat } if user accepts, null if user wants map pick

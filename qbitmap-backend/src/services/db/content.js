@@ -77,10 +77,10 @@ DatabaseService.prototype.isUserZoneOwner = async function(userId, zoneId) {
   return zone && zone.user_id === userId;
 };
 
-DatabaseService.prototype.createLiveBroadcast = async function(userId, { broadcastId, displayName, avatarUrl, mediamtxPath, whepUrl, lng, lat, orientation }) {
+DatabaseService.prototype.createLiveBroadcast = async function(userId, { broadcastId, displayName, avatarUrl, mediamtxPath, whepUrl, lng, lat, accuracyRadiusM, locationSource, orientation }) {
   await this.pool.execute(
-    'INSERT INTO live_broadcasts (broadcast_id, user_id, display_name, avatar_url, mediamtx_path, whep_url, lng, lat, orientation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [broadcastId, userId, displayName, avatarUrl, mediamtxPath, whepUrl, lng, lat, orientation || 'landscape']
+    'INSERT INTO live_broadcasts (broadcast_id, user_id, display_name, avatar_url, mediamtx_path, whep_url, lng, lat, accuracy_radius_m, location_source, orientation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [broadcastId, userId, displayName, avatarUrl, mediamtxPath, whepUrl, lng, lat, accuracyRadiusM || null, locationSource || null, orientation || 'landscape']
   );
 };
 

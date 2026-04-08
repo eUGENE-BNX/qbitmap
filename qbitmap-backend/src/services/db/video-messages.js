@@ -2,11 +2,11 @@ const { notifyH3ContentItem, notifyH3ContentItemRemove } = require('../../utils/
 
 module.exports = function(DatabaseService) {
 
-DatabaseService.prototype.createVideoMessage = async function(senderId, { messageId, recipientId, lng, lat, filePath, fileSize, durationMs, mimeType, description, mediaType, photoMetadata, placeId }) {
+DatabaseService.prototype.createVideoMessage = async function(senderId, { messageId, recipientId, lng, lat, accuracyRadiusM, locationSource, filePath, fileSize, durationMs, mimeType, description, mediaType, photoMetadata, placeId }) {
   await this.pool.execute(
-    `INSERT INTO video_messages (message_id, sender_id, recipient_id, lng, lat, file_path, file_size, duration_ms, mime_type, media_type, description, photo_metadata, place_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [messageId, senderId, recipientId || null, lng, lat, filePath, fileSize, durationMs || null, mimeType, mediaType || 'video', description || null, photoMetadata || null, placeId || null]
+    `INSERT INTO video_messages (message_id, sender_id, recipient_id, lng, lat, accuracy_radius_m, location_source, file_path, file_size, duration_ms, mime_type, media_type, description, photo_metadata, place_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [messageId, senderId, recipientId || null, lng, lat, accuracyRadiusM || null, locationSource || null, filePath, fileSize, durationMs || null, mimeType, mediaType || 'video', description || null, photoMetadata || null, placeId || null]
   );
   // Ownership sync
   if (lat && lng) {

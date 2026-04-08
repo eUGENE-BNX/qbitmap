@@ -79,7 +79,7 @@ async function userRoutes(fastify, options) {
 
   // Update current user's location
   fastify.put('/me/location', async (request, reply) => {
-    const { lat, lng, accuracy } = request.body;
+    const { lat, lng, accuracy, accuracy_radius_m, source } = request.body;
 
     if (lat === undefined || lng === undefined) {
       return reply.code(400).send({ error: 'lat and lng are required' });
@@ -91,9 +91,13 @@ async function userRoutes(fastify, options) {
       return reply.code(400).send({ error: 'Invalid coordinates' });
     }
 
-    await db.updateUserLocation(request.user.userId, lat, lng, accuracy || null);
+    // Accept either legacy `accuracy` or new `accuracy_radius_m` from LocationService
+    const acc = Number.isFinite(accuracy_radius_m) ? accuracy_radius_m : (accuracy || null);
+    const src = typeof source === 'string' ? source.slice(0, 16) : null;
 
-    logger.info({ user: request.user.email, lat, lng, accuracy }, 'User location updated');
+    await db.updateUserLocation(request.user.userId, lat, lng, acc, src);
+
+    logger.info({ user: request.user.email, lat, lng, accuracy: acc, source: src }, 'User location updated');
 
     return {
       status: 'ok',

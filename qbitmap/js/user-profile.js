@@ -7,6 +7,7 @@ import { UserLocationSystem } from './user-location.js';
 import { VideoMessage } from './video-message/index.js';
 import * as AppState from './state.js';
 import { getTeslaIconUrl } from './tesla/icon.js';
+import { LocationService } from './services/location-service.js';
 
 /**
  * QBitmap User Profile Panel
@@ -254,12 +255,6 @@ const UserProfileSystem = {
             <button class="profile-tesla-show-qr">QR Kodu Göster</button>
           </div>
         ` : ''}
-        ${outsideTemp != null || insideTemp != null ? `
-          <span class="profile-tesla-temp-corner">
-            ${tempIcon}
-            ${outsideTemp != null ? `Dış ${outsideTemp}°` : ''}${outsideTemp != null && insideTemp != null ? ' / ' : ''}${insideTemp != null ? `İç ${insideTemp}°` : ''}
-          </span>
-        ` : ''}
         <div class="profile-tesla-header">
           <div class="profile-tesla-title">
             <div class="profile-tesla-plate-row" data-vehicle-id="${escapeHtml(vehicleId)}">
@@ -308,6 +303,12 @@ const UserProfileSystem = {
 
         <div class="profile-tesla-footer">
           ${odometer ? `<span class="profile-tesla-odo">Odometer: ${odometer} km</span>` : ''}
+          ${(outsideTemp != null || insideTemp != null) ? `
+            <span class="profile-tesla-temp">
+              ${tempIcon}
+              ${outsideTemp != null ? `Dış ${outsideTemp}°` : ''}${outsideTemp != null && insideTemp != null ? ' / ' : ''}${insideTemp != null ? `İç ${insideTemp}°` : ''}
+            </span>
+          ` : ''}
           ${carVersion ? `<span class="profile-tesla-version">v${escapeHtml(carVersion)}</span>` : ''}
         </div>
 
@@ -625,31 +626,31 @@ const UserProfileSystem = {
 
   async findLocation() {
     this.close();
-    if (!navigator.geolocation) {
-      AuthSystem.showNotification('Konum servisi desteklenmiyor', 'error');
-      return;
-    }
     AuthSystem.showNotification('Konum aranıyor...', 'info');
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        if (UserLocationSystem) {
-          await UserLocationSystem.showLocation(longitude, latitude, accuracy);
-        }
-        if (AppState.map) {
-          AppState.map.flyTo({ center: [longitude, latitude], zoom: 17, duration: 1000 });
-        }
-        if (AuthSystem) {
-          AuthSystem.showNotification(`Konum belirlendi (±${Math.round(accuracy)}m)`, 'success');
-        }
-      },
-      (error) => {
-        Logger.error('[Profile] Geolocation error:', error);
-        AuthSystem.showNotification('Konum alınamadı', 'error');
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+    try {
+      const loc = await LocationService.get({
+        purpose: 'profile',
+        sampleWindowMs: 15000,
+        acceptThresholdM: 25,
+        approximateMaxM: 200,
+        noCache: true
+      });
+      if (UserLocationSystem) {
+        await UserLocationSystem.showLocation(loc.lng, loc.lat, loc.accuracy_radius_m);
+      }
+      if (AppState.map) {
+        const zoom = loc.quality === 'precise' ? 17 : (loc.quality === 'approximate' ? 14 : 11);
+        AppState.map.flyTo({ center: [loc.lng, loc.lat], zoom, duration: 1000 });
+      }
+      if (AuthSystem) {
+        const label = loc.source === 'ip' ? 'yaklaşık (IP)' : `±${loc.accuracy_radius_m}m`;
+        AuthSystem.showNotification(`Konum belirlendi (${label})`, 'success');
+      }
+    } catch (error) {
+      Logger.error('[Profile] LocationService error:', error);
+      AuthSystem.showNotification('Konum alınamadı', 'error');
+    }
   },
 
   formatDate(dateStr) {

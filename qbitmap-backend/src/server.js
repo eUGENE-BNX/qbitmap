@@ -166,6 +166,9 @@ async function buildServer() {
   await fastify.register(require('./routes/ai'), { prefix: '/api/ai' });
   await fastify.register(require('./routes/users'), { prefix: '/api/users' });
 
+  // Register geo routes (IP-based location fallback for LocationService)
+  await fastify.register(require('./routes/geo'), { prefix: '/api/geo' });
+
   // Register monitoring routes (AI monitoring & alarms)
   await fastify.register(require('./routes/monitoring'), { prefix: '/api/monitoring' });
 

@@ -6,6 +6,7 @@ import { H3Grid } from './h3-grid.js';
 import { H3TronTrails } from './h3-tron-trails.js';
 import { CameraSystem } from './camera-system/index.js';
 import { setMap, layers, satelliteMode, setSatelliteMode } from './state.js';
+import { LocationService } from './services/location-service.js';
 
 // Global unhandled promise rejection handler for video play errors
 window.addEventListener('unhandledrejection', (event) => {
@@ -95,20 +96,20 @@ let updateSatelliteVisibility;
 let videoBounds;
 Logger.log("[Map] Map instance created");
 
-// Request geolocation, save to localStorage, fly on first visit
-if (navigator.geolocation) {
+// Request location via unified LocationService (GPS → IP fallback).
+// Async — map opens immediately on cached/default center, flyTo if first visit.
+{
     const hadLocation = localStorage.getItem('qbitmap_user_location');
-    navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            const loc = { lng: pos.coords.longitude, lat: pos.coords.latitude };
-            localStorage.setItem('qbitmap_user_location', JSON.stringify(loc));
+    LocationService.get({ purpose: 'map-init', sampleWindowMs: 6000 })
+        .then((loc) => {
+            localStorage.setItem('qbitmap_user_location', JSON.stringify({ lng: loc.lng, lat: loc.lat }));
             if (!hadLocation) {
-                map.flyTo({ center: [loc.lng, loc.lat], zoom: 12 });
+                // Coarse IP results land on a wider zoom; precise GPS gets a closer one.
+                const zoom = loc.quality === 'precise' ? 14 : (loc.quality === 'approximate' ? 12 : 10);
+                map.flyTo({ center: [loc.lng, loc.lat], zoom });
             }
-        },
-        () => {},
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
-    );
+        })
+        .catch((err) => Logger.log('[Map] LocationService failed:', err?.message));
 }
 
 map.on("error", (e) => Logger.error("[Map] Error:", e.error));

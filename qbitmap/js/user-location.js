@@ -4,6 +4,7 @@ import { AuthSystem } from './auth.js';
 import { CameraSystem } from './camera-system/index.js';
 import * as AppState from './state.js';
 import { LiveBroadcast } from './live-broadcast/index.js';
+import { LocationService } from './services/location-service.js';
 
 /**
  * UserLocationSystem - Display user's location on map
@@ -649,25 +650,26 @@ const UserLocationSystem = {
         if (btn) btn.classList.add('searching');
 
         try {
-            const position = await LiveBroadcast._getAccurateLocation();
-            const lng = position.coords.longitude;
-            const lat = position.coords.latitude;
+            const loc = await LocationService.get({
+                purpose: 'profile',
+                acceptThresholdM: 25,
+                approximateMaxM: 200
+            });
 
             if (AppState.map) {
+                const targetZoom = loc.quality === 'precise' ? 17 : (loc.quality === 'approximate' ? 14 : 11);
                 AppState.map.flyTo({
-                    center: [lng, lat],
-                    zoom: Math.max(AppState.map.getZoom(), 17),
+                    center: [loc.lng, loc.lat],
+                    zoom: Math.max(AppState.map.getZoom(), targetZoom),
                     duration: 1000
                 });
             }
 
-            this._showPulsingDot(lng, lat);
-            Logger.log(`[UserLocation] Located: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${Math.round(position.coords.accuracy)}m)`);
+            this._showPulsingDot(loc.lng, loc.lat);
+            Logger.log(`[UserLocation] Located: ${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)} (±${loc.accuracy_radius_m}m, ${loc.source})`);
         } catch (error) {
             Logger.warn('[UserLocation] Locate failed:', error);
-            let msg = 'Konum alınamadı';
-            if (error.code === 1) msg = 'Konum izni reddedildi';
-            AuthSystem.showNotification(msg, 'error');
+            AuthSystem.showNotification('Konum alınamadı', 'error');
         } finally {
             if (btn) btn.classList.remove('searching');
         }
