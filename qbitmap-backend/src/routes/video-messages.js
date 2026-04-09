@@ -406,6 +406,57 @@ async function videoMessageRoutes(fastify, options) {
     }
   });
 
+  // GET /:messageId/description?lang=XX - Translated AI description (cached)
+  fastify.get('/:messageId/description', {
+    preHandler: optionalAuthHook,
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
+    const ALLOWED_LANGS = ['en', 'de', 'fr', 'tr', 'es', 'zh', 'ru', 'ar'];
+    try {
+      const { messageId } = request.params;
+      const lang = String(request.query.lang || '').toLowerCase();
+      if (!ALLOWED_LANGS.includes(lang)) {
+        return reply.code(400).send({ error: 'Unsupported lang' });
+      }
+
+      const msg = await db.getVideoMessageById(messageId);
+      if (!msg) return reply.code(404).send({ error: 'Message not found' });
+
+      // Access control for private messages
+      if (msg.recipient_id !== null) {
+        const userId = request.user?.userId;
+        if (!userId || (msg.sender_id !== userId && msg.recipient_id !== userId)) {
+          return reply.code(403).send({ error: 'Access denied' });
+        }
+      }
+
+      if (!msg.ai_description) {
+        return reply.code(404).send({ error: 'No AI description yet' });
+      }
+
+      const sourceLang = msg.ai_description_lang || 'tr';
+      if (sourceLang === lang) {
+        return { lang, text: msg.ai_description, cached: true };
+      }
+
+      const cached = await db.getVideoMessageTranslation(messageId, lang);
+      if (cached) return { lang, text: cached, cached: true };
+
+      const { translateText } = require('../services/ai-translate');
+      try {
+        const translated = await translateText(msg.ai_description, sourceLang, lang);
+        await db.saveVideoMessageTranslation(messageId, lang, translated);
+        return { lang, text: translated, cached: false };
+      } catch (err) {
+        logger.warn({ err: err.message, messageId, lang }, 'Translation failed');
+        return reply.code(503).send({ error: 'Translation unavailable' });
+      }
+    } catch (error) {
+      logger.error({ err: error }, 'Description endpoint failed');
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // GET /:messageId/video - Serve video file with Range support
   fastify.get('/:messageId/video', { preHandler: optionalAuthHook }, async (request, reply) => {
     try {

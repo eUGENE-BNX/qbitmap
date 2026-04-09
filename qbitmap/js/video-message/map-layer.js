@@ -280,6 +280,7 @@ const MapLayerMixin = {
         liked: m.liked ? 'true' : 'false',
         description: m.description || '',
         aiDescription: m.ai_description || '',
+        aiDescriptionLang: m.ai_description_lang || '',
         tags: JSON.stringify(m.tags || []),
         thumbnailPath: m.thumbnail_path || '',
         placeName: m.place_name || ''
@@ -372,6 +373,7 @@ const MapLayerMixin = {
           liked: msg.liked ? 'true' : 'false',
           description: msg.description || '',
           aiDescription: msg.ai_description || '',
+          aiDescriptionLang: msg.ai_description_lang || '',
           tags: JSON.stringify(msg.tags || []),
           thumbnailPath: msg.thumbnail_path || '',
           placeName: msg.place_name || ''

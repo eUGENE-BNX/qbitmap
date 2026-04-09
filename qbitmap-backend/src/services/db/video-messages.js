@@ -254,10 +254,45 @@ DatabaseService.prototype.updateVideoMessageThumbnail = async function(messageId
   );
 };
 
-DatabaseService.prototype.updateVideoMessageAiDescription = async function(messageId, aiDescription) {
+DatabaseService.prototype.updateVideoMessageAiDescription = async function(messageId, aiDescription, langCode = null) {
   await this.pool.execute(
-    'UPDATE video_messages SET ai_description = ? WHERE message_id = ?',
-    [aiDescription, messageId]
+    'UPDATE video_messages SET ai_description = ?, ai_description_lang = ? WHERE message_id = ?',
+    [aiDescription, langCode, messageId]
+  );
+};
+
+// --- Geo language cell cache (coord → primary local lang) ---
+DatabaseService.prototype.getGeoLangCell = async function(cellKey) {
+  const [rows] = await this.pool.execute(
+    'SELECT lang_code, country_code, subdivision_code FROM geo_lang_cells WHERE cell_key = ?',
+    [cellKey]
+  );
+  return rows[0] || null;
+};
+
+DatabaseService.prototype.upsertGeoLangCell = async function(cellKey, countryCode, subdivisionCode, langCode) {
+  await this.pool.execute(
+    `INSERT INTO geo_lang_cells (cell_key, country_code, subdivision_code, lang_code)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE lang_code = VALUES(lang_code), country_code = VALUES(country_code), subdivision_code = VALUES(subdivision_code)`,
+    [cellKey, countryCode, subdivisionCode, langCode]
+  );
+};
+
+// --- On-demand translation cache ---
+DatabaseService.prototype.getVideoMessageTranslation = async function(messageId, lang) {
+  const [rows] = await this.pool.execute(
+    'SELECT text FROM video_message_translations WHERE message_id = ? AND lang = ?',
+    [messageId, lang]
+  );
+  return rows[0]?.text || null;
+};
+
+DatabaseService.prototype.saveVideoMessageTranslation = async function(messageId, lang, text) {
+  await this.pool.execute(
+    `INSERT INTO video_message_translations (message_id, lang, text) VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE text = VALUES(text), created_at = CURRENT_TIMESTAMP`,
+    [messageId, lang, text]
   );
 };
 

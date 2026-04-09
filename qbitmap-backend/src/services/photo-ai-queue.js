@@ -3,17 +3,48 @@
  * Persistent queue — survives backend restarts
  */
 
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const { execFile } = require('child_process');
 const db = require('./database');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'photo-ai-queue' });
-const { getVllmUrl, getVllmApiKey, getModelName, getBackendUrl } = require('../utils/ai-config');
+const { getVllmUrl, getVllmApiKey, getModelName } = require('../utils/ai-config');
+const { resolveLanguageForCoords } = require('../utils/geo-language');
 const circuitBreaker = require('./ai-circuit-breaker');
+
+const FFMPEG_PATH = '/usr/bin/ffmpeg';
+const UPLOADS_DIR = path.resolve(__dirname, '../../uploads/video-messages');
+// Bound box for AI input: keep aspect, no crop, never upscale.
+// Reduces token count so vLLM context limit (16384) isn't exceeded.
+const AI_MAX_W = 1920;
+const AI_MAX_H = 1080;
+
+function downscaleForAi(srcPath) {
+  return new Promise((resolve, reject) => {
+    const outPath = path.join(os.tmpdir(), `ai_${path.basename(srcPath)}.jpg`);
+    const args = [
+      '-i', srcPath,
+      '-vf', `scale='min(${AI_MAX_W},iw)':'min(${AI_MAX_H},ih)':force_original_aspect_ratio=decrease`,
+      '-q:v', '3',
+      '-y',
+      outPath
+    ];
+    execFile(FFMPEG_PATH, args, { timeout: 15000 }, (err) => {
+      if (err) return reject(err);
+      resolve(outPath);
+    });
+  });
+}
 
 const TIMEOUT = 60000; // 60s for photo analysis
 const MAX_CONCURRENCY = 3;
 const POLL_INTERVAL = 3000; // Check DB every 3s for new jobs
 
-const PROMPT = 'You are analyzing a single image.\n\nYour task is to generate one fluent, user-facing paragraph in Turkish only. This paragraph will be displayed directly under the image in an app, and it will also be used as searchable semantic metadata. The goal is to help a person quickly understand the image and to make the image discoverable through text search later.\n\nFocus only on clearly visible, reliable, and visually verifiable details. Prefer concrete and discriminative details over generic wording. Include the most important visible elements such as the type of scene, main objects or products, people if present, readable brand names, labels, prices, packaging, visible text/OCR, spatial arrangement, colors, materials, store or environment clues, and any distinctive details that make this image different from similar images.\n\nMention only things you are visually confident about. Do not hallucinate, speculate, or infer unsupported identity, location, intent, backstory, or hidden context. If a detail is unclear, leave it out instead of guessing.\n\nWrite the result as a single natural paragraph of 300 to 350 tokens. Do not use headings, bullet points, labels, JSON, or list formatting. Do not write like a technical AI report. The final response must read like a polished image description for end users, while still being rich enough for indexing and retrieval.\n\nOutput language must be Turkish only. Do not use English in the final answer.';
+function buildPrompt(languageName) {
+  return `You are analyzing a single image.\n\nYour task is to generate one fluent, user-facing paragraph in ${languageName} only. This paragraph will be displayed directly under the image in an app, and it will also be used as searchable semantic metadata. The goal is to help a person quickly understand the image and to make the image discoverable through text search later.\n\nFocus only on clearly visible, reliable, and visually verifiable details. Prefer concrete and discriminative details over generic wording. Include the most important visible elements such as the type of scene, main objects or products, people if present, readable brand names, labels, prices, packaging, visible text/OCR, spatial arrangement, colors, materials, store or environment clues, and any distinctive details that make this image different from similar images.\n\nMention only things you are visually confident about. Do not hallucinate, speculate, or infer unsupported identity, location, intent, backstory, or hidden context. If a detail is unclear, leave it out instead of guessing.\n\nWrite the result as a single natural paragraph of 300 to 350 tokens. Do not use headings, bullet points, labels, JSON, or list formatting. Do not write like a technical AI report. The final response must read like a polished image description for end users, while still being rich enough for indexing and retrieval.\n\nOutput language must be ${languageName} only. Do not use any other language in the final answer.`;
+}
 
 let activeCount = 0;
 let pollTimer = null;
@@ -65,11 +96,26 @@ async function analyzePhoto(messageId) {
   const vllmUrl = await getVllmUrl();
   const model = await getModelName();
   const apiKey = await getVllmApiKey();
-  const backendUrl = await getBackendUrl();
 
-  const imageUrl = `${backendUrl.replace(/\/$/, '')}/api/video-messages/${messageId}/video`;
+  // Resolve original file from DB and downscale to a vLLM-friendly bounding box.
+  const msg = await db.getVideoMessageById(messageId);
+  if (!msg || !msg.file_path) throw new Error('Message or file_path not found');
+  const lang = await resolveLanguageForCoords(Number(msg.lat), Number(msg.lng));
+  const PROMPT = buildPrompt(lang.name);
+  const srcPath = path.resolve(__dirname, '../../', msg.file_path);
+  if (!srcPath.startsWith(UPLOADS_DIR + path.sep)) throw new Error('Invalid file path');
+  if (!fs.existsSync(srcPath)) throw new Error(`Source image missing: ${srcPath}`);
 
-  logger.info({ messageId, model, imageUrl }, 'Starting photo AI analysis');
+  let resizedPath = null;
+  let imageDataUrl;
+  try {
+    resizedPath = await downscaleForAi(srcPath);
+    const buf = await fs.promises.readFile(resizedPath);
+    imageDataUrl = `data:image/jpeg;base64,${buf.toString('base64')}`;
+    logger.info({ messageId, model, srcSize: (await fs.promises.stat(srcPath)).size, resizedSize: buf.length }, 'Starting photo AI analysis');
+  } finally {
+    if (resizedPath) fs.promises.unlink(resizedPath).catch(() => {});
+  }
 
   const body = {
     model,
@@ -77,7 +123,7 @@ async function analyzePhoto(messageId) {
       role: 'user',
       content: [
         { type: 'text', text: PROMPT },
-        { type: 'image_url', image_url: { url: imageUrl } }
+        { type: 'image_url', image_url: { url: imageDataUrl } }
       ]
     }],
     max_tokens: 512
@@ -103,8 +149,8 @@ async function analyzePhoto(messageId) {
   let text = (data.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   if (!text) throw new Error('Empty AI description');
 
-  await db.updateVideoMessageAiDescription(messageId, text.substring(0, 1000));
-  logger.info({ messageId, len: text.length }, 'Photo AI description saved');
+  await db.updateVideoMessageAiDescription(messageId, text.substring(0, 1000), lang.code);
+  logger.info({ messageId, len: text.length, lang: lang.code }, 'Photo AI description saved');
 }
 
 function start() {

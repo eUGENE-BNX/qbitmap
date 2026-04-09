@@ -367,6 +367,7 @@ CREATE TABLE IF NOT EXISTS video_messages (
   media_type ENUM('video','photo') NOT NULL DEFAULT 'video',
   description VARCHAR(200) DEFAULT NULL,
   ai_description TEXT DEFAULT NULL,
+  ai_description_lang VARCHAR(8) DEFAULT NULL,
   thumbnail_path VARCHAR(500) DEFAULT NULL,
   photo_metadata JSON DEFAULT NULL,
   place_id INT UNSIGNED DEFAULT NULL,
@@ -541,6 +542,28 @@ CREATE TABLE IF NOT EXISTS ai_jobs (
   INDEX idx_aijobs_status (status, next_retry_at),
   INDEX idx_aijobs_message (message_id),
   UNIQUE KEY uk_aijobs_message (message_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================
+-- 31. geo_lang_cells (coord → language cache for AI prompt localization)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS geo_lang_cells (
+  cell_key VARCHAR(24) PRIMARY KEY,
+  country_code VARCHAR(2) DEFAULT NULL,
+  subdivision_code VARCHAR(8) DEFAULT NULL,
+  lang_code VARCHAR(8) NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================
+-- 32. video_message_translations (cached on-demand translations)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS video_message_translations (
+  message_id VARCHAR(64) NOT NULL,
+  lang VARCHAR(8) NOT NULL,
+  text VARCHAR(1200) NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (message_id, lang)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================

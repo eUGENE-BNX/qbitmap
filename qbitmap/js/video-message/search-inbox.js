@@ -120,6 +120,7 @@ const SearchInboxMixin = {
                 liked: msg.liked ? 'true' : 'false',
                 description: msg.description || '',
                 aiDescription: msg.ai_description || '',
+                aiDescriptionLang: msg.ai_description_lang || '',
                 tags: JSON.stringify(msg.tags || []),
                 thumbnailPath: msg.thumbnail_path || ''
               }, [msg.lng, msg.lat]);
@@ -366,6 +367,7 @@ const SearchInboxMixin = {
                   liked: msg.liked ? 'true' : 'false',
                   description: msg.description || '',
                   aiDescription: msg.ai_description || '',
+                aiDescriptionLang: msg.ai_description_lang || '',
                   tags: JSON.stringify(msg.tags || []),
                   thumbnailPath: msg.thumbnail_path || ''
                 }, [msg.lng, msg.lat]);

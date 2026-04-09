@@ -35,6 +35,17 @@ const PopupMixin = {
     const isLoggedIn = AuthSystem.isLoggedIn();
     const description = props.description || '';
     const aiDescription = props.aiDescription || '';
+    const aiDescriptionLang = (props.aiDescriptionLang || 'tr').toLowerCase();
+    const SUPPORTED_LANGS = [
+      { code: 'en', label: 'English' },
+      { code: 'de', label: 'Deutsch' },
+      { code: 'fr', label: 'Français' },
+      { code: 'tr', label: 'Türkçe' },
+      { code: 'es', label: 'Español' },
+      { code: 'zh', label: '中文' },
+      { code: 'ru', label: 'Русский' },
+      { code: 'ar', label: 'العربية' },
+    ];
     const placeName = props.placeName || '';
     const tags = props.tags ? (typeof props.tags === 'string' ? JSON.parse(props.tags) : props.tags) : [];
     const mediaType = props.mediaType || (messageId.startsWith('pmsg_') ? 'photo' : 'video');
@@ -90,7 +101,7 @@ const PopupMixin = {
         </div>
         ${description || aiDescription || placeName || tags.length > 0 || isOwn ? `
         <div class="video-msg-popup-meta">
-          ${description ? `<div class="video-msg-popup-title">${esc(description)}</div>` : ''}
+          ${(description || aiDescription) ? `<div class="video-msg-popup-title-row">${description ? `<div class="video-msg-popup-title">${esc(description)}</div>` : '<div class="video-msg-popup-title-spacer"></div>'}${aiDescription ? `<div class="video-msg-ai-lang-wrap"><button type="button" class="video-msg-ai-lang-btn" data-ai-lang-btn title="Dil seç" aria-label="Dil seç"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></button><div class="video-msg-ai-lang-menu" data-ai-lang-menu hidden>${SUPPORTED_LANGS.map(l => `<button type="button" class="video-msg-ai-lang-item${l.code === aiDescriptionLang ? ' active' : ''}" data-lang="${l.code}">${l.label}</button>`).join('')}</div></div>` : ''}</div>` : ''}
           ${placeName ? `<div class="video-msg-popup-place"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg> ${esc(placeName)}</div>` : ''}
           ${aiDescription ? `<div class="video-msg-ai-wrap"><div class="video-msg-popup-ai-description" data-ai-desc>${esc(aiDescription)}</div><div class="video-msg-ai-fade" data-ai-fade><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div></div>` : ''}
           <div class="video-msg-popup-tags" data-tags-container>
@@ -232,13 +243,74 @@ const PopupMixin = {
       // AI description scroll fade indicator
       const aiDesc = popupEl.querySelector('[data-ai-desc]');
       const aiFade = popupEl.querySelector('[data-ai-fade]');
+      const checkScroll = () => {
+        if (!aiDesc || !aiFade) return;
+        const atBottom = aiDesc.scrollHeight - aiDesc.scrollTop - aiDesc.clientHeight < 4;
+        aiFade.classList.toggle('hidden', atBottom || aiDesc.scrollHeight <= aiDesc.clientHeight);
+      };
       if (aiDesc && aiFade) {
-        const checkScroll = () => {
-          const atBottom = aiDesc.scrollHeight - aiDesc.scrollTop - aiDesc.clientHeight < 4;
-          aiFade.classList.toggle('hidden', atBottom || aiDesc.scrollHeight <= aiDesc.clientHeight);
-        };
         aiDesc.addEventListener('scroll', checkScroll);
         checkScroll();
+      }
+
+      // AI description language dropdown
+      const langBtn = popupEl.querySelector('[data-ai-lang-btn]');
+      const langMenu = popupEl.querySelector('[data-ai-lang-menu]');
+      const langItems = langMenu ? langMenu.querySelectorAll('[data-lang]') : [];
+      if (langBtn && langMenu && aiDesc) {
+        const cache = new Map();
+        cache.set(aiDescriptionLang, aiDescription);
+
+        const closeMenu = () => { langMenu.hidden = true; document.removeEventListener('click', onDocClick, true); };
+        const onDocClick = (e) => { if (!langMenu.contains(e.target) && e.target !== langBtn) closeMenu(); };
+        langBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (langMenu.hidden) {
+            langMenu.hidden = false;
+            setTimeout(() => document.addEventListener('click', onDocClick, true), 0);
+          } else {
+            closeMenu();
+          }
+        };
+
+        langItems.forEach(item => {
+          item.onclick = async (e) => {
+            e.stopPropagation();
+            const target = item.dataset.lang;
+            closeMenu();
+            if (item.classList.contains('active')) return;
+            langItems.forEach(b => b.classList.remove('active'));
+            item.classList.add('active');
+
+            if (cache.has(target)) {
+              aiDesc.textContent = cache.get(target);
+              aiDesc.scrollTop = 0;
+              checkScroll();
+              return;
+            }
+
+            const prevText = aiDesc.textContent;
+            aiDesc.style.opacity = '0.5';
+            try {
+              const res = await fetch(`${this.apiBase}/${encodeURIComponent(messageId)}/description?lang=${target}`, {
+                credentials: 'include'
+              });
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const data = await res.json();
+              cache.set(target, data.text);
+              aiDesc.textContent = data.text;
+              aiDesc.scrollTop = 0;
+              checkScroll();
+            } catch (err) {
+              Logger.warn('[VideoMessage] Translation fetch failed:', err);
+              AuthSystem.showNotification('Çeviri alınamadı', 'error');
+              aiDesc.textContent = prevText;
+              langItems.forEach(b => b.classList.toggle('active', b.dataset.lang === aiDescriptionLang));
+            } finally {
+              aiDesc.style.opacity = '';
+            }
+          };
+        });
       }
 
       // Render comments
