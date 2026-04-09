@@ -146,6 +146,11 @@ async function handleTelemetryMessage(rawData, logger) {
           // Tesla may send number, bool, or string ("1"/"0"/"true"/"false")
           const truthy = value === 1 || value === true || value === '1' || value === 'true' || value === 'True';
           update.locked = truthy ? 1 : 0;
+          // A locked vehicle is definitely parked — clear stale gear/speed
+          if (truthy) {
+            update.gear = 'P';
+            update.speed = 0;
+          }
           hasUpdate = true;
         }
         break;

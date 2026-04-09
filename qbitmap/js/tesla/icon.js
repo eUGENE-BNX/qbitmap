@@ -11,6 +11,22 @@ const KNOWN_COLORS = new Set([
   'DeepBlueMetallic',
 ]);
 
+// Tesla API returns various color names — map them to our icon filenames
+const COLOR_ALIASES = {
+  PearlWhite: 'PearlWhiteMultiCoat',
+  UltraWhite: 'PearlWhiteMultiCoat',
+  SolidWhite: 'PearlWhiteMultiCoat',
+  StealthGrey: 'MidnightSilverMetallic',
+  MidnightSilver: 'MidnightSilverMetallic',
+  Silver: 'MidnightSilverMetallic',
+  Red: 'RedMultiCoat',
+  UltraRed: 'RedMultiCoat',
+  MidnightCherry: 'RedMultiCoat',
+  Black: 'SolidBlack',
+  ObsidianBlack: 'SolidBlack',
+  Blue: 'DeepBlueMetallic',
+};
+
 function normalizeModel(carType, model) {
   // Tesla vehicle_config.car_type: 'modely', 'model3', 'models', 'modelx'
   if (carType) {
@@ -30,7 +46,9 @@ function normalizeModel(carType, model) {
 export function getTeslaIconUrl(vehicle) {
   if (!vehicle) return null;
   const model = normalizeModel(vehicle.carType, vehicle.model);
-  const color = vehicle.color;
-  if (!model || !color || !KNOWN_COLORS.has(color)) return null;
+  const rawColor = vehicle.color;
+  if (!model || !rawColor) return null;
+  const color = KNOWN_COLORS.has(rawColor) ? rawColor : (COLOR_ALIASES[rawColor] || null);
+  if (!color) return null;
   return `/${model}/teslaicons/${color}.png`;
 }

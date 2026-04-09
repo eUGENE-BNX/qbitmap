@@ -59,11 +59,16 @@ async function pollAccount(row) {
 }
 
 async function pollVehicle(vehicle, accessToken, userId) {
-  // Skip vehicles with Fleet Telemetry enabled
-  if (vehicle.telemetry_enabled) return;
-
   const vin = vehicle.vin;
   const now = Date.now();
+
+  // For telemetry-enabled vehicles: only poll if no fresh telemetry recently (fallback)
+  const TELEMETRY_STALE = 10 * 60 * 1000; // 10 minutes
+  if (vehicle.telemetry_enabled) {
+    const lastTelemetry = vehicle.last_telemetry_at ? new Date(vehicle.last_telemetry_at).getTime() : 0;
+    if ((now - lastTelemetry) < TELEMETRY_STALE) return; // telemetry is fresh, skip
+    logger.info({ vin }, 'Telemetry stale, falling back to poller');
+  }
 
   if (!vehicleState.has(vin)) {
     vehicleState.set(vin, {
@@ -78,7 +83,7 @@ async function pollVehicle(vehicle, accessToken, userId) {
 
   // If parked — only poll every PARKED_INTERVAL
   if (state.isParked && (now - state.lastPoll) < PARKED_INTERVAL) {
-    logger.info({ vin, nextIn: Math.round((PARKED_INTERVAL - (now - state.lastPoll)) / 1000) }, 'Parked, skipping');
+    logger.debug({ vin, nextIn: Math.round((PARKED_INTERVAL - (now - state.lastPoll)) / 1000) }, 'Parked, skipping');
     return;
   }
 

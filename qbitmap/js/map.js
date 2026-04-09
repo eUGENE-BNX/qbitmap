@@ -296,6 +296,7 @@ class LayersDropdownControl {
                 break;
             case 'tesla-vehicles':
                 layers.teslaVehiclesVisible = !layers.teslaVehiclesVisible;
+                localStorage.setItem('qbitmap_tesla', layers.teslaVehiclesVisible);
                 toggle.classList.toggle('active', layers.teslaVehiclesVisible);
                 if (layers.teslaVehiclesVisible) {
                     import('/js/tesla/index.js').then(m => {
@@ -510,6 +511,12 @@ map.on("load", async () => {
     if (layers.h3GridVisible) {
         H3Grid.setEnabled(true);
         if (layersControl) layersControl.syncToggleState('h3-grid', true);
+    }
+    if (layers.teslaVehiclesVisible) {
+        import('/js/tesla/index.js').then(m => m.TeslaSystem.show({ silent: true }));
+        if (layersControl) layersControl.syncToggleState('tesla-vehicles', true);
+        const teslaBtn = document.getElementById('tesla-button');
+        if (teslaBtn) teslaBtn.classList.add('active');
     }
 
     // Lazy-load non-critical modules after map is ready

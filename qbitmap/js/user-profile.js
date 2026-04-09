@@ -81,14 +81,14 @@ const UserProfileSystem = {
       this.hasFaceRegistered = user.hasFaceRegistered;
 
       // Fetch extra stats in parallel
-      const [cameraStats, recentMessages, landStats, teslaVehicle] = await Promise.all([
+      const [cameraStats, recentMessages, landStats, teslaVehicles] = await Promise.all([
         this.fetchCameraStats(),
         this.fetchRecentMessages(),
         this.fetchLandStats(user.id),
-        this.fetchTeslaVehicle()
+        this.fetchTeslaVehicles()
       ]);
 
-      this.renderProfile(user, { cameraStats, recentMessages, landStats, teslaVehicle });
+      this.renderProfile(user, { cameraStats, recentMessages, landStats, teslaVehicles });
     } catch (error) {
       Logger.error('[Profile] Load error:', error);
       content.innerHTML = '<div class="profile-face-error"><p>Profil yüklenemedi</p></div>';
@@ -116,13 +116,13 @@ const UserProfileSystem = {
     } catch { return null; }
   },
 
-  async fetchTeslaVehicle() {
+  async fetchTeslaVehicles() {
     try {
       const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles`, { credentials: 'include' });
-      if (!res.ok) return null;
+      if (!res.ok) return [];
       const data = await res.json();
-      return data.vehicles && data.vehicles.length > 0 ? data.vehicles[0] : null;
-    } catch { return null; }
+      return data.vehicles || [];
+    } catch { return []; }
   },
 
   async checkFaceStatus() {
@@ -139,13 +139,13 @@ const UserProfileSystem = {
 
   renderProfile(user, extras) {
     const content = document.querySelector('.profile-panel-content');
-    const { cameraStats, recentMessages, landStats, teslaVehicle } = extras;
+    const { cameraStats, recentMessages, landStats, teslaVehicles } = extras;
 
     content.innerHTML = `
       ${this.renderHeaderCard(user, cameraStats, landStats)}
       ${this.renderInfoRow(user.location, user.hasFaceRegistered)}
       ${this.renderRecentMessages(recentMessages)}
-      ${teslaVehicle ? this.renderTeslaSection(teslaVehicle) : this.renderTeslaConnectCard()}
+      ${teslaVehicles.length > 0 ? teslaVehicles.map(v => this.renderTeslaSection(v)).join('') : this.renderTeslaConnectCard()}
     `;
 
     this.setupEventListeners();
@@ -336,9 +336,8 @@ const UserProfileSystem = {
     }
 
     // Re-show QR modal (telemetry-off banner)
-    const showQrBtn = content.querySelector('.profile-tesla-show-qr');
-    if (showQrBtn) {
-      showQrBtn.addEventListener('click', async () => {
+    content.querySelectorAll('.profile-tesla-show-qr').forEach(btn => {
+      btn.addEventListener('click', async () => {
         try {
           const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles`, { credentials: 'include' });
           const data = await res.json();
@@ -354,12 +353,11 @@ const UserProfileSystem = {
           AuthSystem.showNotification('QR gösterilemedi', 'error');
         }
       });
-    }
+    });
 
-    // Disconnect
-    const disconnectBtn = content.querySelector('.profile-tesla-disconnect');
-    if (disconnectBtn) {
-      disconnectBtn.addEventListener('click', async () => {
+    // Disconnect (any disconnect button disconnects the whole Tesla account)
+    content.querySelectorAll('.profile-tesla-disconnect').forEach(btn => {
+      btn.addEventListener('click', async () => {
         if (!confirm('Tesla hesabınızı ayırmak istediğinize emin misiniz?')) return;
         try {
           await fetch(`${QBitmapConfig.api.base}/api/tesla/disconnect`, {
@@ -371,11 +369,10 @@ const UserProfileSystem = {
           AuthSystem.showNotification('Bağlantı kesilemedi', 'error');
         }
       });
-    }
+    });
 
-    // Mesh visibility toggle
-    const meshBtn = content.querySelector('.profile-tesla-mesh-toggle');
-    if (meshBtn) {
+    // Mesh visibility toggle (per vehicle)
+    content.querySelectorAll('.profile-tesla-mesh-toggle').forEach(meshBtn => {
       meshBtn.addEventListener('click', async () => {
         const vid = meshBtn.dataset.vehicleId;
         const newVisible = meshBtn.dataset.visible !== '1';
@@ -400,51 +397,18 @@ const UserProfileSystem = {
           meshBtn.disabled = false;
         }
       });
-    }
+    });
 
-    // License plate save (new input)
-    const plateRow = content.querySelector('.profile-tesla-plate-row');
-    if (!plateRow) return;
-    const vehicleId = plateRow.dataset.vehicleId;
+    // License plate (per vehicle)
+    content.querySelectorAll('.profile-tesla-plate-row').forEach(plateRow => {
+      const vehicleId = plateRow.dataset.vehicleId;
 
-    const saveBtn = content.querySelector('.profile-tesla-plate-save');
-    const plateInput = content.querySelector('.profile-tesla-plate-input');
-    if (saveBtn && plateInput) {
-      const savePlate = async () => {
-        const plate = plateInput.value.trim();
-        if (!plate) return;
-        try {
-          await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${vehicleId}/license-plate`, {
-            method: 'PATCH', credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ licensePlate: plate })
-          });
-          AuthSystem.showNotification('Plaka kaydedildi', 'success');
-          await this.loadProfile();
-        } catch {
-          AuthSystem.showNotification('Plaka kaydedilemedi', 'error');
-        }
-      };
-      saveBtn.addEventListener('click', savePlate);
-      plateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') savePlate(); });
-    }
-
-    // License plate edit (existing plate)
-    const editBtn = content.querySelector('.profile-tesla-plate-edit');
-    if (editBtn) {
-      editBtn.addEventListener('click', () => {
-        const currentPlate = plateRow.querySelector('.profile-tesla-plate')?.textContent || '';
-        plateRow.innerHTML = `
-          <input type="text" class="profile-tesla-plate-input" value="${escapeHtml(currentPlate)}" maxlength="20">
-          <button class="profile-tesla-plate-save" title="Kaydet">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          </button>
-        `;
-        const input = plateRow.querySelector('.profile-tesla-plate-input');
-        const save = plateRow.querySelector('.profile-tesla-plate-save');
-        input.focus();
+      const bindPlateSave = (container) => {
+        const saveBtn = container.querySelector('.profile-tesla-plate-save');
+        const plateInput = container.querySelector('.profile-tesla-plate-input');
+        if (!saveBtn || !plateInput) return;
         const savePlate = async () => {
-          const plate = input.value.trim();
+          const plate = plateInput.value.trim();
           if (!plate) return;
           try {
             await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${vehicleId}/license-plate`, {
@@ -458,10 +422,30 @@ const UserProfileSystem = {
             AuthSystem.showNotification('Plaka kaydedilemedi', 'error');
           }
         };
-        save.addEventListener('click', savePlate);
-        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') savePlate(); });
-      });
-    }
+        saveBtn.addEventListener('click', savePlate);
+        plateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') savePlate(); });
+      };
+
+      // New plate input (no existing plate)
+      bindPlateSave(plateRow);
+
+      // Edit existing plate
+      const editBtn = plateRow.querySelector('.profile-tesla-plate-edit');
+      if (editBtn) {
+        editBtn.addEventListener('click', () => {
+          const currentPlate = plateRow.querySelector('.profile-tesla-plate')?.textContent || '';
+          plateRow.innerHTML = `
+            <input type="text" class="profile-tesla-plate-input" value="${escapeHtml(currentPlate)}" maxlength="20">
+            <button class="profile-tesla-plate-save" title="Kaydet">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+          `;
+          const input = plateRow.querySelector('.profile-tesla-plate-input');
+          input.focus();
+          bindPlateSave(plateRow);
+        });
+      }
+    });
   },
 
   renderInfoRow(location, hasFaceRegistered) {

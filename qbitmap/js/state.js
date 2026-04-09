@@ -18,7 +18,7 @@ export const layers = {
   photoMessagesVisible: true,
   cityCamerasVisible: true,
   userCamerasVisible: true,
-  teslaVehiclesVisible: false,
+  teslaVehiclesVisible: localStorage.getItem('qbitmap_tesla') === 'true',
   teslaCamLiveVisible: false,
 };
 

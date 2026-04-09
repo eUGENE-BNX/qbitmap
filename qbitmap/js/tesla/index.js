@@ -37,6 +37,7 @@ export const TeslaSystem = {
 
     // Toggle Tesla layer
     layers.teslaVehiclesVisible = !layers.teslaVehiclesVisible;
+    localStorage.setItem('qbitmap_tesla', layers.teslaVehiclesVisible);
     const btn = document.getElementById('tesla-button');
     if (btn) btn.classList.toggle('active', layers.teslaVehiclesVisible);
 
@@ -66,7 +67,7 @@ export const TeslaSystem = {
     });
   },
 
-  async show() {
+  async show(options = {}) {
     await this.init();
 
     // Fetch vehicles
@@ -77,18 +78,20 @@ export const TeslaSystem = {
         TeslaLayer.updateVehicles(data.vehicles);
         TeslaLayer.show();
 
-        // Fly to first vehicle with location
-        const first = data.vehicles.find(v => v.lat && v.lng);
-        if (first) {
-          map.flyTo({ center: [first.lng, first.lat], zoom: 14 });
+        // Fly to first vehicle only on explicit user action, not on restore
+        if (!options.silent) {
+          const first = data.vehicles.find(v => v.lat && v.lng);
+          if (first) {
+            map.flyTo({ center: [first.lng, first.lat], zoom: 14 });
+          }
         }
 
         // Check for vehicles without Fleet Telemetry
         const noTelemetry = data.vehicles.filter(v => !v.telemetryEnabled);
-        if (noTelemetry.length > 0) {
+        if (noTelemetry.length > 0 && !options.silent) {
           this.showTelemetryPrompt(noTelemetry);
         }
-      } else {
+      } else if (!options.silent) {
         showNotification('Herhangi bir Tesla aracınız bağlı değil.', 'info');
       }
     } catch (err) {
