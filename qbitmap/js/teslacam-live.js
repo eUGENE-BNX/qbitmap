@@ -455,7 +455,7 @@ var TeslaCamLive = {
       self._createSourceAndLayer();
     };
     img.onerror = function() { self._createSourceAndLayer(); };
-    img.src = '/car.png';
+    img.src = '/car1.png';
   },
 
   _createSourceAndLayer: function() {

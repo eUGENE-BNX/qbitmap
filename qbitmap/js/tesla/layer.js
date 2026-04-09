@@ -51,17 +51,24 @@ export const TeslaLayer = {
           'icon-ignore-placement': true,
           'text-field': ['concat', ['to-string', ['get', 'speed']], ' km/h'],
           'text-font': ['Noto Sans Medium'],
-          'text-size': 11,
+          'text-size': [
+            'interpolate', ['linear'], ['zoom'],
+            13, 0,
+            14, 7,
+            17, 9,
+            20, 11
+          ],
           'text-offset': [0, 2.2],
           'text-anchor': 'top',
           'text-allow-overlap': true,
           'visibility': 'none'
         },
         paint: {
-          'icon-opacity': [
-            'case',
-            ['==', ['get', 'gear'], 'P'], 0.5,
-            1.0
+          'icon-opacity': 1.0,
+          'text-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            13, 0,
+            13.5, 1
           ],
           'text-color': '#22c55e',
           'text-halo-color': 'rgba(0,0,0,0.8)',

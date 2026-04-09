@@ -437,7 +437,7 @@ const TeslaDashcam = {
       // Fallback: create source/layer anyway, icon might already exist
       self._createSourceAndLayer();
     };
-    img.src = '/car.png'; // Reuse existing car icon for now
+    img.src = '/car1.png';
   },
 
   _createSourceAndLayer: function() {
