@@ -15,14 +15,17 @@
 - `qbitmap.com` → `/opt/qbitmap`
 - `stream.qbitmap.com` → `localhost:3000`
 
-## SSH/Deployment
+## Deployment (MANDATORY: use deploy.sh scripts)
+
+**ALWAYS use deploy.sh - NEVER run raw rsync commands.**
+Scripts have hardcoded excludes and run a dry-run first with confirmation.
+
 ```bash
-# Frontend - build then deploy dist/ (NOT source!)
-cd qbitmap && npm run build
-rsync -avz --delete --exclude='maps' --exclude='uploads' --exclude='teslacam' --exclude='3d' --exclude='model' --exclude='videos' dist/ root@91.99.219.248:/opt/qbitmap/
+# Frontend
+cd /home/eugene/Documents/CODES/Qbitmap/qbitmap && ./deploy.sh
 
 # Backend
-rsync -avz --delete --exclude='.git' --exclude='node_modules' --exclude='*.db' --exclude='*.db-wal' --exclude='*.db-shm' --exclude='uploads' /home/eugene/Documents/CODES/qbitmap-backend/ root@91.99.219.248:/opt/qbitmap-backend/
+cd /home/eugene/Documents/CODES/Qbitmap/qbitmap-backend && ./deploy.sh
 ```
 
 ## IMPORTANT EXCLUSIONS

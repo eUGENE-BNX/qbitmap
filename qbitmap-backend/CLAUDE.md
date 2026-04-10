@@ -5,14 +5,14 @@
 **Server path: `/opt/qbitmap-backend`**
 **NEVER use `/var/www/` - this is WRONG!**
 
-## Deployment Command
-```bash
-rsync -avz --delete --exclude='.git' --exclude='node_modules' --exclude='*.db' /home/eugene/Documents/CODES/qbitmap-backend/ root@91.99.219.248:/opt/qbitmap-backend/
-```
+## Deployment (MANDATORY: use deploy.sh)
 
-## After Deployment
+**ALWAYS use `./deploy.sh` - NEVER run raw rsync commands.**
+The script has hardcoded excludes for uploads/, *.pem, *.db files and runs a dry-run first.
+
 ```bash
-ssh root@91.99.219.248 "chown -R qbitmap:qbitmap /opt/qbitmap-backend && systemctl restart qbitmap-backend"
+cd /home/eugene/Documents/CODES/Qbitmap/qbitmap-backend
+./deploy.sh
 ```
 
 ## Database

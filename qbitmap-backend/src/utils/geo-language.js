@@ -164,10 +164,15 @@ async function resolveLanguageForCoords(lat, lng) {
   }
 
   const geo = await reverseGeocode(lat, lng);
-  const code = pickLang(geo?.country, geo?.subdivision);
+  if (!geo?.country) {
+    // API failed — return English fallback but do NOT cache it
+    logger.warn({ lat, lng, cell }, 'Geocode returned no country, skipping cache');
+    return { code: 'en', name: 'English' };
+  }
+  const code = pickLang(geo.country, geo.subdivision);
 
   try {
-    await db.upsertGeoLangCell(cell, geo?.country || null, geo?.subdivision || null, code);
+    await db.upsertGeoLangCell(cell, geo.country, geo.subdivision || null, code);
   } catch (err) {
     logger.warn({ err: err.message }, 'geo-lang cache write failed');
   }

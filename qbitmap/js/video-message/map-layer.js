@@ -143,7 +143,8 @@ const MapLayerMixin = {
               21, isMobile ? 0.25 : 0.3,
               22, isMobile ? 0.24 : 0.3
             ],
-            'icon-allow-overlap': true
+            'icon-allow-overlap': true,
+            'icon-offset': [10, -10]
           }
         });
 

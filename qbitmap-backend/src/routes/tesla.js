@@ -354,7 +354,7 @@ async function teslaApiRoutes(fastify) {
     let caPem = '';
     try {
       const fs = require('fs');
-      const certPath = process.env.TESLA_TLS_CERT_PATH || '/opt/tesla/tls-cert.pem';
+      const certPath = process.env.TESLA_TLS_CERT_PATH || '/opt/fleet-telemetry/server.crt';
       caPem = fs.readFileSync(certPath, 'utf8').trim();
     } catch (err) {
       logger.error({ err }, 'Failed to read TLS certificate for Fleet Telemetry');
@@ -380,7 +380,7 @@ async function teslaApiRoutes(fastify) {
       vins: [vehicle.vin],
       config: {
         hostname: 'telemetry.qbitmap.com',
-        port: 443,
+        port: 4443,
         ca: caPem,
         fields: {
           Location: { interval_seconds: 15, minimum_delta: 25 },
@@ -392,6 +392,7 @@ async function teslaApiRoutes(fastify) {
           InsideTemp: { interval_seconds: 600 },
           OutsideTemp: { interval_seconds: 600 },
           Locked: { interval_seconds: 600 },
+          SentryMode: { interval_seconds: 600 },
           Odometer: { interval_seconds: 3600 },
         },
         alert_types: [],
