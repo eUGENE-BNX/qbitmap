@@ -314,6 +314,18 @@ async function teslaApiRoutes(fastify) {
     return { status: 'ok', count: vehicles.length };
   });
 
+  // Debug: manual one-time poll for a vehicle (Fleet Telemetry is primary channel)
+  fastify.post('/vehicles/:vehicleId/debug-poll', async (request, reply) => {
+    const { vehicleId } = request.params;
+    const vehicle = await db.getTeslaVehicleByVehicleId(vehicleId);
+    if (!vehicle || vehicle.user_id !== request.user.userId) {
+      return reply.code(404).send({ error: 'Vehicle not found' });
+    }
+    const teslaPoller = require('../services/tesla-poller');
+    const results = await teslaPoller.pollOnce(vehicle.vin);
+    return results[0] || { error: 'No result' };
+  });
+
   // Virtual key pairing URL — user opens this in Tesla app to approve
   fastify.get('/virtual-key-url', async () => {
     return {
@@ -425,12 +437,12 @@ async function teslaTelemetryRoutes(fastify) {
       return reply.code(401).send({ error: 'Invalid webhook secret' });
     }
 
-    const { vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry, odometer } = request.body;
+    const { vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, locked, sentry, odometer } = request.body;
     if (!vin) {
       return reply.code(400).send({ error: 'VIN required' });
     }
 
-    await db.updateVehicleTelemetry({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry, odometer });
+    await db.updateVehicleTelemetry({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, locked, sentry, odometer });
 
     // Broadcast via WebSocket if available
     const vehicle = await db.getTeslaVehicleByVin(vin);
@@ -448,7 +460,6 @@ async function teslaTelemetryRoutes(fastify) {
         insideTemp: insideTemp ?? vehicle.last_inside_temp,
         outsideTemp: outsideTemp ?? vehicle.last_outside_temp,
         estRange: estRange ?? vehicle.last_est_range,
-        chargeLimit: chargeLimit ?? vehicle.last_charge_limit,
         locked: locked ?? vehicle.last_locked,
         sentry: sentry ?? vehicle.last_sentry,
       });

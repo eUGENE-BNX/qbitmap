@@ -222,8 +222,8 @@ async function buildServer() {
   // Start Tesla token refresh service
   teslaTokenService.start();
 
-  // Start Tesla vehicle data poller
-  teslaPoller.start();
+  // Tesla poller disabled — Fleet Telemetry is the primary data channel.
+  // Use teslaPoller.pollOnce(vin) for manual debug when needed.
 
   // Start TeslaCAM sync service (downloads segments from car's Pi)
   teslacamSync.start();
