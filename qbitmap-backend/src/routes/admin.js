@@ -997,7 +997,18 @@ async function adminRoutes(fastify, options) {
       lat: m.lat, lng: m.lng, points: m.media_type === 'photo' ? 1 : 5
     }));
 
-    // 4. Bulk sync all content items
+    // 4. Purge old video/photo content from H3 (removes orphans from direct DB deletes)
+    try {
+      const purgeRes = await fetch(`${H3_SERVICE_URL}/api/v1/sync/content-messages`, {
+        method: 'DELETE',
+        headers: { 'X-Service-Key': H3_SERVICE_KEY }
+      });
+      if (!purgeRes.ok) results.errors.push('content purge failed: ' + purgeRes.status);
+    } catch (e) {
+      results.errors.push('content purge error: ' + e.message);
+    }
+
+    // 5. Bulk sync all content items (fresh insert after purge)
     const allItems = [...cameraItems, ...messageItems];
     try {
       const res = await fetch(`${H3_SERVICE_URL}/api/v1/sync/full-content`, {

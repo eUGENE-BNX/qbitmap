@@ -124,11 +124,36 @@ async function syncItemViewCount({ itemId, viewCount }) {
   );
 }
 
+async function purgeContentByTypes(types) {
+  const result = await pool.query(
+    'DELETE FROM content_items WHERE item_type = ANY($1::text[])',
+    [types]
+  );
+  // Reset video/photo counts for all user profiles
+  await pool.query(
+    `UPDATE user_profiles SET
+       video_count = COALESCE(s.vc, 0),
+       photo_count = COALESCE(s.pc, 0)
+     FROM (
+       SELECT up.id,
+         COUNT(*) FILTER (WHERE ci.item_type = 'video') AS vc,
+         COUNT(*) FILTER (WHERE ci.item_type = 'photo') AS pc
+       FROM user_profiles up
+       LEFT JOIN content_items ci ON ci.user_id = up.id
+       GROUP BY up.id
+     ) s
+     WHERE user_profiles.id = s.id`
+  );
+  cache.invalidateAll();
+  return { deleted: result.rowCount };
+}
+
 module.exports = {
   upsertContentItem,
   removeContentItem,
   upsertUserProfile,
   bulkUpsertContentItems,
   bulkUpsertUserProfiles,
-  syncItemViewCount
+  syncItemViewCount,
+  purgeContentByTypes
 };

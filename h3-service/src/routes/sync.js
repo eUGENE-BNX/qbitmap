@@ -140,6 +140,25 @@ async function syncRoutes(fastify) {
     return { ok: true };
   });
 
+  // Purge content items by type (used before full re-sync)
+  fastify.delete('/content-by-type/:type', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: { type: { type: 'string', enum: ['video', 'photo', 'camera'] } }
+      }
+    }
+  }, async (request) => {
+    const result = await contentSync.purgeContentByTypes([request.params.type]);
+    return { ok: true, ...result };
+  });
+
+  // Purge all video+photo content (keep cameras)
+  fastify.delete('/content-messages', async () => {
+    const result = await contentSync.purgeContentByTypes(['video', 'photo']);
+    return { ok: true, ...result };
+  });
+
   // Sync status
   fastify.get('/status', async () => {
     const pool = require('../services/db-pool');
