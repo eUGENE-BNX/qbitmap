@@ -393,6 +393,10 @@ async function teslaApiRoutes(fastify) {
           OutsideTemp: { interval_seconds: 600 },
           Locked: { interval_seconds: 600 },
           SentryMode: { interval_seconds: 600 },
+          TpmsPressureFl: { interval_seconds: 600 },
+          TpmsPressureFr: { interval_seconds: 600 },
+          TpmsPressureRl: { interval_seconds: 600 },
+          TpmsPressureRr: { interval_seconds: 600 },
           Odometer: { interval_seconds: 3600 },
         },
         alert_types: [],
@@ -438,12 +442,12 @@ async function teslaTelemetryRoutes(fastify) {
       return reply.code(401).send({ error: 'Invalid webhook secret' });
     }
 
-    const { vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, locked, sentry, odometer } = request.body;
+    const { vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, locked, sentry, odometer, tpmsFl, tpmsFr, tpmsRl, tpmsRr } = request.body;
     if (!vin) {
       return reply.code(400).send({ error: 'VIN required' });
     }
 
-    await db.updateVehicleTelemetry({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, locked, sentry, odometer });
+    await db.updateVehicleTelemetry({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, locked, sentry, odometer, tpmsFl, tpmsFr, tpmsRl, tpmsRr });
 
     // Broadcast via WebSocket if available
     const vehicle = await db.getTeslaVehicleByVin(vin);

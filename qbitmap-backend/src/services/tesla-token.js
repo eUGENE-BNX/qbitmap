@@ -37,14 +37,7 @@ function start() {
     }
   });
 
-  // Daily TPMS sync — every day at 04:00
-  cron.schedule('0 4 * * *', async () => {
-    try {
-      await syncTpms();
-    } catch (err) {
-      logger.error({ err }, 'Daily TPMS sync failed');
-    }
-  });
+  // TPMS now comes via Fleet Telemetry — no REST poll needed
 
   logger.info('Tesla token refresh service started');
 }
