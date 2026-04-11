@@ -300,25 +300,83 @@ DatabaseService.prototype.storePlacesCache = async function(cellLat, cellLng, ra
   // Clear old cell-place links
   await this.pool.execute('DELETE FROM places_cache_cell_places WHERE cell_id = ?', [cellId]);
 
-  // Upsert each place and link to cell
+  // [PERF-03] Batch the per-place writes. The old loop issued 3 round-trips
+  // per place (upsert google_places → SELECT id → INSERT IGNORE link) →
+  // 60 queries for a 20-result Google Places response. Replace with:
+  //   1. one multi-row INSERT ... ON DUPLICATE KEY UPDATE into google_places
+  //   2. one SELECT ... WHERE google_place_id IN (...) to recover the ids
+  //   3. one multi-row INSERT IGNORE into places_cache_cell_places
+  // Total: 3 round-trips regardless of page size.
+  if (places.length === 0) {
+    return cellId;
+  }
+
+  // Use pool.query (not pool.execute) for the variable-length VALUES list:
+  // execute() would create a fresh server-side prepared statement for every
+  // distinct `places.length` we've ever seen, which accumulates over time.
+  // Same tradeoff made elsewhere in this codebase — see
+  // services/db/video-messages.js for the `IN (?, ?, ?)` batch pattern.
+
+  // (1) Multi-row upsert into google_places
+  const placeRowSql = '(?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())';
+  const placeValues = places.flatMap(p => [
+    p.googlePlaceId,
+    p.displayName,
+    p.formattedAddress,
+    p.lat,
+    p.lng,
+    JSON.stringify(p.types),
+    p.businessStatus,
+    p.rating,
+    p.userRatingsTotal
+  ]);
+  await this.pool.query(
+    `INSERT INTO google_places
+       (google_place_id, display_name, formatted_address, lat, lng, types,
+        business_status, rating, user_ratings_total, cached_at)
+     VALUES ${places.map(() => placeRowSql).join(', ')}
+     ON DUPLICATE KEY UPDATE
+       display_name       = VALUES(display_name),
+       formatted_address  = VALUES(formatted_address),
+       lat                = VALUES(lat),
+       lng                = VALUES(lng),
+       types              = VALUES(types),
+       business_status    = VALUES(business_status),
+       rating             = VALUES(rating),
+       user_ratings_total = VALUES(user_ratings_total),
+       cached_at          = NOW()`,
+    placeValues
+  );
+
+  // (2) Batch-recover the internal ids for the upserted rows. We can't rely
+  // on LAST_INSERT_ID here because some rows may have been updates and
+  // others inserts. A single SELECT ... IN (...) is the cleanest recovery.
+  const googlePlaceIds = places.map(p => p.googlePlaceId);
+  const inPlaceholders = googlePlaceIds.map(() => '?').join(',');
+  const [idRows] = await this.pool.query(
+    `SELECT id, google_place_id FROM google_places WHERE google_place_id IN (${inPlaceholders})`,
+    googlePlaceIds
+  );
+  // Guard against the (unexpected) case where the upsert didn't return a
+  // row for some id — skip links we can't resolve rather than crashing the
+  // whole cache write.
+  const idByGoogleId = new Map(idRows.map(r => [r.google_place_id, r.id]));
+
+  // (3) Multi-row INSERT IGNORE for the cell→place links. INSERT IGNORE
+  // handles the PK collision on (cell_id, place_id) when a place is
+  // already linked (can happen if the earlier DELETE raced with a
+  // concurrent storePlacesCache for the same cell).
+  const linkRows = [];
   for (const p of places) {
-    await this.pool.execute(
-      `INSERT INTO google_places (google_place_id, display_name, formatted_address, lat, lng, types, business_status, rating, user_ratings_total, cached_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-       ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), formatted_address = VALUES(formatted_address),
-         lat = VALUES(lat), lng = VALUES(lng), types = VALUES(types), business_status = VALUES(business_status),
-         rating = VALUES(rating), user_ratings_total = VALUES(user_ratings_total), cached_at = NOW()`,
-      [p.googlePlaceId, p.displayName, p.formattedAddress, p.lat, p.lng, JSON.stringify(p.types), p.businessStatus, p.rating, p.userRatingsTotal]
-    );
-
-    const [placeRows] = await this.pool.execute(
-      'SELECT id FROM google_places WHERE google_place_id = ?',
-      [p.googlePlaceId]
-    );
-
-    await this.pool.execute(
-      'INSERT IGNORE INTO places_cache_cell_places (cell_id, place_id) VALUES (?, ?)',
-      [cellId, placeRows[0].id]
+    const placeRowId = idByGoogleId.get(p.googlePlaceId);
+    if (placeRowId != null) linkRows.push([cellId, placeRowId]);
+  }
+  if (linkRows.length > 0) {
+    const linkPlaceholders = linkRows.map(() => '(?, ?)').join(', ');
+    const linkValues = linkRows.flat();
+    await this.pool.query(
+      `INSERT IGNORE INTO places_cache_cell_places (cell_id, place_id) VALUES ${linkPlaceholders}`,
+      linkValues
     );
   }
 
