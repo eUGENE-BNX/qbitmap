@@ -152,7 +152,14 @@ DatabaseService.prototype.releaseCamera = async function(cameraId, userId) {
     return { success: false, error: 'You do not own this camera.' };
   }
 
+  const camera = await this.getCameraById(cameraId);
   await this.pool.execute('UPDATE cameras SET user_id = NULL WHERE id = ?', [cameraId]);
+
+  // Remove 50-point camera content_item from H3 service
+  if (camera && camera.device_id) {
+    notifyH3ContentItemRemove(camera.device_id).catch(() => {});
+  }
+
   return { success: true };
 };
 

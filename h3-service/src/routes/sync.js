@@ -159,6 +159,19 @@ async function syncRoutes(fastify) {
     return { ok: true, ...result };
   });
 
+  // Manual recalculate user counts (operational recovery)
+  fastify.post('/recalc-user/:userId', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: { userId: { type: 'integer', minimum: 1 } }
+      }
+    }
+  }, async (request) => {
+    await contentSync.recalcUserContentCounts(parseInt(request.params.userId));
+    return { ok: true };
+  });
+
   // Sync status
   fastify.get('/status', async () => {
     const pool = require('../services/db-pool');

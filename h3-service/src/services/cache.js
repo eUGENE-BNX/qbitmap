@@ -2,6 +2,7 @@ class LRUCache {
   constructor(maxSize = 2000) {
     this._cache = new Map();
     this._maxSize = maxSize;
+    this._invalidateTimer = null;
   }
 
   get(key) {
@@ -26,6 +27,14 @@ class LRUCache {
 
   invalidateAll() {
     this._cache.clear();
+  }
+
+  debouncedInvalidateAll(delayMs = 150) {
+    if (this._invalidateTimer) return;
+    this._invalidateTimer = setTimeout(() => {
+      this._cache.clear();
+      this._invalidateTimer = null;
+    }, delayMs);
   }
 }
 

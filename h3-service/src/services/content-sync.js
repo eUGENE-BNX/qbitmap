@@ -21,8 +21,14 @@ async function upsertContentItem({ itemType, itemId, userId, lat, lng, points })
 }
 
 async function removeContentItem(itemId) {
-  await pool.query('DELETE FROM content_items WHERE item_id = $1', [itemId]);
-  cache.invalidateAll();
+  const { rows } = await pool.query(
+    'DELETE FROM content_items WHERE item_id = $1 RETURNING user_id',
+    [itemId]
+  );
+  if (rows.length > 0 && rows[0].user_id) {
+    await recalcUserContentCounts(rows[0].user_id);
+  }
+  cache.debouncedInvalidateAll();
 }
 
 async function upsertUserProfile({ id, displayName, avatarUrl }) {
@@ -155,5 +161,6 @@ module.exports = {
   bulkUpsertContentItems,
   bulkUpsertUserProfiles,
   syncItemViewCount,
-  purgeContentByTypes
+  purgeContentByTypes,
+  recalcUserContentCounts
 };
