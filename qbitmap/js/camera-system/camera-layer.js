@@ -63,23 +63,13 @@ const CameraLayerMixin = {
 
     // Load three icon variants
     this.loadCameraIcons(() => {
-      // [MI-5] Clustering for scalability with many cameras.
-      // [PERF-07] promoteId + updateable enable GeoJSONSource.updateData
-      // partial updates in startRecordingBlink(), so the 500ms blink tick
-      // no longer reindexes the entire source + supercluster every frame.
-      //   - promoteId='device_id' tells MapLibre to use the string
-      //     device_id as the stable feature id (there's no top-level
-      //     numeric `id` on the features).
-      //   - updateable:true is required by GeoJSONSource.updateData; it
-      //     costs nothing when no partial updates are issued.
+      // [MI-5] Clustering for scalability with many cameras
       this.map.addSource('cameras', {
         type: 'geojson',
         data: this.cameraGeojson,
         cluster: true,
         clusterMaxZoom: 17,
-        clusterRadius: 60,
-        promoteId: 'device_id',
-        updateable: true
+        clusterRadius: 60
       });
 
       // Cluster circle layer
@@ -371,21 +361,6 @@ const CameraLayerMixin = {
 
   /**
    * Start recording blink animation for map icons
-   *
-   * [PERF-07] The old implementation re-uploaded the entire filtered
-   * GeoJSON via source.setData() every 500ms, which forced MapLibre to
-   * rebuild the supercluster index and re-tile every bucket — ~200
-   * cameras on a mid-range phone produced sustained jank.
-   *
-   * Now we use GeoJSONSource.updateData({ update: [...] }) for a true
-   * partial update: only the `recBlink` property is touched and only on
-   * the features whose state is 'recording'. The cluster index isn't
-   * invalidated because the spatial positions haven't changed and
-   * supercluster doesn't aggregate on `recBlink`.
-   *
-   * Requires `updateable: true` + `promoteId: 'device_id'` on the
-   * source (set up above in addCameraLayer). Falls back to setData() if
-   * updateData isn't available or if the source isn't yet updateable.
    */
   startRecordingBlink() {
     // Zaten çalışıyorsa başlatma
@@ -401,46 +376,22 @@ const CameraLayerMixin = {
         return;
       }
 
+      // GeoJSON'daki kayıtta olan kameraların recBlink property'sini toggle et
       const source = this.map?.getSource('cameras');
-      if (!source || !this.cameraGeojson || !this.cameraGeojson.features) return;
+      if (source && this.cameraGeojson && this.cameraGeojson.features) {
+        let hasChanges = false;
 
-      // Collect recording features and keep the in-memory copy in sync so
-      // any future full setData() path (e.g. refreshCameraLayer on auth
-      // change) still renders the current blink phase instead of stale
-      // data from the last frame.
-      const recordingIds = [];
-      for (const f of this.cameraGeojson.features) {
-        if (f.properties.state === 'recording') {
-          f.properties.recBlink = isOn;
-          recordingIds.push(f.properties.device_id);
+        this.cameraGeojson.features.forEach(f => {
+          if (f.properties.state === 'recording') {
+            f.properties.recBlink = isOn;
+            hasChanges = true;
+          }
+        });
+
+        if (hasChanges) {
+          source.setData(this._getFilteredGeojson());
         }
       }
-
-      if (recordingIds.length === 0) return;
-
-      // Fast path: partial property update. updateData() takes promoteId
-      // ids directly. Ids that aren't in the currently-rendered (filtered)
-      // feature set are silently ignored, which is fine — we don't need
-      // to blink a camera the user has hidden.
-      if (typeof source.updateData === 'function') {
-        try {
-          source.updateData({
-            update: recordingIds.map(id => ({
-              id,
-              addOrUpdateProperties: [{ key: 'recBlink', value: isOn }]
-            }))
-          });
-          return;
-        } catch (e) {
-          // Fall through to the slow path if MapLibre rejects the diff
-          // (e.g. source not yet marked updateable because the layer was
-          // created on a pre-PERF-07 deploy still in the tab's bfcache).
-          Logger.warn('[CameraLayer] updateData failed, falling back to setData', e);
-        }
-      }
-
-      // Slow path: full reindex. Kept for backwards compatibility.
-      source.setData(this._getFilteredGeojson());
     }, 500); // 500ms blink interval
 
     Logger.log('[CameraLayer] Recording blink started');
