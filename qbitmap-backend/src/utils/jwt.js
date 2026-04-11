@@ -51,7 +51,13 @@ function generateToken(user) {
     tokenVersion: user.token_version ?? 1
   };
 
+  // [SEC-08] Pin the signing algorithm explicitly. jsonwebtoken@9.x's
+  // default is already HS256, but a future upgrade or accidental header
+  // override could silently introduce a weaker / attacker-controlled
+  // algorithm. Keeping this value locked means verifyToken's algorithms
+  // allow-list stays in sync with what we actually issue.
   return jwt.sign(payload, config.jwt.secret, {
+    algorithm: 'HS256',
     expiresIn: config.jwt.expiresIn
   });
 }
@@ -61,7 +67,12 @@ function generateToken(user) {
  */
 function verifyToken(token) {
   try {
-    return jwt.verify(token, config.jwt.secret);
+    // [SEC-08] Pinning `algorithms` blocks the classic "alg: none" and
+    // HS256-verified-as-RS256 downgrade attacks. Without this allow-list,
+    // jsonwebtoken falls back to whatever the token header asks for.
+    return jwt.verify(token, config.jwt.secret, {
+      algorithms: ['HS256']
+    });
   } catch (error) {
     return null;
   }
