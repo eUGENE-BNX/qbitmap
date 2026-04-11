@@ -1,7 +1,13 @@
 const cron = require('node-cron');
 const db = require('./database');
 const mediamtx = require('./mediamtx');
+const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'cleanup' });
+
+// [PERF-05] Bound the MediaMTX probe so one slow/unresponsive check can't
+// wedge the whole 15-second broadcast cleanup interval. 5s matches the
+// other short MediaMTX timeouts used in status health checks.
+const MEDIAMTX_PROBE_TIMEOUT_MS = 5000;
 
 class CleanupService {
   constructor() {
@@ -74,32 +80,50 @@ class CleanupService {
         // WebSocket service not available yet
       }
 
-      for (const broadcast of activeBroadcasts) {
-        const ageMs = Date.now() - new Date(broadcast.started_at).getTime();
+      // [PERF-05] Fan out per-broadcast work onto parallel tasks and bound
+      // each MediaMTX probe with a timeout. Previously this was a sequential
+      // `for...of` with an untimed `fetch`, so a single slow MediaMTX probe
+      // would block the whole interval and every subsequent broadcast in
+      // the loop. Each map callback owns its own try/catch so one task's
+      // failure cannot cancel the batch; a thrown error from one iteration
+      // used to silently kill every remaining iteration via the outer
+      // try/catch.
+      const now = Date.now();
+      await Promise.all(activeBroadcasts.map(async (broadcast) => {
+        try {
+          const ageMs = now - new Date(broadcast.started_at).getTime();
 
-        // Hard limit: 15 minutes max (broadcast limit is 10 min + buffer)
-        if (ageMs > 15 * 60 * 1000) {
-          await this.endStaleBroadcast(broadcast, wsService);
-          continue;
-        }
-
-        // Check MediaMTX for orphaned broadcasts (no publisher) after 20s
-        if (ageMs > 20 * 1000) {
-          try {
-            const response = await fetch(`${mediamtx.MEDIAMTX_API}/v3/paths/get/${broadcast.mediamtx_path}`);
-            if (response.status === 404) {
-              await this.endStaleBroadcast(broadcast, wsService);
-            } else if (response.ok) {
-              const data = await response.json();
-              if (!data.source || data.source.type === '') {
-                await this.endStaleBroadcast(broadcast, wsService);
-              }
-            }
-          } catch (e) {
-            // MediaMTX unreachable, skip this round
+          // Hard limit: 15 minutes max (broadcast limit is 10 min + buffer)
+          if (ageMs > 15 * 60 * 1000) {
+            await this.endStaleBroadcast(broadcast, wsService);
+            return;
           }
+
+          // Check MediaMTX for orphaned broadcasts (no publisher) after 20s
+          if (ageMs > 20 * 1000) {
+            try {
+              const response = await fetchWithTimeout(
+                `${mediamtx.MEDIAMTX_API}/v3/paths/get/${broadcast.mediamtx_path}`,
+                {},
+                MEDIAMTX_PROBE_TIMEOUT_MS
+              );
+              if (response.status === 404) {
+                await this.endStaleBroadcast(broadcast, wsService);
+              } else if (response.ok) {
+                const data = await response.json();
+                if (!data.source || data.source.type === '') {
+                  await this.endStaleBroadcast(broadcast, wsService);
+                }
+              }
+            } catch (e) {
+              // MediaMTX unreachable or probe timed out — skip this round.
+              // Intentionally quiet: the next 15s tick will retry.
+            }
+          }
+        } catch (err) {
+          logger.warn({ err, broadcastId: broadcast.broadcast_id }, 'Broadcast cleanup task failed');
         }
-      }
+      }));
     } catch (error) {
       logger.error({ err: error }, 'Broadcast cleanup error');
     }
