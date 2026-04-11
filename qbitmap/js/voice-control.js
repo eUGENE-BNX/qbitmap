@@ -2,7 +2,10 @@ import { QBitmapConfig } from './config.js';
 import { Logger } from './utils.js';
 import { AuthSystem } from './auth.js';
 import { CameraSystem } from './camera-system/index.js';
-import { MyCamerasSystem } from './my-cameras/index.js';
+// [PERF-01] MyCamerasSystem is only opened inside an event handler; the
+// static top-level import dragged the ~75KB my-cameras chunk into the main
+// static graph on every page load. It's now dynamic-only — see the
+// `import('/js/my-cameras/index.js')` call in the openMyCameras handler.
 import { VoiceCommands } from './voice-commands.js';
 import * as AppState from './state.js';
 
@@ -309,8 +312,8 @@ const VoiceControl = {
             }
 
             // Paneli de aç
-            import('/js/my-cameras/index.js').then(() => {
-              if (MyCamerasSystem?.open) MyCamerasSystem.open();
+            import('/js/my-cameras/index.js').then(m => {
+              m.MyCamerasSystem?.open?.();
             });
           } catch (err) {
             Logger.error('[Voice] openMyCameras hatası:', err);

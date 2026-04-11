@@ -1,8 +1,39 @@
 import { QBitmapConfig } from '../config.js';
 import { Logger } from '../utils.js';
-import { LiveBroadcast } from '../live-broadcast/index.js';
-import { VideoMessage } from '../video-message/index.js';
-import { CommentWidget } from '../comments.js';
+
+// [PERF-01] Lazy feature loaders
+// -------------------------------
+// The WS mixin only touches LiveBroadcast / VideoMessage / CommentWidget
+// inside specific event-type branches. Static imports here dragged all three
+// chunks (~120KB combined) into the main graph on every page load even
+// though most sessions never trigger those events.
+//
+// Each loader caches its resolved module so subsequent events are sync after
+// the first miss. Handlers that can be fire-and-forget use .then(); paths
+// that need the module synchronously (handleInitialState) await it.
+let _liveBroadcastPromise = null;
+function getLiveBroadcast() {
+  if (!_liveBroadcastPromise) {
+    _liveBroadcastPromise = import('../live-broadcast/index.js').then(m => m.LiveBroadcast);
+  }
+  return _liveBroadcastPromise;
+}
+
+let _videoMessagePromise = null;
+function getVideoMessage() {
+  if (!_videoMessagePromise) {
+    _videoMessagePromise = import('../video-message/index.js').then(m => m.VideoMessage);
+  }
+  return _videoMessagePromise;
+}
+
+let _commentWidgetPromise = null;
+function getCommentWidget() {
+  if (!_commentWidgetPromise) {
+    _commentWidgetPromise = import('../comments.js').then(m => m.CommentWidget);
+  }
+  return _commentWidgetPromise;
+}
 
 /**
  * QBitmap Camera System - WebSocket Module
@@ -100,43 +131,43 @@ const WebSocketMixin = {
         break;
 
       case 'broadcast_started':
-        LiveBroadcast.handleBroadcastStarted(payload);
+        getLiveBroadcast().then(LB => LB.handleBroadcastStarted(payload));
         break;
 
       case 'broadcast_ended':
-        LiveBroadcast.handleBroadcastEnded(payload);
+        getLiveBroadcast().then(LB => LB.handleBroadcastEnded(payload));
         break;
 
       case 'recording_saved':
-        LiveBroadcast.handleRecordingSaved(payload);
+        getLiveBroadcast().then(LB => LB.handleRecordingSaved(payload));
         break;
 
       case 'video_message_new':
-        VideoMessage.handleNewMessage(payload);
+        getVideoMessage().then(VM => VM.handleNewMessage(payload));
         break;
 
       case 'video_message_deleted':
-        VideoMessage.handleDeletedMessage(payload);
+        getVideoMessage().then(VM => VM.handleDeletedMessage(payload));
         break;
 
       case 'video_message_unread_count':
-        VideoMessage.updateBadgeCount(payload.count);
+        getVideoMessage().then(VM => VM.updateBadgeCount(payload.count));
         break;
 
       case 'video_message_tags_updated':
-        VideoMessage.handleTagsUpdated(payload);
+        getVideoMessage().then(VM => VM.handleTagsUpdated(payload));
         break;
 
       case 'ai_description_ready':
-        VideoMessage.handleAiDescriptionReady(payload);
+        getVideoMessage().then(VM => VM.handleAiDescriptionReady(payload));
         break;
 
       case 'comment_new':
-        CommentWidget.handleCommentNew(payload);
+        getCommentWidget().then(CW => CW.handleCommentNew(payload));
         break;
 
       case 'comment_deleted':
-        CommentWidget.handleCommentDeleted(payload);
+        getCommentWidget().then(CW => CW.handleCommentDeleted(payload));
         break;
 
       case 'pong':
@@ -158,8 +189,11 @@ const WebSocketMixin = {
 
   /**
    * Handle initial state on WebSocket connect
+   * [PERF-01] Async so we only load LiveBroadcast / VideoMessage chunks
+   * when the server actually has broadcast / video-message state to
+   * restore. A session with neither won't pay for those chunks at all.
    */
-  handleInitialState(payload) {
+  async handleInitialState(payload) {
     Logger.log('[WS] Received initial state:', payload);
 
     // Restore AI monitoring states
@@ -180,8 +214,9 @@ const WebSocketMixin = {
       this.activeAlarms.set(alarm.deviceId, alarm);
     }
 
-    // Restore active broadcasts
-    if (payload.broadcasts && LiveBroadcast) {
+    // Restore active broadcasts (lazy-load LiveBroadcast only if any exist)
+    if (payload.broadcasts && payload.broadcasts.length) {
+      const LiveBroadcast = await getLiveBroadcast();
       LiveBroadcast.activeBroadcasts.clear();
       for (const b of payload.broadcasts) {
         LiveBroadcast.activeBroadcasts.set(b.broadcast_id, b);
@@ -189,8 +224,9 @@ const WebSocketMixin = {
       LiveBroadcast.updateMapLayer();
     }
 
-    // Restore unread video message count
-    if (payload.unreadVideoMessages !== undefined && VideoMessage) {
+    // Restore unread video message count (lazy-load VideoMessage only if needed)
+    if (payload.unreadVideoMessages !== undefined) {
+      const VideoMessage = await getVideoMessage();
       VideoMessage.updateBadgeCount(payload.unreadVideoMessages);
     }
 

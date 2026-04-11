@@ -2,7 +2,9 @@ import { QBitmapConfig } from './config.js';
 import { Logger } from './utils.js';
 import { Analytics } from './analytics.js';
 import { H3Grid } from './h3-grid.js';
-import { VideoMessage } from './video-message/index.js';
+// [PERF-01] VideoMessage is only touched inside the ad-click handler below.
+// Loaded dynamically to keep the ~90KB video-message chunk off the main
+// static graph on every page load.
 
 /**
  * QBitmap H3 TRON Light Trail Effect
@@ -548,6 +550,9 @@ const H3TronTrails = {
       this._map.once('moveend', () => {
         setTimeout(async () => {
           try {
+            // [PERF-01] Lazy-load video-message chunk on click instead of
+            // pulling it into the main bundle on page load.
+            const { VideoMessage } = await import('./video-message/index.js');
             const msgId = 'vmsg_1_mlyzyvxx';
             const base = VideoMessage.apiBase || (QBitmapConfig.api.base + '/api/video-messages');
             const resp = await fetch(`${base}/${msgId}`, { credentials: 'include' });

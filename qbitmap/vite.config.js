@@ -28,7 +28,16 @@ export default defineConfig({
       external: [
         'three',
         /^three\/addons\//,
-      ]
+      ],
+      // [PERF-01] No explicit manualChunks. We tried grouping features into
+      // named chunks (`live-broadcast`, `camera-system`, etc.) but Rollup
+      // handles cross-chunk shared deps by hoisting them into whichever
+      // manual chunk claims them first. That moved services/location-service
+      // into the live-broadcast chunk, which then got statically referenced
+      // by main (via user-location → LocationService) — the exact leak we
+      // were trying to prevent. Letting Rollup auto-split on dynamic import
+      // boundaries keeps shared utilities in their own hoisted chunk and
+      // the feature chunks cleanly async-only.
     },
     // Copy static assets to dist via a plugin (see below)
   },

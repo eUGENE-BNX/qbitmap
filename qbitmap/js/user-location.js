@@ -3,7 +3,9 @@ import { Logger, escapeHtml } from './utils.js';
 import { AuthSystem } from './auth.js';
 import { CameraSystem } from './camera-system/index.js';
 import * as AppState from './state.js';
-import { LiveBroadcast } from './live-broadcast/index.js';
+// [PERF-01] Removed static `import { LiveBroadcast } from './live-broadcast/index.js'`
+// — it was never referenced in this file but pulled the ~20KB live-broadcast
+// chunk into the main static graph on every page load.
 import { LocationService } from './services/location-service.js';
 
 /**
