@@ -4,7 +4,48 @@
  */
 
 const healthChecker = require('../services/health-checker');
+const { authHook } = require('../utils/jwt');
 const logger = require('../utils/logger').child({ module: 'status-routes' });
+
+// [SEC-07] Scrub a service health entry before sending it to unauthenticated
+// callers. The raw entry includes:
+//   - host         → internal IP/port (91.98.90.57, etc.)
+//   - metadata     → upstream /health JSON, which for MediaMTX leaks the
+//                    full camera path list including device IDs
+//   - error        → connection error string, often includes the internal
+//                    URL/IP in ECONNREFUSED messages
+// Authenticated detail requests (/service/:serviceId) still get the raw
+// object; the sanitization only affects anonymous /health responses.
+function sanitizeServiceForPublic(s) {
+  return {
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    // Replace the raw host with the human-readable description so the
+    // public status page still has something to render in the "host"
+    // column without exposing an internal IP.
+    host: s.description,
+    icon: s.icon,
+    status: s.status,
+    statusCode: s.statusCode,
+    responseTime: s.responseTime,
+    lastCheck: s.lastCheck,
+    // `error` is intentionally replaced with a non-descriptive flag so the
+    // UI can still badge a service as failing without leaking the raw
+    // upstream URL embedded in the error message.
+    ...(s.error ? { error: 'unreachable' } : {})
+  };
+}
+
+function sanitizePublicHealth(health) {
+  return {
+    timestamp: health.timestamp,
+    services: (health.services || []).map(sanitizeServiceForPublic),
+    connections: health.connections,
+    summary: health.summary,
+    overall: health.overall
+  };
+}
 
 async function statusRoutes(fastify, options) {
   /**
@@ -41,7 +82,10 @@ async function statusRoutes(fastify, options) {
       // Check if force refresh is requested
       const forceRefresh = request.query.refresh === 'true';
       const status = await healthChecker.checkAllServices(forceRefresh);
-      return status;
+      // [SEC-07] Scrub internal topology before sending to the public.
+      // The /health endpoint stays public so status.qbitmap.com keeps
+      // working without credentials, but callers never see internal IPs.
+      return sanitizePublicHealth(status);
     } catch (error) {
       logger.error({ err: error }, 'Health check failed');
       return reply.code(500).send({
@@ -82,11 +126,17 @@ async function statusRoutes(fastify, options) {
 
   /**
    * GET /service/:serviceId
-   * Returns health status of a specific service
+   * Returns health status of a specific service.
+   * [SEC-07] Requires authentication — this endpoint returns the full
+   * internal service record (host, metadata, error) which previously
+   * leaked MediaMTX IPs and camera path listings to anonymous callers.
+   * The public /health endpoint above delivers the same overall picture
+   * with sanitized fields for the status.qbitmap.com page.
    */
   fastify.get('/service/:serviceId', {
+    preHandler: authHook,
     schema: {
-      description: 'Get health status of a specific service',
+      description: 'Get health status of a specific service (authenticated)',
       params: {
         type: 'object',
         properties: {
