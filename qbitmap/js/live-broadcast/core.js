@@ -136,8 +136,8 @@ const CoreMixin = {
       // 1. Request camera + mic permissions (use currentResolution, back camera preferred)
       const savedId = getSavedCameraId();
       const videoConstraints = {
-        width: { ideal: this.currentResolution.width },
-        height: { ideal: this.currentResolution.height },
+        width: { exact: this.currentResolution.width },
+        height: { exact: this.currentResolution.height },
         frameRate: { ideal: 24 },
         focusMode: { ideal: 'continuous' }
       };
