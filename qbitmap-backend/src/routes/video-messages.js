@@ -9,6 +9,7 @@ const videoAiQueue = require('../services/video-ai-queue');
 const photoAiQueue = require('../services/photo-ai-queue');
 const { safePath } = require('../utils/validation');
 const { validateMagicBytes } = require('../utils/file-validation');
+const { execFile } = require('child_process');
 
 const UPLOADS_DIR = path.resolve(__dirname, '../../uploads/video-messages');
 const ALLOWED_MIME_TYPES = ['video/mp4', 'video/webm', 'image/jpeg', 'image/png', 'image/webp'];
@@ -17,9 +18,16 @@ const EXT_MAP = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'image/jpeg': 'jpg',
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_DURATION_MS = 30000;
 
-// Ensure uploads directory exists
+const ORIGINALS_DIR = path.resolve(UPLOADS_DIR, 'originals');
+const OPTIMIZED_MAX_DIM = 2048;
+const OPTIMIZED_QUALITY = 85;
+
+// Ensure uploads directories exist
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+if (!fs.existsSync(ORIGINALS_DIR)) {
+  fs.mkdirSync(ORIGINALS_DIR, { recursive: true });
 }
 
 async function videoMessageRoutes(fastify, options) {
@@ -142,6 +150,49 @@ async function videoMessageRoutes(fastify, options) {
       if (!validateMagicBytes(headBuf, mimeType)) {
         await fs.promises.unlink(filePath);
         return reply.code(400).send({ error: 'File content does not match declared type' });
+      }
+
+      // Photo optimization: archive original, create optimized serving copy
+      // Strips EXIF metadata, resizes to max 2048px, same format
+      if (isPhoto) {
+        const originalPath = path.resolve(ORIGINALS_DIR, `${messageId}.${ext}`);
+        try {
+          await fs.promises.copyFile(filePath, originalPath);
+          await new Promise((resolve, reject) => {
+            const args = [
+              '-i', originalPath,
+              '-vf', `scale='min(${OPTIMIZED_MAX_DIM},iw)':'min(${OPTIMIZED_MAX_DIM},ih)':force_original_aspect_ratio=decrease`,
+              '-map_metadata', '-1',
+              ...(mimeType === 'image/jpeg' ? ['-q:v', String(OPTIMIZED_QUALITY)] : []),
+              ...(mimeType === 'image/png' ? ['-compression_level', '6'] : []),
+              ...(mimeType === 'image/webp' ? ['-quality', String(OPTIMIZED_QUALITY)] : []),
+              '-y', filePath
+            ];
+            execFile('/usr/bin/ffmpeg', args, { timeout: 15000 }, (err) => err ? reject(err) : resolve());
+          });
+          const optStats = await fs.promises.stat(filePath);
+          logger.info({ messageId, originalSize: fileSize, optimizedSize: optStats.size }, 'Photo optimized, original archived');
+        } catch (optErr) {
+          logger.warn({ err: optErr, messageId }, 'Photo optimization failed, serving original');
+        }
+      }
+
+      // Server-side video duration validation via ffprobe
+      if (!isPhoto) {
+        const actualDurationMs = await new Promise((resolve) => {
+          execFile('/usr/bin/ffprobe', [
+            '-v', 'error', '-show_entries', 'format=duration',
+            '-of', 'csv=p=0', filePath
+          ], { timeout: 10000 }, (err, stdout) => {
+            if (err) return resolve(null);
+            const secs = parseFloat(stdout.trim());
+            resolve(Number.isFinite(secs) ? Math.round(secs * 1000) : null);
+          });
+        });
+        if (actualDurationMs !== null && actualDurationMs > MAX_DURATION_MS + 1000) {
+          await fs.promises.unlink(filePath);
+          return reply.code(400).send({ error: `Video too long: ${Math.round(actualDurationMs / 1000)}s (max ${MAX_DURATION_MS / 1000}s)` });
+        }
       }
 
       // Generate thumbnail (fire-and-forget, don't block upload response)
@@ -487,8 +538,14 @@ async function videoMessageRoutes(fastify, options) {
       const range = request.headers.range;
       if (range) {
         const parts = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const start = Math.max(0, parseInt(parts[0], 10) || 0);
+        const end = Math.min(parts[1] ? parseInt(parts[1], 10) : fileSize - 1, fileSize - 1);
+
+        if (start >= fileSize || start > end) {
+          reply.header('Content-Range', `bytes */${fileSize}`);
+          return reply.code(416).send({ error: 'Range not satisfiable' });
+        }
+
         const chunkSize = end - start + 1;
 
         reply.code(206);
@@ -590,6 +647,11 @@ async function videoMessageRoutes(fastify, options) {
       // Delete file from disk (path traversal safe)
       const filePath = safePath(deleted.file_path, 'uploads');
       if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
+      // Delete original archive if exists
+      if (filePath) {
+        const origPath = path.resolve(ORIGINALS_DIR, path.basename(filePath));
+        try { fs.unlinkSync(origPath); } catch {}
+      }
       // Delete thumbnail if exists
       if (deleted.thumbnail_path) {
         const thumbPath = safePath(deleted.thumbnail_path, 'uploads');

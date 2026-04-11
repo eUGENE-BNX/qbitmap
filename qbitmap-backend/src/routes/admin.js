@@ -787,6 +787,11 @@ async function adminRoutes(fastify, options) {
     // Delete file from disk
     const filePath = safePath(deleted.file_path, 'uploads');
     if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
+    // Delete original archive if exists
+    if (filePath) {
+      const origPath = path.resolve(path.dirname(filePath), 'originals', path.basename(filePath));
+      try { fs.unlinkSync(origPath); } catch {}
+    }
 
     // Delete thumbnail
     if (deleted.thumbnail_path) {
@@ -924,6 +929,10 @@ async function adminRoutes(fastify, options) {
         if (deleted) {
           const filePath = safePath(deleted.file_path, 'uploads');
           if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
+          if (filePath) {
+            const origPath = path.resolve(path.dirname(filePath), 'originals', path.basename(filePath));
+            try { fs.unlinkSync(origPath); } catch {}
+          }
           if (deleted.thumbnail_path) {
             const thumbPath = safePath(deleted.thumbnail_path, 'uploads');
             if (thumbPath) { try { fs.unlinkSync(thumbPath); } catch {} }
