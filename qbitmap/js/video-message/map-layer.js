@@ -387,15 +387,43 @@ const MapLayerMixin = {
     } else if (AppState.map) {
       AppState.map.on('load', openMsg);
     } else {
-      // Map not yet created, wait for it
-      const waitForMap = setInterval(() => {
+      // Map not yet created, wait for it.
+      //
+      // [PERF-08] Store both timer ids on `this` so we can:
+      //   (a) cancel an in-flight wait if handleDeepLink is re-entered
+      //       before the previous one resolved (otherwise we'd stack up
+      //       independent intervals with no way to stop the old ones);
+      //   (b) clear the 10s fallback setTimeout the instant the interval
+      //       wins — the original code never did this, so a 10s ghost
+      //       setTimeout would sit in the event loop for the full
+      //       duration even after openMsg had already fired;
+      //   (c) be cancellable from an external teardown path in the
+      //       future (no caller does this today, but storing the ids is
+      //       a precondition).
+      this._cancelDeepLinkMapWait();
+      this._deepLinkMapWaitInterval = setInterval(() => {
         if (AppState.map && AppState.map.isStyleLoaded()) {
-          clearInterval(waitForMap);
+          this._cancelDeepLinkMapWait();
           openMsg();
         }
       }, 500);
-      // Give up after 10 seconds
-      setTimeout(() => clearInterval(waitForMap), 10000);
+      this._deepLinkMapWaitTimeout = setTimeout(() => {
+        this._cancelDeepLinkMapWait();
+        Logger.warn('[VideoMessage] Deep link: map never became ready within 10s, giving up');
+      }, 10000);
+    }
+  },
+
+  // [PERF-08] Clear the handleDeepLink() poll + fallback timer together.
+  // Safe to call from any state — unset/cleared timers are no-ops.
+  _cancelDeepLinkMapWait() {
+    if (this._deepLinkMapWaitInterval) {
+      clearInterval(this._deepLinkMapWaitInterval);
+      this._deepLinkMapWaitInterval = null;
+    }
+    if (this._deepLinkMapWaitTimeout) {
+      clearTimeout(this._deepLinkMapWaitTimeout);
+      this._deepLinkMapWaitTimeout = null;
     }
   },
 };
