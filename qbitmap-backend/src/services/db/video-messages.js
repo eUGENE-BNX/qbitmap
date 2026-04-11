@@ -47,9 +47,8 @@ DatabaseService.prototype.getVideoMessageById = async function(messageId, userId
   return msg;
 };
 
-DatabaseService.prototype.getVideoMessages = async function(userId, { bounds, limit = 50, offset = 0 } = {}) {
+DatabaseService.prototype.getVideoMessages = async function(userId, { bounds, limit = 50, offset = 0, cursor = null } = {}) {
   const safeLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 100);
-  const safeOffset = Math.max(parseInt(offset) || 0, 0);
 
   let where = '(vm.recipient_id IS NULL';
   const params = [];
@@ -66,6 +65,15 @@ DatabaseService.prototype.getVideoMessages = async function(userId, { bounds, li
     params.push(bounds.swLng, bounds.neLng, bounds.swLat, bounds.neLat);
   }
 
+  // Cursor-based pagination: use created_at cursor for O(1) seeks
+  // Falls back to OFFSET for backwards compatibility
+  if (cursor) {
+    where += ' AND vm.created_at < ?';
+    params.push(cursor);
+  }
+
+  const offsetClause = (!cursor && offset) ? ` OFFSET ${Math.max(parseInt(offset) || 0, 0)}` : '';
+
   const [rows] = await this.pool.execute(
     `SELECT vm.*, u.display_name AS sender_name, u.avatar_url AS sender_avatar,
             COALESCE(vc.view_count, 0) AS view_count,
@@ -78,7 +86,7 @@ DatabaseService.prototype.getVideoMessages = async function(userId, { bounds, li
      LEFT JOIN google_places gp ON gp.id = vm.place_id
      WHERE ${where}
      ORDER BY vm.created_at DESC
-     LIMIT ${safeLimit} OFFSET ${safeOffset}`,
+     LIMIT ${safeLimit}${offsetClause}`,
     params
   );
   // [PERF] Batch fetch tags instead of N+1 queries
@@ -202,7 +210,7 @@ DatabaseService.prototype.searchVideoMessages = async function(query, userId = n
   // Build FULLTEXT search term for BOOLEAN MODE (prefix matching with *)
   const ftTerm = query.split(/\s+/).filter(w => w.length >= 2).map(w => `+${w}*`).join(' ');
 
-  // UNION: tag LIKE search + FULLTEXT search on description/ai_description
+  // UNION: tag LIKE + FULLTEXT on description/ai_description + FULLTEXT on translations
   const sql = `SELECT DISTINCT vm.*, u.display_name AS sender_name, u.avatar_url AS sender_avatar,
           COALESCE(vc.view_count, 0) AS view_count
    FROM video_messages vm
@@ -216,12 +224,16 @@ DatabaseService.prototype.searchVideoMessages = async function(query, userId = n
      UNION
      SELECT ft_vm.id FROM video_messages ft_vm
      WHERE MATCH(ft_vm.description, ft_vm.ai_description) AGAINST(? IN BOOLEAN MODE)
+     UNION
+     SELECT tr_vm.id FROM video_messages tr_vm
+     JOIN video_message_translations vmt2 ON vmt2.message_id = tr_vm.message_id
+     WHERE MATCH(vmt2.text) AGAINST(? IN BOOLEAN MODE)
    )
    AND ${visibilityClause}
    ORDER BY vm.created_at DESC
    LIMIT ${safeLimit} OFFSET ${safeOffset}`;
 
-  const params = [`%${query}%`, ftTerm, ...visibilityParams];
+  const params = [`%${query}%`, ftTerm, ftTerm, ...visibilityParams];
   const [rows] = await this.pool.execute(sql, params);
 
   // [PERF] Batch fetch tags instead of N+1 queries

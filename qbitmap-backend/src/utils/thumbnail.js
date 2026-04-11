@@ -10,28 +10,46 @@ const logger = require('./logger').child({ module: 'thumbnail' });
 
 const FFMPEG_PATH = '/usr/bin/ffmpeg';
 const THUMB_WIDTH = 320;
+const PREVIEW_WIDTH = 800;
 const WEBP_QUALITY = 40;
+const PREVIEW_QUALITY = 70;
 
 /**
- * Generate a JPEG thumbnail from a video file.
- * Extracts a single frame at 1 second (or 0s fallback).
+ * Generate a WebP thumbnail from a video file.
+ * Extracts a single frame at 25% of duration (or 1s/0s fallback).
  * @param {string} videoPath - Absolute path to the video file
  * @param {string} thumbPath - Absolute path for the output thumbnail
+ * @param {object} [opts] - Options
+ * @param {number} [opts.width] - Thumbnail width (default: 320)
+ * @param {number} [opts.quality] - WebP quality (default: 40)
+ * @param {number} [opts.durationMs] - Video duration in ms (for smart frame selection)
  * @returns {Promise<boolean>} true if successful
  */
-function generateThumbnail(videoPath, thumbPath) {
+function generateThumbnail(videoPath, thumbPath, opts = {}) {
   if (!fs.existsSync(FFMPEG_PATH)) {
     logger.warn('ffmpeg not found at %s, skipping thumbnail', FFMPEG_PATH);
     return Promise.resolve(false);
   }
 
+  const width = opts.width || THUMB_WIDTH;
+  const quality = opts.quality || WEBP_QUALITY;
+  // Smart frame selection: 25% of duration, clamp to [1s, 10s], fallback 1s
+  let seekTime = '00:00:01';
+  if (opts.durationMs && opts.durationMs > 2000) {
+    const seekSec = Math.min(Math.max(Math.round(opts.durationMs / 4) / 1000, 1), 10);
+    const h = String(Math.floor(seekSec / 3600)).padStart(2, '0');
+    const m = String(Math.floor((seekSec % 3600) / 60)).padStart(2, '0');
+    const s = String(Math.floor(seekSec % 60)).padStart(2, '0');
+    seekTime = `${h}:${m}:${s}`;
+  }
+
   const args = [
     '-i', videoPath,
-    '-ss', '00:00:01',
+    '-ss', seekTime,
     '-vframes', '1',
-    '-vf', `scale=${THUMB_WIDTH}:-1`,
+    '-vf', `scale=${width}:-1`,
     '-c:v', 'libwebp',
-    '-quality', String(WEBP_QUALITY),
+    '-quality', String(quality),
     '-y',
     thumbPath
   ];
@@ -39,9 +57,9 @@ function generateThumbnail(videoPath, thumbPath) {
   return new Promise((resolve) => {
     execFile(FFMPEG_PATH, args, { timeout: 10000 }, (err) => {
       if (err) {
-        // Fallback: try frame at 0s (video may be shorter than 1s)
+        // Fallback: try frame at 0s (video may be shorter than seek time)
         const fallbackArgs = args.slice();
-        fallbackArgs[fallbackArgs.indexOf('00:00:01')] = '00:00:00';
+        fallbackArgs[fallbackArgs.indexOf(seekTime)] = '00:00:00';
         execFile(FFMPEG_PATH, fallbackArgs, { timeout: 10000 }, (err2) => {
           if (err2) {
             logger.warn({ err: err2 }, 'Thumbnail generation failed');
@@ -58,23 +76,29 @@ function generateThumbnail(videoPath, thumbPath) {
 }
 
 /**
- * Generate a JPEG thumbnail from a photo file.
- * Resizes the image to THUMB_WIDTH while preserving aspect ratio.
+ * Generate a WebP thumbnail from a photo file.
+ * Resizes the image while preserving aspect ratio.
  * @param {string} imagePath - Absolute path to the image file
  * @param {string} thumbPath - Absolute path for the output thumbnail
+ * @param {object} [opts] - Options
+ * @param {number} [opts.width] - Thumbnail width (default: 320)
+ * @param {number} [opts.quality] - WebP quality (default: 40)
  * @returns {Promise<boolean>} true if successful
  */
-function generatePhotoThumbnail(imagePath, thumbPath) {
+function generatePhotoThumbnail(imagePath, thumbPath, opts = {}) {
   if (!fs.existsSync(FFMPEG_PATH)) {
     logger.warn('ffmpeg not found at %s, skipping photo thumbnail', FFMPEG_PATH);
     return Promise.resolve(false);
   }
 
+  const width = opts.width || THUMB_WIDTH;
+  const quality = opts.quality || WEBP_QUALITY;
+
   const args = [
     '-i', imagePath,
-    '-vf', `scale=${THUMB_WIDTH}:-1`,
+    '-vf', `scale=${width}:-1`,
     '-c:v', 'libwebp',
-    '-quality', String(WEBP_QUALITY),
+    '-quality', String(quality),
     '-y',
     thumbPath
   ];
@@ -91,4 +115,11 @@ function generatePhotoThumbnail(imagePath, thumbPath) {
   });
 }
 
-module.exports = { generateThumbnail, generatePhotoThumbnail };
+module.exports = {
+  generateThumbnail,
+  generatePhotoThumbnail,
+  THUMB_WIDTH,
+  PREVIEW_WIDTH,
+  WEBP_QUALITY,
+  PREVIEW_QUALITY
+};

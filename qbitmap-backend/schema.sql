@@ -380,6 +380,7 @@ CREATE TABLE IF NOT EXISTS video_messages (
   INDEX idx_vmsg_media_type (media_type),
   INDEX idx_vmsg_place (place_id),
   FULLTEXT INDEX ft_vmsg_text (description, ai_description),
+  INDEX idx_vmsg_created_geo (created_at DESC, lng, lat),
   CONSTRAINT fk_vmsg_sender FOREIGN KEY (sender_id) REFERENCES users(id),
   CONSTRAINT fk_vmsg_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_vmsg_place FOREIGN KEY (place_id) REFERENCES google_places(id) ON DELETE SET NULL
@@ -563,7 +564,8 @@ CREATE TABLE IF NOT EXISTS video_message_translations (
   lang VARCHAR(8) NOT NULL,
   text VARCHAR(1200) NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (message_id, lang)
+  PRIMARY KEY (message_id, lang),
+  FULLTEXT INDEX ft_vmsg_trans (text)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================

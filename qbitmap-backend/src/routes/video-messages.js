@@ -195,21 +195,31 @@ async function videoMessageRoutes(fastify, options) {
         }
       }
 
-      // Generate thumbnail (fire-and-forget, don't block upload response)
+      // Generate thumbnails (fire-and-forget, don't block upload response)
+      const { generateThumbnail, generatePhotoThumbnail, PREVIEW_WIDTH, PREVIEW_QUALITY } = require('../utils/thumbnail');
       const thumbFileName = `${messageId}_thumb.webp`;
+      const previewFileName = `${messageId}_preview.webp`;
       const thumbFilePath = path.resolve(UPLOADS_DIR, thumbFileName);
+      const previewFilePath = path.resolve(UPLOADS_DIR, previewFileName);
       const thumbRelPath = `uploads/video-messages/${thumbFileName}`;
       if (isPhoto) {
-        const { generatePhotoThumbnail } = require('../utils/thumbnail');
-        generatePhotoThumbnail(filePath, thumbFilePath).then(async (ok) => {
-          if (ok) {
+        // Map thumb (320px) + popup preview (800px) in parallel
+        Promise.all([
+          generatePhotoThumbnail(filePath, thumbFilePath),
+          generatePhotoThumbnail(filePath, previewFilePath, { width: PREVIEW_WIDTH, quality: PREVIEW_QUALITY })
+        ]).then(async ([thumbOk]) => {
+          if (thumbOk) {
             try { await db.updateVideoMessageThumbnail(messageId, thumbRelPath); } catch {}
           }
         }).catch(() => {});
       } else {
-        const { generateThumbnail } = require('../utils/thumbnail');
-        generateThumbnail(filePath, thumbFilePath).then(async (ok) => {
-          if (ok) {
+        // Video: use duration for smart frame selection + generate preview
+        const vidDurationMs = durationMs || null;
+        Promise.all([
+          generateThumbnail(filePath, thumbFilePath, { durationMs: vidDurationMs }),
+          generateThumbnail(filePath, previewFilePath, { width: PREVIEW_WIDTH, quality: PREVIEW_QUALITY, durationMs: vidDurationMs })
+        ]).then(async ([thumbOk]) => {
+          if (thumbOk) {
             try { await db.updateVideoMessageThumbnail(messageId, thumbRelPath); } catch {}
           }
         }).catch(() => {});
@@ -302,10 +312,11 @@ async function videoMessageRoutes(fastify, options) {
   });
 
   // GET / - List video messages (for map markers)
+  // Supports cursor-based pagination: ?cursor=2026-04-10T12:00:00.000Z
   fastify.get('/', { preHandler: optionalAuthHook }, async (request, reply) => {
     try {
       const userId = request.user?.userId || null;
-      const { bounds: boundsStr, limit, offset } = request.query;
+      const { bounds: boundsStr, limit, offset, cursor } = request.query;
 
       let bounds = null;
       if (boundsStr) {
@@ -315,8 +326,10 @@ async function videoMessageRoutes(fastify, options) {
         }
       }
 
-      const messages = await db.getVideoMessages(userId, { bounds, limit, offset });
-      return { messages };
+      const messages = await db.getVideoMessages(userId, { bounds, limit, offset, cursor: cursor || null });
+      // Include nextCursor for cursor-based pagination
+      const nextCursor = messages.length > 0 ? messages[messages.length - 1].created_at : null;
+      return { messages, nextCursor };
     } catch (error) {
       logger.error({ err: error }, 'Failed to list video messages');
       return reply.code(500).send({ error: 'Internal server error' });
@@ -400,9 +413,11 @@ async function videoMessageRoutes(fastify, options) {
   });
 
   // GET /:messageId/thumbnail - Serve thumbnail image
+  // ?size=preview returns 800px preview, default returns 320px thumb
   fastify.get('/:messageId/thumbnail', { preHandler: optionalAuthHook }, async (request, reply) => {
     try {
       const { messageId } = request.params;
+      const wantPreview = request.query.size === 'preview';
       const msg = await db.getVideoMessageById(messageId);
 
       if (!msg || !msg.thumbnail_path) {
@@ -417,7 +432,16 @@ async function videoMessageRoutes(fastify, options) {
         }
       }
 
-      const thumbPath = safePath(msg.thumbnail_path, 'uploads');
+      let thumbPath = safePath(msg.thumbnail_path, 'uploads');
+      // Try preview version if requested
+      if (wantPreview && thumbPath) {
+        const previewPath = thumbPath.replace('_thumb.webp', '_preview.webp');
+        if (fs.existsSync(previewPath)) {
+          thumbPath = previewPath;
+        }
+        // Falls back to regular thumb if preview doesn't exist
+      }
+
       if (!thumbPath || !fs.existsSync(thumbPath)) {
         return reply.code(404).send({ error: 'Thumbnail file not found' });
       }
@@ -652,10 +676,15 @@ async function videoMessageRoutes(fastify, options) {
         const origPath = path.resolve(ORIGINALS_DIR, path.basename(filePath));
         try { fs.unlinkSync(origPath); } catch {}
       }
-      // Delete thumbnail if exists
+      // Delete thumbnail + preview if exist
       if (deleted.thumbnail_path) {
         const thumbPath = safePath(deleted.thumbnail_path, 'uploads');
-        if (thumbPath) { try { fs.unlinkSync(thumbPath); } catch {} }
+        if (thumbPath) {
+          try { fs.unlinkSync(thumbPath); } catch {}
+          // Preview uses same pattern: _thumb.webp → _preview.webp
+          const previewPath = thumbPath.replace('_thumb.webp', '_preview.webp');
+          try { fs.unlinkSync(previewPath); } catch {}
+        }
       }
 
       // Notify via WebSocket
