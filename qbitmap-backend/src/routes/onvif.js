@@ -132,6 +132,13 @@ async function onvifRoutes(fastify, options) {
         return reply.code(404).send({ error: 'QBitmap camera not found' });
       }
 
+      // [SEC-04] Ownership check — only the camera owner may bind it to an
+      // ONVIF device, or an attacker could hijack someone else's camera into
+      // their ONVIF account and capture its event stream.
+      if (camera.user_id !== request.user.userId) {
+        return reply.code(403).send({ error: 'Not authorized to link this camera' });
+      }
+
       // Create link
       const result = await db.createOnvifLink(qbitmapCameraId, onvifCameraId, templateId);
 
@@ -160,6 +167,16 @@ async function onvifRoutes(fastify, options) {
     if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
 
     try {
+      // [SEC-04] Ownership check — leaks less, but the link row still reveals
+      // which camera is bound to which ONVIF device and supported events.
+      const camera = await db.getCameraById(cameraId);
+      if (!camera) {
+        return reply.code(404).send({ error: 'Camera not found' });
+      }
+      if (camera.user_id !== request.user.userId) {
+        return reply.code(403).send({ error: 'Not authorized to view this link' });
+      }
+
       const link = await db.getOnvifLink(cameraId);
 
       if (!link) {
@@ -197,6 +214,17 @@ async function onvifRoutes(fastify, options) {
     }
 
     try {
+      // [SEC-04] Ownership check before anything — an attacker must not be
+      // able to probe templates or flip another user's camera to a bad
+      // profile that silently eats its events.
+      const camera = await db.getCameraById(cameraId);
+      if (!camera) {
+        return reply.code(404).send({ error: 'Camera not found' });
+      }
+      if (camera.user_id !== request.user.userId) {
+        return reply.code(403).send({ error: 'Not authorized to modify this link' });
+      }
+
       // Verify template exists
       const template = await db.getOnvifTemplateById(templateId);
       if (!template) {
@@ -210,7 +238,7 @@ async function onvifRoutes(fastify, options) {
       }
 
       // Update template in database
-      const result = await db.updateOnvifLinkTemplate(parseInt(cameraId), templateId);
+      const result = await db.updateOnvifLinkTemplate(cameraId, templateId);
 
       if (!result.success) {
         return reply.code(500).send({ error: result.error || 'Failed to update link' });
@@ -258,10 +286,21 @@ async function onvifRoutes(fastify, options) {
    * Remove ONVIF link for a QBitmap camera
    */
   fastify.delete('/link/:cameraId', async (request, reply) => {
-    const { cameraId } = request.params;
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
 
     try {
-      const result = await db.deleteOnvifLink(parseInt(cameraId));
+      // [SEC-04] Ownership check — otherwise any authenticated user can
+      // unlink another user's camera from ONVIF and kill its event feed.
+      const camera = await db.getCameraById(cameraId);
+      if (!camera) {
+        return reply.code(404).send({ error: 'Camera not found' });
+      }
+      if (camera.user_id !== request.user.userId) {
+        return reply.code(403).send({ error: 'Not authorized to delete this link' });
+      }
+
+      const result = await db.deleteOnvifLink(cameraId);
 
       if (!result.success) {
         return reply.code(500).send({ error: result.error || 'Failed to delete link' });
@@ -382,14 +421,25 @@ async function onvifRoutes(fastify, options) {
    * Get ONVIF event history for a camera
    */
   fastify.get('/events/:cameraId', async (request, reply) => {
-    const { cameraId } = request.params;
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
     const { limit = 100 } = request.query;
 
     try {
-      const events = await db.getOnvifEvents(parseInt(cameraId), parseInt(limit));
+      // [SEC-04] Ownership check — event history reveals motion/human
+      // detection patterns on another user's camera.
+      const camera = await db.getCameraById(cameraId);
+      if (!camera) {
+        return reply.code(404).send({ error: 'Camera not found' });
+      }
+      if (camera.user_id !== request.user.userId) {
+        return reply.code(403).send({ error: 'Not authorized to view these events' });
+      }
+
+      const events = await db.getOnvifEvents(cameraId, parseInt(limit));
 
       return {
-        cameraId: parseInt(cameraId),
+        cameraId,
         events: events.map(e => ({
           id: e.id,
           eventType: e.event_type,
@@ -406,11 +456,14 @@ async function onvifRoutes(fastify, options) {
 
   /**
    * GET /api/onvif/links
-   * Get all ONVIF links (for debugging)
+   * List the caller's ONVIF links. [SEC-04] Previously this returned every
+   * user's links globally ("for debugging") — any authenticated user could
+   * enumerate which QBitmap cameras were bound to which ONVIF devices. Now
+   * scoped to request.user.userId via db.getOnvifLinksByUser.
    */
   fastify.get('/links', async (request, reply) => {
     try {
-      const links = await db.getAllOnvifLinks();
+      const links = await db.getOnvifLinksByUser(request.user.userId);
       return {
         links: links.map(l => ({
           qbitmapCameraId: l.qbitmap_camera_id,
@@ -429,14 +482,16 @@ async function onvifRoutes(fastify, options) {
 
   /**
    * GET /api/onvif/events
-   * Get recent ONVIF events for all cameras
+   * Get recent ONVIF events for the caller's cameras. [SEC-04] Previously
+   * this returned cross-tenant event history globally; now scoped to
+   * request.user.userId via db.getRecentOnvifEventsByUser.
    */
   fastify.get('/events', async (request, reply) => {
     const { limit = 50 } = request.query;
     const safeLimit = Math.min(parseInt(limit) || 50, 100);
 
     try {
-      const events = await db.getAllRecentOnvifEvents(safeLimit);
+      const events = await db.getRecentOnvifEventsByUser(request.user.userId, safeLimit);
 
       return {
         events: events.map(e => ({

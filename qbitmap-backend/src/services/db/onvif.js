@@ -139,6 +139,21 @@ DatabaseService.prototype.getAllOnvifLinks = async function() {
   return rows;
 };
 
+// [SEC-04] User-scoped ONVIF links — called from /api/onvif/links instead of
+// getAllOnvifLinks so an authenticated user cannot enumerate every other
+// user's camera-to-ONVIF bindings.
+DatabaseService.prototype.getOnvifLinksByUser = async function(userId) {
+  const [rows] = await this.pool.execute(`
+    SELECT col.*, c.device_id, c.name, oct.model_name, oct.manufacturer
+    FROM camera_onvif_links col
+    JOIN cameras c ON c.id = col.qbitmap_camera_id
+    JOIN onvif_camera_templates oct ON oct.id = col.onvif_template_id
+    WHERE c.user_id = ?
+    ORDER BY col.created_at DESC
+  `, [userId]);
+  return rows;
+};
+
 DatabaseService.prototype.deleteOnvifLink = async function(qbitmapCameraId) {
   try {
     await this.pool.execute('DELETE FROM camera_onvif_links WHERE qbitmap_camera_id = ?', [qbitmapCameraId]);
@@ -198,6 +213,22 @@ DatabaseService.prototype.getAllRecentOnvifEvents = async function(limit = 50) {
     ORDER BY oe.\`timestamp\` DESC
     LIMIT ${safeLimit}
   `);
+  return rows;
+};
+
+// [SEC-04] User-scoped recent events. Without this, GET /api/onvif/events
+// returned the entire cross-tenant event history to any authenticated user,
+// leaking motion/human detection activity on other users' cameras.
+DatabaseService.prototype.getRecentOnvifEventsByUser = async function(userId, limit = 50) {
+  const safeLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 500);
+  const [rows] = await this.pool.query(`
+    SELECT oe.*, c.device_id, c.name
+    FROM onvif_events oe
+    JOIN cameras c ON c.id = oe.camera_id
+    WHERE c.user_id = ?
+    ORDER BY oe.\`timestamp\` DESC
+    LIMIT ${safeLimit}
+  `, [userId]);
   return rows;
 };
 
