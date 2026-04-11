@@ -81,14 +81,15 @@ const UserProfileSystem = {
       this.hasFaceRegistered = user.hasFaceRegistered;
 
       // Fetch extra stats in parallel
-      const [cameraStats, recentMessages, landStats, teslaVehicles] = await Promise.all([
+      const [cameraStats, recentMessages, landStats, teslaVehicles, broadcastRecordings] = await Promise.all([
         this.fetchCameraStats(),
         this.fetchRecentMessages(),
         this.fetchLandStats(user.id),
-        this.fetchTeslaVehicles()
+        this.fetchTeslaVehicles(),
+        this.fetchBroadcastRecordings()
       ]);
 
-      this.renderProfile(user, { cameraStats, recentMessages, landStats, teslaVehicles });
+      this.renderProfile(user, { cameraStats, recentMessages, landStats, teslaVehicles, broadcastRecordings });
     } catch (error) {
       Logger.error('[Profile] Load error:', error);
       content.innerHTML = '<div class="profile-face-error"><p>Profil yüklenemedi</p></div>';
@@ -125,6 +126,15 @@ const UserProfileSystem = {
     } catch { return []; }
   },
 
+  async fetchBroadcastRecordings() {
+    try {
+      const res = await fetch(`${QBitmapConfig.api.base}/api/broadcast-recordings/my`, { credentials: 'include' });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.recordings || [];
+    } catch { return []; }
+  },
+
   async checkFaceStatus() {
     try {
       const response = await fetch(`${this.apiBase}/me`, { credentials: 'include' });
@@ -139,12 +149,13 @@ const UserProfileSystem = {
 
   renderProfile(user, extras) {
     const content = document.querySelector('.profile-panel-content');
-    const { cameraStats, recentMessages, landStats, teslaVehicles } = extras;
+    const { cameraStats, recentMessages, landStats, teslaVehicles, broadcastRecordings } = extras;
 
     content.innerHTML = `
       ${this.renderHeaderCard(user, cameraStats, landStats)}
       ${this.renderInfoRow(user.location, user.hasFaceRegistered)}
       ${this.renderRecentMessages(recentMessages)}
+      ${this.renderBroadcastRecordings(broadcastRecordings)}
       ${teslaVehicles.length > 0 ? teslaVehicles.map(v => this.renderTeslaSection(v)).join('') : this.renderTeslaConnectCard()}
     `;
 
@@ -156,6 +167,9 @@ const UserProfileSystem = {
     content.querySelectorAll('.media-card[data-message-id]').forEach(card => {
       card.addEventListener('click', () => UserProfileSystem.openMessage(card.dataset.messageId));
     });
+
+    // Bind broadcast recording card handlers
+    this.setupBroadcastRecordingListeners(content);
   },
 
   renderHeaderCard(user, cameraStats, landStats) {
@@ -531,6 +545,174 @@ const UserProfileSystem = {
     }).join('');
 
     return `<div class="profile-recent-section">${header}<div class="profile-media-grid">${thumbs}</div></div>`;
+  },
+
+  renderBroadcastRecordings(recordings) {
+    const header = `<h4>Son Canlı Yayınlar</h4>`;
+
+    if (!recordings || recordings.length === 0) {
+      return `<div class="profile-recent-section">${header}<div class="profile-recent-empty">Henüz kayıtlı yayın yok</div></div>`;
+    }
+
+    // Show last 8
+    const items = recordings.slice(0, 8);
+    const cards = items.map(rec => {
+      const thumbUrl = `${QBitmapConfig.api.base}/api/broadcast-recordings/${encodeURIComponent(rec.recording_id)}/thumbnail`;
+      const timeAgo = this.formatTimeAgo(rec.created_at);
+      const durationSec = Math.round((rec.duration_ms || 0) / 1000);
+      const min = Math.floor(durationSec / 60);
+      const sec = durationSec % 60;
+      const durationLabel = `${min}:${sec.toString().padStart(2, '0')}`;
+      const isPublic = rec.show_on_map && rec.is_public;
+
+      return `
+        <div class="media-card broadcast-rec-card" data-recording-id="${escapeHtml(rec.recording_id)}" data-lng="${rec.lng}" data-lat="${rec.lat}">
+          <div class="media-card-thumb">
+            <img src="${thumbUrl}" alt="" loading="lazy">
+            <span class="media-type-badge broadcast-duration-badge">${durationLabel}</span>
+          </div>
+          <div class="broadcast-rec-actions">
+            <button class="broadcast-rec-visibility-btn${isPublic ? ' active' : ''}" title="${isPublic ? 'Haritadan kaldır' : 'Haritada göster'}">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button class="broadcast-rec-delete-btn" title="Sil">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </button>
+          </div>
+          <span class="media-card-time">${timeAgo}</span>
+        </div>
+      `;
+    }).join('');
+
+    return `<div class="profile-recent-section">${header}<div class="profile-media-grid">${cards}</div></div>`;
+  },
+
+  setupBroadcastRecordingListeners(content) {
+    // Click on card → fly to location & play recording
+    content.querySelectorAll('.broadcast-rec-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.broadcast-rec-visibility-btn') || e.target.closest('.broadcast-rec-delete-btn')) return;
+        const recordingId = card.dataset.recordingId;
+        const lng = parseFloat(card.dataset.lng);
+        const lat = parseFloat(card.dataset.lat);
+        this.close();
+        if (AppState.map && lng && lat) {
+          AppState.map.flyTo({ center: [lng, lat], zoom: 15, duration: 1000 });
+        }
+        setTimeout(() => this.openRecordingPopup(recordingId, lng, lat), 1200);
+      });
+    });
+
+    // Visibility toggle
+    content.querySelectorAll('.broadcast-rec-visibility-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const card = btn.closest('.broadcast-rec-card');
+        const recordingId = card.dataset.recordingId;
+        const isActive = btn.classList.contains('active');
+        const newState = !isActive;
+
+        try {
+          const res = await fetch(`${QBitmapConfig.api.base}/api/broadcast-recordings/${encodeURIComponent(recordingId)}/visibility`, {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ showOnMap: newState, isPublic: newState })
+          });
+          if (res.ok) {
+            btn.classList.toggle('active', newState);
+            btn.title = newState ? 'Haritadan kaldır' : 'Haritada göster';
+          }
+        } catch (err) {
+          Logger.error('[Profile] Visibility toggle error:', err);
+        }
+      });
+    });
+
+    // Delete button
+    content.querySelectorAll('.broadcast-rec-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm('Bu yayın kaydını silmek istediğinizden emin misiniz?')) return;
+
+        const card = btn.closest('.broadcast-rec-card');
+        const recordingId = card.dataset.recordingId;
+
+        try {
+          const res = await fetch(`${QBitmapConfig.api.base}/api/broadcast-recordings/${encodeURIComponent(recordingId)}`, {
+            method: 'DELETE',
+            credentials: 'include'
+          });
+          if (res.ok) {
+            card.remove();
+          }
+        } catch (err) {
+          Logger.error('[Profile] Delete recording error:', err);
+        }
+      });
+    });
+  },
+
+  openRecordingPopup(recordingId, lng, lat) {
+    const map = AppState.map;
+    if (!map) return;
+
+    // Remove existing recording popup if any
+    if (this._recordingPopup) {
+      this._recordingPopup.remove();
+      this._recordingPopup = null;
+    }
+
+    const videoUrl = `${QBitmapConfig.api.base}/api/broadcast-recordings/${encodeURIComponent(recordingId)}/video`;
+
+    const html = `
+      <div class="broadcast-popup-content past-recording-popup">
+        <div class="camera-popup-header">
+          <div class="camera-popup-title">
+            <div class="camera-title-line1">
+              <span class="camera-id">Yayın Kaydı</span>
+            </div>
+          </div>
+          <div class="camera-popup-buttons">
+            <button class="cam-btn close-btn" title="Kapat">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="camera-popup-body">
+          <div class="camera-frame-container" style="aspect-ratio:16/9;background:#000;">
+            <video controls playsinline preload="metadata" src="${videoUrl}"
+                   style="width:100%;height:100%;display:block;"></video>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const popup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      maxWidth: 'none',
+      className: 'camera-popup-wrapper',
+      anchor: 'bottom'
+    })
+      .setLngLat([lng, lat])
+      .setHTML(html)
+      .addTo(map);
+
+    this._recordingPopup = popup;
+
+    setTimeout(() => {
+      const el = popup.getElement();
+      if (!el) return;
+      const closeBtn = el.querySelector('.close-btn');
+      if (closeBtn) closeBtn.onclick = () => {
+        popup.remove();
+        this._recordingPopup = null;
+      };
+    }, 50);
   },
 
   formatTimeAgo(dateStr) {

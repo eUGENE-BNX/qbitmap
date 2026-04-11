@@ -107,6 +107,10 @@ const WebSocketMixin = {
         LiveBroadcast.handleBroadcastEnded(payload);
         break;
 
+      case 'recording_saved':
+        LiveBroadcast.handleRecordingSaved(payload);
+        break;
+
       case 'video_message_new':
         VideoMessage.handleNewMessage(payload);
         break;

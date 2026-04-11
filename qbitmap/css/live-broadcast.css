@@ -188,6 +188,177 @@
   animation: pulse-mic 1.5s ease-in-out infinite;
 }
 
+/* ============================================
+   Past Recording Popup Badge
+   ============================================ */
+
+.past-rec-badge {
+  margin-left: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+}
+
+.camera-popup-wrapper .maplibregl-popup-content:has(.past-recording-popup) {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.camera-popup-wrapper .maplibregl-popup-tip:has(+ .maplibregl-popup-content .past-recording-popup),
+.camera-popup-wrapper:has(.past-recording-popup) .maplibregl-popup-tip {
+  display: none;
+}
+
+.past-recording-popup {
+  background: rgba(20, 20, 30, 0.95);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  width: 320px;
+}
+
+.past-recording-popup .camera-popup-body {
+  padding: 0;
+}
+
+.past-recording-popup .camera-frame-container {
+  border-radius: 0;
+}
+
+.past-recording-popup video {
+  border-radius: 0;
+}
+
+/* ============================================
+   Broadcast Record Dialog
+   ============================================ */
+
+.broadcast-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+
+.broadcast-dialog-overlay.visible {
+  opacity: 1;
+}
+
+.broadcast-dialog {
+  background: rgba(30, 30, 40, 0.95);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 320px;
+  width: 90%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.broadcast-dialog-title {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.broadcast-dialog-body {
+  margin-bottom: 20px;
+}
+
+.broadcast-record-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.broadcast-record-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #d93025;
+  cursor: pointer;
+}
+
+.broadcast-dialog-hint {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  margin-top: 8px;
+  line-height: 1.4;
+  padding: 0 4px;
+}
+
+.broadcast-dialog-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.broadcast-dialog-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  color: #fff;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.broadcast-dialog-btn:hover {
+  opacity: 0.9;
+}
+
+.broadcast-dialog-btn.cancel {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.broadcast-dialog-btn.confirm {
+  background: #d93025;
+}
+
+/* ============================================
+   Broadcast Countdown Timer
+   ============================================ */
+
+.broadcast-countdown {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: rgba(217, 48, 37, 0.8);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.broadcast-countdown.countdown-warning {
+  background: #d93025;
+  animation: countdown-blink 1s ease-in-out infinite;
+}
+
+@keyframes countdown-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* Mobile responsive */
 @media (max-width: 640px) {
   .location-dialog-btn {
@@ -209,5 +380,10 @@
   }
   .location-dialog-content {
     padding: 20px 16px;
+  }
+  .broadcast-dialog-btn {
+    padding: 14px 16px;
+    font-size: 15px;
+    min-height: 48px;
   }
 }

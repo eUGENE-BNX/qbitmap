@@ -204,6 +204,9 @@ async function buildServer() {
   // Register live broadcast routes
   await fastify.register(require('./routes/broadcasts'), { prefix: '/api/broadcasts' });
 
+  // Register broadcast recordings routes
+  await fastify.register(require('./routes/broadcast-recordings'), { prefix: '/api/broadcast-recordings' });
+
   // Register admin routes (admin panel)
   await fastify.register(require('./routes/admin'), { prefix: '/api/admin' });
 

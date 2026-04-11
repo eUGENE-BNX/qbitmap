@@ -77,8 +77,8 @@ class CleanupService {
       for (const broadcast of activeBroadcasts) {
         const ageMs = Date.now() - new Date(broadcast.started_at).getTime();
 
-        // Hard limit: 30 minutes max
-        if (ageMs > 30 * 60 * 1000) {
+        // Hard limit: 15 minutes max (broadcast limit is 10 min + buffer)
+        if (ageMs > 15 * 60 * 1000) {
           await this.endStaleBroadcast(broadcast, wsService);
           continue;
         }
@@ -106,18 +106,45 @@ class CleanupService {
   }
 
   async endStaleBroadcast(broadcast, wsService) {
-    // Stop recording if active before removing path
+    // Check for active recording before stopping
+    let activeRec = null;
     try {
-      await db.stopRecording(broadcast.broadcast_id);
+      activeRec = await db.getActiveRecording(broadcast.broadcast_id);
+      if (activeRec) {
+        await db.stopRecording(broadcast.broadcast_id);
+        // Disable recording on MediaMTX
+        try {
+          await fetch(`${mediamtx.MEDIAMTX_API}/v3/config/paths/patch/${broadcast.mediamtx_path}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ record: false })
+          });
+        } catch (e) {}
+      }
     } catch (e) {
       // No active recording or already stopped
     }
 
-    try {
-      await mediamtx.removePath(broadcast.mediamtx_path);
-    } catch (e) {
-      // Path may already be gone
+    // If recording was active, trigger async save before removing path
+    if (activeRec) {
+      try {
+        const { processBroadcastRecording } = require('../routes/broadcasts');
+        processBroadcastRecording(broadcast, activeRec, broadcast.user_id).catch(err => {
+          logger.error({ err, broadcastId: broadcast.broadcast_id }, 'Failed to process recording on stale cleanup');
+        });
+      } catch (e) {
+        logger.warn({ err: e }, 'Could not trigger recording save from cleanup');
+      }
     }
+
+    // Delay path removal if recording is being saved
+    setTimeout(async () => {
+      try {
+        await mediamtx.removePath(broadcast.mediamtx_path);
+      } catch (e) {
+        // Path may already be gone
+      }
+    }, activeRec ? 5000 : 0);
 
     await db.endLiveBroadcast(broadcast.broadcast_id, broadcast.user_id);
 
@@ -126,12 +153,13 @@ class CleanupService {
         type: 'broadcast_ended',
         payload: {
           broadcastId: broadcast.broadcast_id,
-          userId: broadcast.user_id
+          userId: broadcast.user_id,
+          reason: 'stale'
         }
       });
     }
 
-    logger.info({ broadcastId: broadcast.broadcast_id, userId: broadcast.user_id }, 'Stale broadcast cleaned up');
+    logger.info({ broadcastId: broadcast.broadcast_id, userId: broadcast.user_id, hadRecording: !!activeRec }, 'Stale broadcast cleaned up');
   }
 
   /**

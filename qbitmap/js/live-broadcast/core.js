@@ -56,6 +56,12 @@ const CoreMixin = {
 
   // Recording state
   broadcastRecording: false,
+  broadcastRecordEnabled: false,
+
+  // Broadcast timer state
+  _broadcastTimerInterval: null,
+  _broadcastMaxDurationMs: 600000,
+  _broadcastStartTime: null,
 
   // Popup zoom state
   _popupZoomLevel: 0,
@@ -201,12 +207,20 @@ const CoreMixin = {
         }
       }
 
-      // 3. Call backend to start broadcast
+      // 3. Ask if user wants to record this broadcast
+      const recordChoice = await this._showRecordDialog();
+      if (recordChoice.cancelled) {
+        this.cleanupMediaResources();
+        return;
+      }
+      const shouldRecord = recordChoice.record;
+
+      // 4. Call backend to start broadcast
       const startResponse = await fetch(`${this.apiBase}/start`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lng, lat, accuracy_radius_m: accuracyRadiusM, source: locationSource })
+        body: JSON.stringify({ lng, lat, accuracy_radius_m: accuracyRadiusM, source: locationSource, record: shouldRecord })
       });
 
       if (!startResponse.ok) {
@@ -216,21 +230,26 @@ const CoreMixin = {
 
       const data = await startResponse.json();
       this.currentBroadcast = data.broadcast;
+      this.broadcastRecordEnabled = shouldRecord;
+      this.broadcastRecording = shouldRecord;
 
-      // 4. Publish via WHIP
+      // 5. Publish via WHIP
       await this.publishWhip(data.broadcast.whipUrl, this.mediaStream);
 
       Analytics.event('broadcast_start');
 
-      // 5. Update UI
+      // 6. Update UI
       this.isBroadcasting = true;
+      this._broadcastMaxDurationMs = data.broadcast.maxDurationMs || 600000;
+      this._broadcastStartTime = Date.now();
+      this._startBroadcastCountdown();
       if (btn) {
         btn.classList.add('active');
         btn.setAttribute('aria-pressed', 'true');
         btn.title = 'Canlı Yayını Durdur';
       }
 
-      // 6. Immediately add own broadcast to map (don't wait for WS round-trip)
+      // 7. Immediately add own broadcast to map (don't wait for WS round-trip)
       const bc = data.broadcast;
       const user = AuthSystem.getUser ? AuthSystem.getUser() : AuthSystem.user;
       this.activeBroadcasts.set(bc.broadcastId, {
@@ -244,16 +263,16 @@ const CoreMixin = {
       });
       this.updateMapLayer();
 
-      // 7. Fly map to broadcast location
+      // 8. Fly map to broadcast location
       if (AppState.map) {
         AppState.map.flyTo({ center: [bc.lng, bc.lat], zoom: Math.max(AppState.map.getZoom(), 14) });
       }
 
       _hapticBroadcast('success');
-      AuthSystem.showNotification('Canlı yayın başladı', 'success');
+      AuthSystem.showNotification(shouldRecord ? 'Canlı yayın başladı (kayıt aktif)' : 'Canlı yayın başladı', 'success');
       Logger.log('[LiveBroadcast] Broadcasting started');
 
-      // 8. Auto-open own broadcast popup (so controls are accessible)
+      // 9. Auto-open own broadcast popup (so controls are accessible)
       this.openBroadcastPopup({
         broadcastId: bc.broadcastId,
         displayName: user?.displayName || 'User',
@@ -285,6 +304,19 @@ const CoreMixin = {
     // Add tracks from getUserMedia stream
     for (const track of stream.getTracks()) {
       pc.addTrack(track, stream);
+    }
+
+    // Prefer H264 codec for video (required for MediaMTX fMP4 recording - VP8 not supported)
+    const videoTransceiver = pc.getTransceivers().find(t => t.sender.track?.kind === 'video');
+    if (videoTransceiver && typeof RTCRtpSender.getCapabilities === 'function') {
+      const caps = RTCRtpSender.getCapabilities('video');
+      if (caps) {
+        const h264Codecs = caps.codecs.filter(c => c.mimeType === 'video/H264');
+        const otherCodecs = caps.codecs.filter(c => c.mimeType !== 'video/H264');
+        if (h264Codecs.length > 0) {
+          videoTransceiver.setCodecPreferences([...h264Codecs, ...otherCodecs]);
+        }
+      }
     }
 
     // Handle ICE connection state
@@ -351,14 +383,13 @@ const CoreMixin = {
 
     const btn = document.getElementById('broadcast-button');
 
+    // Stop countdown timer
+    this._stopBroadcastCountdown();
+
     // Stop face detection if active
     this.stopBroadcastFaceDetection();
 
-    // Stop recording if active (best effort)
-    if (this.broadcastRecording) {
-      fetch(`${this.apiBase}/recording/stop`, { method: 'POST', credentials: 'include' }).catch(() => {});
-      this.broadcastRecording = false;
-    }
+    const wasRecording = this.broadcastRecording || this.broadcastRecordEnabled;
 
     // Immediately remove own broadcast from map (don't wait for backend)
     if (this.currentBroadcast) {
@@ -394,11 +425,17 @@ const CoreMixin = {
       this.currentBroadcast = null;
       this.whipSessionUrl = null;
       this._stopping = false;
+      this.broadcastRecording = false;
+      this.broadcastRecordEnabled = false;
 
       if (btn) {
         btn.classList.remove('active');
         btn.setAttribute('aria-pressed', 'false');
         btn.title = 'Canlı Yayın';
+      }
+
+      if (wasRecording) {
+        showNotification('Yayın kaydediliyor...', 'info');
       }
 
       Logger.log('[LiveBroadcast] Broadcasting stopped');
@@ -445,6 +482,97 @@ const CoreMixin = {
   },
 
   /**
+   * Show pre-broadcast dialog asking if user wants to record
+   * @returns {Promise<boolean>} true if user wants to record
+   */
+  /**
+   * Show pre-broadcast dialog asking if user wants to record.
+   * Returns: { cancelled: false, record: boolean } or { cancelled: true }
+   */
+  _showRecordDialog() {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'broadcast-dialog-overlay';
+      overlay.innerHTML = `
+        <div class="broadcast-dialog">
+          <div class="broadcast-dialog-title">Canlı Yayın Ayarları</div>
+          <div class="broadcast-dialog-body">
+            <label class="broadcast-record-toggle">
+              <input type="checkbox" id="broadcast-record-checkbox" checked>
+              <span>Yayını kaydet</span>
+            </label>
+            <div class="broadcast-dialog-hint">Kayıt, yayın boyunca devam eder. Sonradan profilinizde ve haritada paylaşabilirsiniz. Maks. 10 dk.</div>
+          </div>
+          <div class="broadcast-dialog-actions">
+            <button class="broadcast-dialog-btn cancel">İptal</button>
+            <button class="broadcast-dialog-btn confirm">Yayına Başla</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add('visible'));
+
+      const cleanup = (result) => {
+        overlay.classList.remove('visible');
+        setTimeout(() => overlay.remove(), 200);
+        resolve(result);
+      };
+
+      overlay.querySelector('.cancel').addEventListener('click', () => {
+        cleanup({ cancelled: true });
+      });
+      overlay.querySelector('.confirm').addEventListener('click', () => {
+        const checked = overlay.querySelector('#broadcast-record-checkbox').checked;
+        cleanup({ cancelled: false, record: checked });
+      });
+    });
+  },
+
+  /**
+   * Start broadcast countdown timer
+   */
+  _startBroadcastCountdown() {
+    this._broadcastStartTime = Date.now();
+    this._updateCountdownDisplay();
+    this._broadcastTimerInterval = setInterval(() => {
+      const elapsed = Date.now() - this._broadcastStartTime;
+      const remaining = this._broadcastMaxDurationMs - elapsed;
+      if (remaining <= 0) {
+        this._stopBroadcastCountdown();
+        this.stopBroadcast();
+        return;
+      }
+      this._updateCountdownDisplay();
+    }, 1000);
+  },
+
+  /**
+   * Update countdown display in the broadcast popup
+   */
+  _updateCountdownDisplay() {
+    const el = document.getElementById('broadcast-countdown');
+    if (!el) return;
+    const elapsed = Date.now() - this._broadcastStartTime;
+    const remaining = Math.max(0, this._broadcastMaxDurationMs - elapsed);
+    const totalSec = Math.ceil(remaining / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    el.textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+    el.classList.toggle('countdown-warning', remaining <= 30000);
+  },
+
+  /**
+   * Stop broadcast countdown timer
+   */
+  _stopBroadcastCountdown() {
+    if (this._broadcastTimerInterval) {
+      clearInterval(this._broadcastTimerInterval);
+      this._broadcastTimerInterval = null;
+    }
+    this._broadcastStartTime = null;
+  },
+
+  /**
    * Load active broadcasts from API
    */
   async loadActiveBroadcasts() {
@@ -483,6 +611,29 @@ const CoreMixin = {
     this.activeBroadcasts.delete(payload.broadcastId);
     this.updateMapLayer();
     this.closeBroadcastPopup(payload.broadcastId);
+
+    // If timeout, show notification (for own broadcast)
+    if (payload.reason === 'timeout' && this.currentBroadcast?.broadcastId === payload.broadcastId) {
+      this._stopBroadcastCountdown();
+      this.cleanupMediaResources();
+      this.isBroadcasting = false;
+      this.currentBroadcast = null;
+      this._stopping = false;
+      const btn = document.getElementById('broadcast-button');
+      if (btn) {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-pressed', 'false');
+        btn.title = 'Canlı Yayın';
+      }
+      showNotification('Yayın süresi doldu (10 dk)', 'info');
+    }
+  },
+
+  handleRecordingSaved(payload) {
+    const user = AuthSystem.getUser ? AuthSystem.getUser() : AuthSystem.user;
+    if (user && payload.userId === user.id) {
+      showNotification('Yayın kaydı başarıyla kaydedildi', 'success');
+    }
   },
 };
 

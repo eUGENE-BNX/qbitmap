@@ -31,6 +31,7 @@ const PopupMixin = {
           <div class="camera-popup-title">
             <div class="camera-title-line1">
               <span class="camera-id">${escapeHtml(displayName)}</span>
+              ${isOwnBroadcast ? '<span id="broadcast-countdown" class="broadcast-countdown"></span>' : ''}
             </div>
           </div>
           <div class="camera-popup-buttons">
@@ -113,7 +114,12 @@ const PopupMixin = {
       if (!popupEl) return;
 
       const closeBtn = popupEl.querySelector('.close-btn');
-      if (closeBtn) closeBtn.onclick = () => this.closeBroadcastPopupElement();
+      if (closeBtn) closeBtn.onclick = () => {
+        if (isOwnBroadcast) {
+          this.stopBroadcast();
+        }
+        this.closeBroadcastPopupElement();
+      };
 
       const reportBtn = popupEl.querySelector('.report-btn');
       if (reportBtn) reportBtn.onclick = () => ReportSystem.showReportDialog('broadcast', broadcastId);

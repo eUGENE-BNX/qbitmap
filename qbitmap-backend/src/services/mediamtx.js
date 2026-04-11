@@ -132,7 +132,7 @@ async function addPath(pathName, rtspUrl, options = {}) {
  * @param {string} pathName - Unique path name for the stream
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-async function addRtmpPath(pathName) {
+async function addRtmpPath(pathName, options = {}) {
   try {
     const config = {
       // No source - this is a publish endpoint
@@ -141,7 +141,8 @@ async function addRtmpPath(pathName) {
       recordFormat: 'fmp4',
       recordPartDuration: '1s',
       recordSegmentDuration: '1h',
-      recordDeleteAfter: '360h'
+      recordDeleteAfter: '360h',
+      ...options
     };
 
     const response = await fetch(`${MEDIAMTX_API}/v3/config/paths/add/${pathName}`, {

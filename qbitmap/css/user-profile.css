@@ -1078,3 +1078,106 @@
     gap: 6px;
   }
 }
+
+/* ============================================
+   Broadcast Recording Cards & Popup
+   ============================================ */
+
+.broadcast-rec-card {
+  position: relative;
+}
+
+.broadcast-rec-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.broadcast-rec-visibility-btn,
+.broadcast-rec-delete-btn {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.broadcast-rec-visibility-btn:hover,
+.broadcast-rec-delete-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.broadcast-rec-visibility-btn.active {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.4);
+  color: #7c3aed;
+}
+
+.broadcast-rec-delete-btn:hover {
+  background: rgba(217, 48, 37, 0.1);
+  color: #d93025;
+}
+
+.broadcast-duration-badge {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Recording Playback Popup */
+.broadcast-recording-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.broadcast-recording-popup {
+  background: rgba(20, 20, 30, 0.95);
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 640px;
+  width: 95%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.broadcast-recording-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.broadcast-recording-popup-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.broadcast-recording-popup-close:hover {
+  color: #fff;
+}
+
+.broadcast-recording-popup video {
+  width: 100%;
+  display: block;
+  max-height: 70vh;
+  background: #000;
+}

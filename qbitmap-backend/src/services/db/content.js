@@ -397,4 +397,72 @@ DatabaseService.prototype.getPlacesStats = async function() {
   return { totalPlaces, totalCells, taggedMessages };
 };
 
+// ==================== Broadcast Recordings ====================
+
+DatabaseService.prototype.createBroadcastRecording = async function(userId, { recordingId, broadcastId, displayName, avatarUrl, filePath, fileSize, durationMs, thumbnailPath, lng, lat, orientation }) {
+  await this.pool.execute(
+    `INSERT INTO broadcast_recordings (recording_id, user_id, broadcast_id, display_name, avatar_url, file_path, file_size, duration_ms, thumbnail_path, lng, lat, orientation)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [recordingId, userId, broadcastId || null, displayName || null, avatarUrl || null, filePath, fileSize || 0, durationMs || 0, thumbnailPath || null, lng, lat, orientation || 'landscape']
+  );
+};
+
+DatabaseService.prototype.getBroadcastRecordingsByUser = async function(userId, limit = 20) {
+  const safeLimit = Math.min(Math.max(parseInt(limit) || 20, 1), 20);
+  const [rows] = await this.pool.execute(
+    `SELECT * FROM broadcast_recordings WHERE user_id = ? ORDER BY created_at DESC LIMIT ${safeLimit}`,
+    [userId]
+  );
+  return rows;
+};
+
+DatabaseService.prototype.getBroadcastRecordingById = async function(recordingId) {
+  const [rows] = await this.pool.execute('SELECT * FROM broadcast_recordings WHERE recording_id = ?', [recordingId]);
+  return rows[0] || null;
+};
+
+DatabaseService.prototype.countBroadcastRecordingsByUser = async function(userId) {
+  const [rows] = await this.pool.execute('SELECT COUNT(*) AS cnt FROM broadcast_recordings WHERE user_id = ?', [userId]);
+  return rows[0].cnt;
+};
+
+DatabaseService.prototype.deleteBroadcastRecording = async function(recordingId, userId) {
+  const recording = await this.getBroadcastRecordingById(recordingId);
+  if (!recording) return { success: false, error: 'Recording not found' };
+  if (recording.user_id !== userId) return { success: false, error: 'Not authorized' };
+  await this.pool.execute('DELETE FROM broadcast_recordings WHERE recording_id = ?', [recordingId]);
+  return { success: true, recording };
+};
+
+DatabaseService.prototype.getOldestBroadcastRecording = async function(userId) {
+  const [rows] = await this.pool.execute(
+    'SELECT * FROM broadcast_recordings WHERE user_id = ? ORDER BY created_at ASC LIMIT 1',
+    [userId]
+  );
+  return rows[0] || null;
+};
+
+DatabaseService.prototype.updateRecordingVisibility = async function(recordingId, userId, { showOnMap, isPublic }) {
+  const recording = await this.getBroadcastRecordingById(recordingId);
+  if (!recording) return { success: false, error: 'Recording not found' };
+  if (recording.user_id !== userId) return { success: false, error: 'Not authorized' };
+
+  await this.pool.execute(
+    'UPDATE broadcast_recordings SET show_on_map = ?, is_public = ? WHERE recording_id = ?',
+    [showOnMap ? 1 : 0, isPublic ? 1 : 0, recordingId]
+  );
+  return { success: true };
+};
+
+DatabaseService.prototype.getPublicMapRecordings = async function() {
+  const [rows] = await this.pool.execute(
+    `SELECT recording_id, user_id, display_name, avatar_url, duration_ms, lng, lat, orientation, created_at
+     FROM broadcast_recordings
+     WHERE show_on_map = 1 AND is_public = 1
+     ORDER BY created_at DESC
+     LIMIT 200`
+  );
+  return rows;
+};
+
 };

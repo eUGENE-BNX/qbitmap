@@ -685,4 +685,29 @@ CREATE TABLE IF NOT EXISTS tesla_vehicles (
   CONSTRAINT fk_tesla_vehicles_account FOREIGN KEY (tesla_account_id) REFERENCES tesla_accounts(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- =================================================================
+-- 28. broadcast_recordings
+-- =================================================================
+CREATE TABLE IF NOT EXISTS broadcast_recordings (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  recording_id VARCHAR(64) UNIQUE NOT NULL,
+  user_id INT UNSIGNED NOT NULL,
+  broadcast_id VARCHAR(255) DEFAULT NULL,
+  display_name VARCHAR(255),
+  avatar_url TEXT,
+  file_path VARCHAR(500) NOT NULL,
+  file_size INT UNSIGNED DEFAULT 0,
+  duration_ms INT UNSIGNED DEFAULT 0,
+  thumbnail_path VARCHAR(500) DEFAULT NULL,
+  lng DOUBLE NOT NULL,
+  lat DOUBLE NOT NULL,
+  orientation VARCHAR(20) DEFAULT 'landscape',
+  is_public TINYINT(1) DEFAULT 0,
+  show_on_map TINYINT(1) DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_bcrec_user (user_id, created_at DESC),
+  INDEX idx_bcrec_map (show_on_map, is_public),
+  CONSTRAINT fk_bcrec_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

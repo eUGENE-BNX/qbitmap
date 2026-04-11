@@ -20,6 +20,7 @@ export const layers = {
   userCamerasVisible: true,
   teslaVehiclesVisible: localStorage.getItem('qbitmap_tesla') === 'true',
   teslaCamLiveVisible: false,
+  pastBroadcastsVisible: false,
 };
 
 // Map mode state

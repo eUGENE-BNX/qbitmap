@@ -145,6 +145,7 @@ class LayersDropdownControl {
             { id: 'video', label: 'Canlı Uydu Görüntüleri' },
             { id: '3d-buildings', label: '3D Binalar' },
             { id: 'vehicles', label: 'Online Araçlar' },
+            { id: 'past-broadcasts', label: 'Yayın Kayıtları' },
             { id: 'tesla-vehicles', label: 'Tesla Mesh' },
             { id: 'teslacam-live', label: 'TeslaCam' }
         ];
@@ -347,6 +348,19 @@ class LayersDropdownControl {
                 ['photo-messages', 'photo-message-clusters', 'photo-message-cluster-count'].forEach(id => {
                     if (this._map.getLayer(id)) this._map.setLayoutProperty(id, 'visibility', _photoMessagesVisible ? 'visible' : 'none');
                 });
+                break;
+            case 'past-broadcasts':
+                layers.pastBroadcastsVisible = !layers.pastBroadcastsVisible;
+                toggle.classList.toggle('active', layers.pastBroadcastsVisible);
+                if (layers.pastBroadcastsVisible) {
+                    import('/js/live-broadcast/past-recordings.js').then(m => {
+                        m.PastBroadcastLayer.show(this._map);
+                    });
+                } else {
+                    import('/js/live-broadcast/past-recordings.js').then(m => {
+                        m.PastBroadcastLayer.hide(this._map);
+                    });
+                }
                 break;
         }
         this._updateButtonState();

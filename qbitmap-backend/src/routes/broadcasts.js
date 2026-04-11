@@ -1,3 +1,7 @@
+const path = require('path');
+const fs = require('fs');
+const { pipeline } = require('stream/promises');
+const { execFile } = require('child_process');
 const db = require('../services/database');
 const mediamtx = require('../services/mediamtx');
 const wsService = require('../services/websocket');
@@ -7,8 +11,16 @@ const logger = require('../utils/logger').child({ module: 'broadcasts' });
 const { services } = require('../config');
 
 const MEDIAMTX_API = services.mediamtxApi;
-const MAX_RECORDING_DURATION_MS = 60 * 60 * 1000; // 60 min
+const MEDIAMTX_PLAYBACK = services.mediamtxPlayback;
+const MAX_BROADCAST_DURATION_MS = 600 * 1000; // 10 min (600 seconds)
+const MAX_RECORDING_DURATION_MS = 600 * 1000; // 10 min
+const MAX_RECORDINGS_PER_USER = 20;
+const RECORDINGS_DIR = path.join(__dirname, '../../uploads/broadcast-recordings');
 const broadcastRecordingTimers = new Map();
+const broadcastAutoStopTimers = new Map();
+
+// Ensure recordings directory exists
+fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
 
 async function stopBroadcastRecording(broadcastId, pathName) {
   clearTimeout(broadcastRecordingTimers.get(broadcastId));
@@ -22,6 +34,129 @@ async function stopBroadcastRecording(broadcastId, pathName) {
     });
   } catch (e) {
     logger.warn({ broadcastId, pathName, err: e }, 'Failed to disable recording on MediaMTX');
+  }
+}
+
+/**
+ * Stop broadcast auto-stop timer
+ */
+function clearAutoStopTimer(broadcastId) {
+  clearTimeout(broadcastAutoStopTimers.get(broadcastId));
+  broadcastAutoStopTimers.delete(broadcastId);
+}
+
+/**
+ * Generate thumbnail from video file using ffmpeg
+ */
+function generateThumbnail(videoPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    execFile('ffmpeg', [
+      '-i', videoPath,
+      '-ss', '1',
+      '-vframes', '1',
+      '-vf', 'scale=320:-2',
+      '-q:v', '5',
+      '-y',
+      outputPath
+    ], { timeout: 15000 }, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+/**
+ * Process and save a broadcast recording after broadcast stops.
+ * Runs async (fire-and-forget from the stop response).
+ */
+async function processBroadcastRecording(broadcast, activeRec, userId) {
+  const { broadcast_id: broadcastId, mediamtx_path: pathName, lng, lat, orientation, display_name, avatar_url } = broadcast;
+  const startTime = new Date(activeRec.started_at);
+  const durationMs = Date.now() - startTime.getTime();
+  const durationSec = Math.ceil(durationMs / 1000);
+
+  if (durationSec < 3) {
+    logger.info({ broadcastId }, 'Recording too short (<3s), skipping save');
+    return;
+  }
+
+  const recordingId = `brec_${userId}_${Date.now().toString(36)}`;
+  const videoFile = path.join(RECORDINGS_DIR, `${recordingId}.mp4`);
+  const thumbFile = path.join(RECORDINGS_DIR, `${recordingId}_thumb.jpg`);
+
+  try {
+    // Wait for MediaMTX to finalize the last fMP4 segment
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Download from MediaMTX Playback API
+    const playbackUrl = `${MEDIAMTX_PLAYBACK}/get?path=${pathName}&start=${encodeURIComponent(startTime.toISOString())}&duration=${durationSec}&format=mp4`;
+    const response = await fetch(playbackUrl, { signal: AbortSignal.timeout(120000) });
+
+    if (!response.ok) {
+      throw new Error(`Playback API error: ${response.status}`);
+    }
+
+    // Stream to disk
+    const writeStream = fs.createWriteStream(videoFile);
+    await pipeline(response.body, writeStream);
+
+    const stats = fs.statSync(videoFile);
+    if (stats.size < 1024) {
+      fs.unlinkSync(videoFile);
+      logger.warn({ broadcastId }, 'Recording file too small, discarding');
+      return;
+    }
+
+    // Generate thumbnail
+    let thumbnailPath = null;
+    try {
+      await generateThumbnail(videoFile, thumbFile);
+      thumbnailPath = `broadcast-recordings/${recordingId}_thumb.jpg`;
+    } catch (e) {
+      logger.warn({ broadcastId, err: e }, 'Thumbnail generation failed');
+    }
+
+    // Save to DB
+    await db.createBroadcastRecording(userId, {
+      recordingId,
+      broadcastId,
+      displayName: display_name,
+      avatarUrl: avatar_url,
+      filePath: `broadcast-recordings/${recordingId}.mp4`,
+      fileSize: stats.size,
+      durationMs: Math.min(durationMs, MAX_BROADCAST_DURATION_MS),
+      thumbnailPath,
+      lng,
+      lat,
+      orientation: orientation || 'landscape'
+    });
+
+    // Enforce quota: delete oldest if user has > MAX_RECORDINGS_PER_USER
+    const count = await db.countBroadcastRecordingsByUser(userId);
+    if (count > MAX_RECORDINGS_PER_USER) {
+      const oldest = await db.getOldestBroadcastRecording(userId);
+      if (oldest) {
+        const oldFile = path.join(__dirname, '../../uploads', oldest.file_path);
+        const oldThumb = oldest.thumbnail_path ? path.join(__dirname, '../../uploads', oldest.thumbnail_path) : null;
+        try { fs.unlinkSync(oldFile); } catch (e) {}
+        if (oldThumb) try { fs.unlinkSync(oldThumb); } catch (e) {}
+        await db.deleteBroadcastRecording(oldest.recording_id, userId);
+        logger.info({ userId, deletedRecordingId: oldest.recording_id }, 'Deleted oldest recording (quota exceeded)');
+      }
+    }
+
+    // Notify user via WebSocket
+    wsService.broadcast({
+      type: 'recording_saved',
+      payload: { userId, recordingId, broadcastId }
+    });
+
+    logger.info({ userId, recordingId, broadcastId, fileSize: stats.size }, 'Broadcast recording saved');
+  } catch (err) {
+    logger.error({ err, broadcastId, recordingId }, 'Failed to process broadcast recording');
+    // Cleanup partial file
+    try { fs.unlinkSync(videoFile); } catch (e) {}
+    try { fs.unlinkSync(thumbFile); } catch (e) {}
   }
 }
 
@@ -41,7 +176,7 @@ async function broadcastRoutes(fastify, options) {
   // POST /start - Start a live broadcast (requires auth)
   fastify.post('/start', { preHandler: authHook }, async (request, reply) => {
     const userId = request.user.userId;
-    const { lng, lat, orientation, accuracy_radius_m, source } = request.body || {};
+    const { lng, lat, orientation, accuracy_radius_m, source, record } = request.body || {};
 
     // Validate coordinates
     if (!Number.isFinite(lng) || !Number.isFinite(lat) ||
@@ -91,7 +226,8 @@ async function broadcastRoutes(fastify, options) {
 
     // Generate path and create on MediaMTX
     const pathName = mediamtx.generateBroadcastPathName(userId);
-    const mediamtxResult = await mediamtx.addRtmpPath(pathName);
+    const shouldRecord = record === true;
+    const mediamtxResult = await mediamtx.addRtmpPath(pathName, shouldRecord ? { record: true } : {});
     if (!mediamtxResult.success && !mediamtxResult.warning) {
       logger.error({ userId, pathName, error: mediamtxResult.error }, 'Failed to create broadcast path');
       return reply.code(502).send({
@@ -141,7 +277,49 @@ async function broadcastRoutes(fastify, options) {
       }
     });
 
-    logger.info({ userId, broadcastId, pathName }, 'Live broadcast started');
+    // If recording requested, create active_recordings entry
+    if (shouldRecord) {
+      await db.startRecording(broadcastId, pathName, userId, MAX_RECORDING_DURATION_MS);
+      logger.info({ userId, broadcastId }, 'Broadcast recording started from beginning');
+    }
+
+    // Auto-stop broadcast after MAX_BROADCAST_DURATION_MS
+    const autoStopTimer = setTimeout(async () => {
+      broadcastAutoStopTimers.delete(broadcastId);
+      try {
+        const bc = await db.getActiveBroadcastByUser(userId);
+        if (!bc || bc.broadcast_id !== broadcastId) return;
+
+        // Stop recording if active
+        const activeRec = await db.getActiveRecording(broadcastId);
+        if (activeRec) {
+          await stopBroadcastRecording(broadcastId, pathName);
+          // Process the recording async
+          processBroadcastRecording(bc, activeRec, userId).catch(err => {
+            logger.error({ err, broadcastId }, 'Failed to process recording on auto-stop');
+          });
+        }
+
+        // Remove path from MediaMTX (delay if recording is being processed)
+        setTimeout(async () => {
+          await mediamtx.removePath(pathName);
+        }, activeRec ? 5000 : 0);
+
+        await db.endLiveBroadcast(broadcastId, userId);
+
+        wsService.broadcast({
+          type: 'broadcast_ended',
+          payload: { broadcastId, userId, reason: 'timeout' }
+        });
+
+        logger.info({ userId, broadcastId }, 'Broadcast auto-stopped (600s limit)');
+      } catch (e) {
+        logger.error({ err: e, broadcastId }, 'Auto-stop broadcast error');
+      }
+    }, MAX_BROADCAST_DURATION_MS);
+    broadcastAutoStopTimers.set(broadcastId, autoStopTimer);
+
+    logger.info({ userId, broadcastId, pathName, recording: shouldRecord }, 'Live broadcast started');
 
     return {
       status: 'ok',
@@ -151,7 +329,9 @@ async function broadcastRoutes(fastify, options) {
         whipUrl,
         whepUrl,
         lng,
-        lat
+        lat,
+        recording: shouldRecord,
+        maxDurationMs: MAX_BROADCAST_DURATION_MS
       }
     };
   });
@@ -165,15 +345,26 @@ async function broadcastRoutes(fastify, options) {
       return reply.code(404).send({ error: 'No active broadcast found' });
     }
 
-    // Stop recording if active
+    // Clear broadcast auto-stop timer
+    clearAutoStopTimer(broadcast.broadcast_id);
+
+    // Stop recording if active and trigger async save
     const activeRec = await db.getActiveRecording(broadcast.broadcast_id);
+    let recordingSaving = false;
     if (activeRec) {
       await stopBroadcastRecording(broadcast.broadcast_id, broadcast.mediamtx_path);
-      logger.info({ broadcastId: broadcast.broadcast_id }, 'Auto-stopped recording on broadcast stop');
+      recordingSaving = true;
+      // Process the recording async (don't block the stop response)
+      processBroadcastRecording(broadcast, activeRec, userId).catch(err => {
+        logger.error({ err, broadcastId: broadcast.broadcast_id }, 'Failed to process recording on stop');
+      });
+      logger.info({ broadcastId: broadcast.broadcast_id }, 'Recording stopped, save in progress');
     }
 
-    // Remove path from MediaMTX
-    await mediamtx.removePath(broadcast.mediamtx_path);
+    // Remove path from MediaMTX (delay if recording is being processed to allow download)
+    setTimeout(async () => {
+      await mediamtx.removePath(broadcast.mediamtx_path);
+    }, recordingSaving ? 5000 : 0);
 
     // End in database
     await db.endLiveBroadcast(broadcast.broadcast_id, userId);
@@ -183,13 +374,14 @@ async function broadcastRoutes(fastify, options) {
       type: 'broadcast_ended',
       payload: {
         broadcastId: broadcast.broadcast_id,
-        userId
+        userId,
+        reason: 'manual'
       }
     });
 
     logger.info({ userId, broadcastId: broadcast.broadcast_id }, 'Live broadcast stopped');
 
-    return { status: 'ok' };
+    return { status: 'ok', recordingSaving };
   });
 
   // ==================== Recording Endpoints ====================
@@ -312,3 +504,4 @@ async function broadcastRoutes(fastify, options) {
 }
 
 module.exports = broadcastRoutes;
+module.exports.processBroadcastRecording = processBroadcastRecording;
