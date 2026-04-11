@@ -5,6 +5,7 @@
 
 const db = require('../services/database');
 const { authHook, invalidateUserVersionCache } = require('../utils/jwt');
+const { clearAiConfigCache } = require('../utils/ai-config');
 const { validateBody, userOverridesSchema, adminUpdateUserSchema, adminPlanSchema, safePath, parseId } = require('../utils/validation');
 const fs = require('fs');
 
@@ -756,6 +757,11 @@ async function adminRoutes(fastify, options) {
       }
       await db.setSystemSetting(key, value.trim());
     }
+
+    // [PERF-02] Drop the ai-config module cache so the next AI job sees
+    // the updated ai_service_url / ai_vision_model / ai_service_api_key /
+    // backend_public_url immediately instead of waiting out the 60s TTL.
+    clearAiConfigCache();
 
     fastify.log.info({ updates, admin: request.user.email }, 'System settings updated');
 
