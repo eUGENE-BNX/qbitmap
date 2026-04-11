@@ -437,8 +437,18 @@ async function teslaApiRoutes(fastify) {
 async function teslaTelemetryRoutes(fastify) {
 
   fastify.post('/telemetry-event', async (request, reply) => {
-    const secret = request.headers['x-webhook-secret'];
-    if (secret !== config.tesla.telemetryWebhookSecret) {
+    // [SEC-06] Constant-time comparison — mirrors utils/auth.js:42 pattern.
+    // A plain `!==` leaks the matching prefix length through response
+    // timing, letting an attacker iteratively recover the shared secret.
+    // Buffer.from(... || '') handles a missing header without throwing, and
+    // the length pre-check is required because timingSafeEqual rejects
+    // unequal-length inputs with a thrown exception.
+    const providedSecret = Buffer.from(request.headers['x-webhook-secret'] || '', 'utf8');
+    const expectedSecret = Buffer.from(config.tesla.telemetryWebhookSecret, 'utf8');
+    if (
+      providedSecret.length !== expectedSecret.length ||
+      !crypto.timingSafeEqual(providedSecret, expectedSecret)
+    ) {
       return reply.code(401).send({ error: 'Invalid webhook secret' });
     }
 
