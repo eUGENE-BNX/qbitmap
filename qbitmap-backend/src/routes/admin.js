@@ -4,7 +4,7 @@
  */
 
 const db = require('../services/database');
-const { authHook } = require('../utils/jwt');
+const { authHook, invalidateUserVersionCache } = require('../utils/jwt');
 const { validateBody, userOverridesSchema, adminUpdateUserSchema, adminPlanSchema, safePath, parseId } = require('../utils/validation');
 const fs = require('fs');
 
@@ -115,6 +115,11 @@ async function adminRoutes(fastify, options) {
     // Update active status
     if (is_active !== undefined) {
       await db.setUserActive(parseInt(userId), is_active);
+      // [SEC-01] Deactivation bumps token_version in DB; drop local cache so
+      // this worker sees the revocation on the very next request.
+      if (!is_active) {
+        invalidateUserVersionCache(parseInt(userId));
+      }
     }
 
     // Update notes
@@ -145,6 +150,9 @@ async function adminRoutes(fastify, options) {
 
     // Soft delete by deactivating
     await db.setUserActive(parseInt(userId), false);
+    // [SEC-01] token_version was bumped inside setUserActive(false); drop
+    // the local version cache so this worker revokes immediately.
+    invalidateUserVersionCache(parseInt(userId));
 
     return { success: true, message: 'User deactivated' };
   });

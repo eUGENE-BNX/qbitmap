@@ -1,6 +1,6 @@
 const WebSocket = require('ws');
 const db = require('./database');
-const { verifyToken } = require('../utils/jwt');
+const { verifyTokenWithVersion } = require('../utils/jwt');
 const logger = require('../utils/logger').child({ module: 'websocket' });
 const cookie = require('cookie');
 
@@ -90,7 +90,7 @@ class WebSocketService {
       path: '/ws/cameras'
     });
 
-    this.wss.on('connection', (ws, request) => {
+    this.wss.on('connection', async (ws, request) => {
       const clientIp = request.socket.remoteAddress;
       logger.info({ ip: clientIp }, 'New WebSocket connection');
 
@@ -110,9 +110,12 @@ class WebSocketService {
       ws.subscribedCameras = [];
 
       // [SECURITY] Auto-authenticate from HttpOnly cookie (no JS exposure)
+      // [SEC-01] Full version-aware verification — a token whose user has
+      // logged out or been deactivated must be rejected here, not admitted
+      // because the raw JWT signature still validates.
       const token = extractTokenFromCookie(request);
       if (token) {
-        const decoded = verifyToken(token);
+        const decoded = await verifyTokenWithVersion(token);
         if (decoded) {
           ws.userId = decoded.userId;
           ws.userEmail = decoded.email;

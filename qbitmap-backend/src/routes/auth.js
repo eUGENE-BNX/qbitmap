@@ -1,6 +1,6 @@
 const config = require('../config');
 const db = require('../services/database');
-const { generateToken, verifyToken, extractToken, invalidateTokenCache } = require('../utils/jwt');
+const { generateToken, verifyToken, verifyTokenWithVersion, extractToken, invalidateTokenCache, invalidateUserVersionCache } = require('../utils/jwt');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const { validateBody } = require('../utils/validation');
 const logger = require('../utils/logger').child({ module: 'auth' });
@@ -107,7 +107,8 @@ async function authRoutes(fastify, options) {
       return reply.code(401).send({ error: 'No token provided' });
     }
 
-    const decoded = verifyToken(token);
+    // [SEC-01] Version-aware: a revoked token must not return user data.
+    const decoded = await verifyTokenWithVersion(token);
     if (!decoded) {
       return reply.code(401).send({ error: 'Invalid or expired token' });
     }
@@ -150,7 +151,9 @@ async function authRoutes(fastify, options) {
       return { valid: false };
     }
 
-    const decoded = verifyToken(token);
+    // [SEC-01] Include version check so the frontend learns about revocation
+    // and prompts re-login instead of hanging on to a dead session.
+    const decoded = await verifyTokenWithVersion(token);
     return { valid: !!decoded };
   });
 
@@ -166,6 +169,16 @@ async function authRoutes(fastify, options) {
       invalidateTokenCache(token);
       const decoded = verifyToken(token);
       if (decoded) {
+        // [SEC-01] Bump token_version so this JWT — and any other copies of
+        // it (other tabs/devices) — stop authenticating on every worker
+        // within ~30s. Without this, the cryptographic 7-day expiry would
+        // keep the token valid even after logout.
+        try {
+          await db.bumpUserTokenVersion(decoded.userId);
+          invalidateUserVersionCache(decoded.userId);
+        } catch (err) {
+          logger.error({ err, userId: decoded.userId }, 'Failed to bump token_version on logout');
+        }
         logger.info({ email: decoded.email }, 'User logged out');
       }
     }

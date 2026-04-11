@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS users (
   plan_id INT UNSIGNED DEFAULT 1,
   role VARCHAR(20) DEFAULT 'user',
   is_active TINYINT(1) DEFAULT 1,
+  token_version INT UNSIGNED NOT NULL DEFAULT 1,
   last_login DATETIME,
   notes TEXT,
   auth_provider VARCHAR(50) DEFAULT 'google',

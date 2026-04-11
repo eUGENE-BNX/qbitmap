@@ -116,8 +116,27 @@ DatabaseService.prototype.updateUserRole = async function(userId, role) {
 };
 
 DatabaseService.prototype.setUserActive = async function(userId, isActive) {
-  await this.pool.execute('UPDATE users SET is_active = ? WHERE id = ?', [isActive ? 1 : 0, userId]);
+  // [SEC-01] Deactivation must immediately revoke outstanding JWTs. Bump
+  // token_version in the same statement so in-flight tokens fail the version
+  // check inside authHook within its short version-cache TTL.
+  if (isActive) {
+    await this.pool.execute('UPDATE users SET is_active = 1 WHERE id = ?', [userId]);
+  } else {
+    await this.pool.execute(
+      'UPDATE users SET is_active = 0, token_version = token_version + 1 WHERE id = ?',
+      [userId]
+    );
+  }
   return { success: true };
+};
+
+// [SEC-01] Bump token_version to revoke all outstanding JWTs for this user.
+// Called on logout so a leaked/shared token cannot outlive the session.
+DatabaseService.prototype.bumpUserTokenVersion = async function(userId) {
+  await this.pool.execute(
+    'UPDATE users SET token_version = token_version + 1 WHERE id = ?',
+    [userId]
+  );
 };
 
 DatabaseService.prototype.setUserOverrides = async function(userId, overrides) {
