@@ -267,10 +267,10 @@
   aspect-ratio: 16 / 9;
 }
 
-/* Portrait video (9:16) - swap dimensions */
+/* Portrait video (9:16) - swap dimensions, keep header readable */
 .camera-frame-container.portrait.zoom-0 {
-  width: 180px;
-  height: 320px;
+  width: 240px;
+  height: 427px;
 }
 
 .camera-frame-container.portrait.zoom-1 {

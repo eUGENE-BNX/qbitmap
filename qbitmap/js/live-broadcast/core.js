@@ -370,22 +370,21 @@ const CoreMixin = {
     this.cleanupMediaResources();
 
     try {
-      // Teardown WHIP session
-      if (this.whipSessionUrl) {
-        try {
-          const deleteUrl = `${QBitmapConfig.api.public}/whip-proxy?url=${encodeURIComponent(this.whipSessionUrl)}`;
-          await fetch(deleteUrl, { method: 'DELETE', credentials: 'include' });
-        } catch (e) {
-          Logger.warn('[WHIP] Session teardown failed:', e);
-        }
-      }
-
-      // Call backend to stop broadcast
-      await fetch(`${this.apiBase}/stop`, {
+      // Notify backend FIRST so other clients see broadcast end immediately
+      const stopPromise = fetch(`${this.apiBase}/stop`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
-      });
+      }).catch(e => Logger.warn('[LiveBroadcast] Stop API failed:', e));
+
+      // Teardown WHIP session in parallel (can be slow on mobile)
+      const whipPromise = this.whipSessionUrl
+        ? fetch(`${QBitmapConfig.api.public}/whip-proxy?url=${encodeURIComponent(this.whipSessionUrl)}`, {
+            method: 'DELETE', credentials: 'include'
+          }).catch(e => Logger.warn('[WHIP] Session teardown failed:', e))
+        : Promise.resolve();
+
+      await Promise.all([stopPromise, whipPromise]);
 
     } catch (error) {
       Logger.error('[LiveBroadcast] Stop error:', error);

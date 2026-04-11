@@ -23,6 +23,7 @@ const PopupMixin = {
     const whepUrl = props.whepUrl || '';
     const isLoggedIn = typeof AuthSystem !== 'undefined' && AuthSystem.isLoggedIn();
     const isOwnBroadcast = this.isBroadcasting && this.currentBroadcast && this.currentBroadcast.broadcastId === broadcastId;
+    this._isOwnBroadcastPopup = isOwnBroadcast;
 
     const html = `
       <div class="broadcast-popup-content" data-broadcast-id="${escapeHtml(broadcastId)}">
@@ -299,6 +300,17 @@ const PopupMixin = {
    * Close broadcast popup element
    */
   closeBroadcastPopupElement() {
+    // If closing own broadcast popup, stop the broadcast + remove icon immediately
+    if (this._isOwnBroadcastPopup && this.isBroadcasting) {
+      this._isOwnBroadcastPopup = false;
+      // Remove icon from map RIGHT NOW (don't wait for async stopBroadcast)
+      if (this.currentBroadcast) {
+        this.activeBroadcasts.delete(this.currentBroadcast.broadcastId);
+        this.updateMapLayer();
+      }
+      this.stopBroadcast();
+    }
+
     // Cleanup AI search mode
     if (this._aiSearchMode && this.currentPopup) {
       const popupEl = this.currentPopup.getElement();

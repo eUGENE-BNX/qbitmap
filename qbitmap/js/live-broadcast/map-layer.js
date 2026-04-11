@@ -70,10 +70,26 @@ const MapLayerMixin = {
         source: 'live-broadcasts',
         layout: {
           'icon-image': 'broadcast-icon-live',
-          'icon-size': 0.6,
+          'icon-size': [
+            'interpolate', ['linear'], ['zoom'],
+            5, 0.2,
+            10, 0.33,
+            14, 0.45,
+            18, 0.65
+          ],
           'icon-allow-overlap': true
         }
       });
+
+      // Pulse animation - oscillate opacity
+      this._broadcastPulse = setInterval(() => {
+        if (!map.getLayer('live-broadcasts')) {
+          clearInterval(this._broadcastPulse);
+          return;
+        }
+        const t = (Math.sin(Date.now() / 400) + 1) / 2; // 0..1 sinusoidal
+        map.setPaintProperty('live-broadcasts', 'icon-opacity', 0.4 + t * 0.6); // 0.4..1.0
+      }, 50);
 
       // Click to watch
       map.on('click', 'live-broadcasts', (e) => {
@@ -106,16 +122,19 @@ const MapLayerMixin = {
    * Load broadcast icon
    */
   loadBroadcastIcon(map, callback) {
+    // Red broadcast icon - center dot with signal waves on both sides
     const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="46" height="18" viewBox="0 0 46 18">
-        <rect x="0" y="0" width="46" height="18" rx="4" fill="#d93025"/>
-        <polygon points="6,4 6,14 13,9" fill="white"/>
-        <text x="16" y="13" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="white">LIVE</text>
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+        <circle cx="24" cy="24" r="6" fill="#d93025"/>
+        <path d="M15 15a12.7 12.7 0 0 0 0 18" stroke="#d93025" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+        <path d="M9 9a21.2 21.2 0 0 0 0 30" stroke="#d93025" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+        <path d="M33 15a12.7 12.7 0 0 1 0 18" stroke="#d93025" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+        <path d="M39 9a21.2 21.2 0 0 1 0 30" stroke="#d93025" stroke-width="3.5" stroke-linecap="round" fill="none"/>
       </svg>
     `;
 
     const base64 = 'data:image/svg+xml;base64,' + btoa(svg);
-    const img = new Image(46, 18);
+    const img = new Image(48, 48);
     img.onload = () => {
       if (!map.hasImage('broadcast-icon-live')) {
         map.addImage('broadcast-icon-live', img);

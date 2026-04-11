@@ -49,13 +49,38 @@ async function broadcastRoutes(fastify, options) {
       return reply.code(400).send({ error: 'Valid lng and lat are required' });
     }
 
-    // Only one active broadcast per user
+    // Only one active broadcast per user - auto-cleanup stale ones
     const existing = await db.getActiveBroadcastByUser(userId);
     if (existing) {
-      return reply.code(409).send({
-        error: 'You already have an active broadcast',
-        broadcast: existing
-      });
+      // Check if the old broadcast is actually alive on MediaMTX
+      let isStale = false;
+      try {
+        const res = await fetch(`${MEDIAMTX_API}/v3/paths/get/${existing.mediamtx_path}`);
+        if (res.status === 404) {
+          isStale = true;
+        } else if (res.ok) {
+          const data = await res.json();
+          if (!data.source || data.source.type === '') isStale = true;
+        }
+      } catch (e) {
+        isStale = true; // MediaMTX unreachable, treat as stale
+      }
+
+      if (isStale) {
+        // Auto-cleanup the stale broadcast so user can start fresh
+        try { await mediamtx.removePath(existing.mediamtx_path); } catch (e) {}
+        await db.endLiveBroadcast(existing.broadcast_id, userId);
+        wsService.broadcast({
+          type: 'broadcast_ended',
+          payload: { broadcastId: existing.broadcast_id, userId }
+        });
+        logger.info({ broadcastId: existing.broadcast_id }, 'Auto-cleaned stale broadcast on new start');
+      } else {
+        return reply.code(409).send({
+          error: 'You already have an active broadcast',
+          broadcast: existing
+        });
+      }
     }
 
     // Get user info for display on map
