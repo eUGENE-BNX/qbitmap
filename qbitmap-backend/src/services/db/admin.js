@@ -352,33 +352,48 @@ DatabaseService.prototype.updateUserNotes = async function(userId, notes) {
 };
 
 DatabaseService.prototype.getAdminStats = async function() {
-  const [totalUsersRows] = await this.pool.execute('SELECT COUNT(*) as count FROM users');
-  const [activeUsersRows] = await this.pool.execute('SELECT COUNT(*) as count FROM users WHERE is_active = 1');
-  const [totalCamerasRows] = await this.pool.execute('SELECT COUNT(*) as count FROM cameras');
-  const [onlineCamerasRows] = await this.pool.execute(
-    'SELECT COUNT(*) as count FROM cameras WHERE last_seen > DATE_SUB(NOW(), INTERVAL 5 MINUTE)'
-  );
-
+  // [PERF-04] All 8 queries below are independent COUNT/SUM/GROUP BY's —
+  // there's no data flow between them. The original implementation awaited
+  // each one in sequence, so the admin dashboard's first paint waited out
+  // the sum of their latencies (typically 7-14ms on a warm pool).
+  // Promise.all fans them out onto separate pool connections so the total
+  // is bounded by the slowest query instead of their sum.
   const today = new Date().toISOString().split('T')[0];
-  const [aiRows] = await this.pool.execute(
-    'SELECT SUM(ai_analysis_count) as count FROM user_usage WHERE usage_date = ?',
-    [today]
-  );
 
-  const [videoCountRows] = await this.pool.execute(
-    "SELECT COUNT(*) as count FROM video_messages WHERE media_type = 'video'"
-  );
-  const [photoCountRows] = await this.pool.execute(
-    "SELECT COUNT(*) as count FROM video_messages WHERE media_type = 'photo'"
-  );
-
-  const [planDistribution] = await this.pool.execute(`
-    SELECT p.name, p.display_name, COUNT(u.id) as user_count
-    FROM user_plans p
-    LEFT JOIN users u ON u.plan_id = p.id
-    GROUP BY p.id
-    ORDER BY p.id
-  `);
+  const [
+    [totalUsersRows],
+    [activeUsersRows],
+    [totalCamerasRows],
+    [onlineCamerasRows],
+    [aiRows],
+    [videoCountRows],
+    [photoCountRows],
+    [planDistribution]
+  ] = await Promise.all([
+    this.pool.execute('SELECT COUNT(*) as count FROM users'),
+    this.pool.execute('SELECT COUNT(*) as count FROM users WHERE is_active = 1'),
+    this.pool.execute('SELECT COUNT(*) as count FROM cameras'),
+    this.pool.execute(
+      'SELECT COUNT(*) as count FROM cameras WHERE last_seen > DATE_SUB(NOW(), INTERVAL 5 MINUTE)'
+    ),
+    this.pool.execute(
+      'SELECT SUM(ai_analysis_count) as count FROM user_usage WHERE usage_date = ?',
+      [today]
+    ),
+    this.pool.execute(
+      "SELECT COUNT(*) as count FROM video_messages WHERE media_type = 'video'"
+    ),
+    this.pool.execute(
+      "SELECT COUNT(*) as count FROM video_messages WHERE media_type = 'photo'"
+    ),
+    this.pool.execute(`
+      SELECT p.name, p.display_name, COUNT(u.id) as user_count
+      FROM user_plans p
+      LEFT JOIN users u ON u.plan_id = p.id
+      GROUP BY p.id
+      ORDER BY p.id
+    `)
+  ]);
 
   return {
     total_users: totalUsersRows[0].count,
