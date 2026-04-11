@@ -25,6 +25,18 @@ const H3Grid = {
   _ownershipFetchController: null,
   _userColorMap: new Map(),
 
+  // [PERF-06] Viewport memoization.
+  // _lastPaddedBounds is the padded {swLat, swLng, neLat, neLng} that drove
+  // the previous polygonToCells + ownership fetch. _lastResolution is the
+  // H3 resolution that was current at the time. If a viewport-change event
+  // fires but the new (unpadded) view is fully inside that cached padded
+  // region AND the resolution is unchanged, the cached cells still cover
+  // the visible area and we can skip polygonToCells + the ownership fetch
+  // entirely. Typical small pans (<15% of the viewport) fall into this
+  // fast path and do zero work.
+  _lastPaddedBounds: null,
+  _lastResolution: null,
+
   // Predefined pastel color palette - each user gets a unique color
   _PASTEL_COLORS: [
     { fill: [255, 175, 110, 60], line: [230, 140, 70, 90],  highlight: [255, 155, 80, 130],  hex: '#ffaf6e' },  // orange
@@ -149,6 +161,10 @@ const H3Grid = {
       this._ownershipMap = null;
       this._fogRingData = [];
       this._userColorMap.clear();
+      // [PERF-06] Drop the memoization snapshot so re-enabling forces a
+      // fresh compute instead of short-circuiting against a stale view.
+      this._lastPaddedBounds = null;
+      this._lastResolution = null;
       if (this._tooltip) this._tooltip.style.display = 'none';
       this._showLeaderboardBtn(false);
     }
@@ -157,7 +173,13 @@ const H3Grid = {
   _onViewportChange() {
     if (!this._enabled) return;
     clearTimeout(this._debounceTimer);
-    this._debounceTimer = setTimeout(() => this._computeAndRender(), 80);
+    // [PERF-06] 80ms was too tight: at 60fps a normal drag fires moveend
+    // many times in quick succession and each 80ms debounce window still
+    // allowed spurious recomputes. 250ms gives the map a chance to settle
+    // after a multi-step pan / zoom gesture while still feeling
+    // responsive, and the memoization below drops most of the surviving
+    // calls to a no-op anyway.
+    this._debounceTimer = setTimeout(() => this._computeAndRender(), 250);
   },
 
   _getResolution(zoom) {
@@ -186,9 +208,27 @@ const H3Grid = {
     const zoom = Math.floor(this._map.getZoom());
     const resolution = this._getResolution(zoom);
 
-    // Expand viewport by 15% on each side to fill edges
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
+
+    // [PERF-06] Fast path: if the new (unpadded) view is still inside the
+    // padded region we computed last time AND the resolution is unchanged,
+    // the hexagons already in _hexagonData cover the visible area and the
+    // ownership fetch we did for that region is still valid. Skip the
+    // whole polygonToCells + fetch + relayer work.
+    const cached = this._lastPaddedBounds;
+    if (
+      cached &&
+      resolution === this._lastResolution &&
+      sw.lat >= cached.swLat &&
+      sw.lng >= cached.swLng &&
+      ne.lat <= cached.neLat &&
+      ne.lng <= cached.neLng
+    ) {
+      return;
+    }
+
+    // Expand viewport by 15% on each side to fill edges
     const latPad = (ne.lat - sw.lat) * 0.15;
     const lngPad = (ne.lng - sw.lng) * 0.15;
 
@@ -215,6 +255,17 @@ const H3Grid = {
 
     this._hexagonData = cells.map(idx => ({ h3Index: idx }));
     this._currentResolution = resolution;
+
+    // [PERF-06] Record the padded bounds + resolution that produced
+    // _hexagonData. The next _computeAndRender will short-circuit if the
+    // view still fits inside this region at the same resolution.
+    this._lastPaddedBounds = {
+      swLat: sw.lat - latPad,
+      swLng: sw.lng - lngPad,
+      neLat: ne.lat + latPad,
+      neLng: ne.lng + lngPad
+    };
+    this._lastResolution = resolution;
 
     // Notify TRON trails of new hex data
     if (H3TronTrails._enabled) {
