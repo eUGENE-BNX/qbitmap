@@ -370,17 +370,18 @@ const CoreMixin = {
     this.cleanupMediaResources();
 
     try {
-      // Notify backend FIRST so other clients see broadcast end immediately
+      // Notify backend FIRST - use keepalive so request survives on mobile
       const stopPromise = fetch(`${this.apiBase}/stop`, {
         method: 'POST',
         credentials: 'include',
+        keepalive: true,
         headers: { 'Content-Type': 'application/json' }
       }).catch(e => Logger.warn('[LiveBroadcast] Stop API failed:', e));
 
       // Teardown WHIP session in parallel (can be slow on mobile)
       const whipPromise = this.whipSessionUrl
         ? fetch(`${QBitmapConfig.api.public}/whip-proxy?url=${encodeURIComponent(this.whipSessionUrl)}`, {
-            method: 'DELETE', credentials: 'include'
+            method: 'DELETE', credentials: 'include', keepalive: true
           }).catch(e => Logger.warn('[WHIP] Session teardown failed:', e))
         : Promise.resolve();
 
@@ -408,14 +409,23 @@ const CoreMixin = {
    * Synchronous stop for beforeunload (best effort)
    */
   stopBroadcastSync() {
+    // Use keepalive fetch (survives page unload, sends credentials)
     try {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${this.apiBase}/stop`, false);
-      xhr.withCredentials = true;
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.send('{}');
+      fetch(`${this.apiBase}/stop`, {
+        method: 'POST',
+        credentials: 'include',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json' }
+      }).catch(() => {});
     } catch (e) {
-      // Best effort
+      // Fallback to sync XHR
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${this.apiBase}/stop`, false);
+        xhr.withCredentials = true;
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send('{}');
+      } catch (e2) { /* Best effort */ }
     }
     this.cleanupMediaResources();
   },

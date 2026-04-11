@@ -15,14 +15,14 @@ class CleanupService {
       this.runMaintenance();
     });
 
-    // Run stale broadcast cleanup every 60 seconds (offset by 30s to avoid collision with stream-cache cleanup)
+    // Run stale broadcast cleanup every 15 seconds (offset by 5s to avoid collision with stream-cache cleanup)
     setTimeout(() => {
       this.broadcastCleanupInterval = setInterval(() => {
         this.cleanupStaleBroadcasts();
-      }, 60 * 1000);
-    }, 30 * 1000);
+      }, 15 * 1000);
+    }, 5 * 1000);
 
-    logger.info('Cleanup service started - maintenance every 6 hours, broadcast cleanup every 60s (30s offset)');
+    logger.info('Cleanup service started - maintenance every 6 hours, broadcast cleanup every 15s');
   }
 
   async runMaintenance() {
@@ -83,8 +83,8 @@ class CleanupService {
           continue;
         }
 
-        // Check MediaMTX for orphaned broadcasts (no publisher) after 60s
-        if (ageMs > 60 * 1000) {
+        // Check MediaMTX for orphaned broadcasts (no publisher) after 20s
+        if (ageMs > 20 * 1000) {
           try {
             const response = await fetch(`${mediamtx.MEDIAMTX_API}/v3/paths/get/${broadcast.mediamtx_path}`);
             if (response.status === 404) {
