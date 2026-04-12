@@ -3,10 +3,18 @@
  * Periodically syncs segments from teslacam.qbitmap.com (Raspberry Pi in Tesla)
  * Downloads video.mp4 + metadata.json per segment to local disk
  * Keeps last 10 segments, deletes older ones
+ *
+ * [PERF-11] All filesystem I/O is async (fs.promises + stream.pipeline).
+ * The previous version used readFileSync/writeFileSync/statSync throughout,
+ * blocking the event loop for 10-50ms per 13MB video write and stalling
+ * every 30s tick with multiple sync stat/readdir/readFile calls.
  */
 
 const fs = require('fs');
+const fsp = fs.promises;
 const path = require('path');
+const { Readable } = require('stream');
+const { pipeline } = require('stream/promises');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'teslacam-sync' });
 
@@ -22,6 +30,7 @@ let localSegments = [];
 let syncing = false;
 
 function start() {
+  // mkdirSync at boot is fine — happens once before server listens.
   fs.mkdirSync(STORAGE_DIR, { recursive: true });
   _loadLocalSegments();
   syncTimer = setInterval(tick, SYNC_INTERVAL);
@@ -120,7 +129,7 @@ async function tick() {
     }
 
     // 5. Rebuild localSegments from disk (single source of truth)
-    _loadLocalSegments();
+    await _loadLocalSegments();
 
   } catch (e) {
     logger.error({ err: e.message }, 'TeslaCAM sync tick error');
@@ -132,7 +141,7 @@ async function tick() {
 async function _downloadSegment(segSummary) {
   const segId = segSummary.id;
   const segDir = path.join(STORAGE_DIR, segId);
-  fs.mkdirSync(segDir, { recursive: true });
+  await fsp.mkdir(segDir, { recursive: true });
 
   // 1. Download metadata JSON
   const metaResp = await fetchWithTimeout(
@@ -140,71 +149,71 @@ async function _downloadSegment(segSummary) {
   );
   if (!metaResp.ok) throw new Error('Metadata fetch failed: ' + metaResp.status);
   const metadata = await metaResp.json();
-  fs.writeFileSync(path.join(segDir, 'metadata.json'), JSON.stringify(metadata));
+  await fsp.writeFile(path.join(segDir, 'metadata.json'), JSON.stringify(metadata));
 
-  // 2. Download video MP4
+  // 2. Download video MP4 — stream directly to disk instead of buffering
+  // the entire ~13MB in memory then writeFileSync-blocking the event loop.
   const videoResp = await fetchWithTimeout(
     TESLACAM_API + '/api/segments/' + segId + '/video.mp4', {}, VIDEO_TIMEOUT
   );
   if (!videoResp.ok) throw new Error('Video fetch failed: ' + videoResp.status);
-  const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
-  fs.writeFileSync(path.join(segDir, 'video.mp4'), videoBuffer);
 
-  const videoMB = (videoBuffer.length / 1024 / 1024).toFixed(1);
+  const videoPath = path.join(segDir, 'video.mp4');
+  await pipeline(
+    Readable.fromWeb(videoResp.body),
+    fs.createWriteStream(videoPath)
+  );
+
+  const stats = await fsp.stat(videoPath);
+  const videoMB = (stats.size / 1024 / 1024).toFixed(1);
   logger.info({ segId, points: metadata.length, videoMB }, 'Segment synced');
 }
 
-function _pruneSegments() {
-  while (localSegments.length > MAX_SEGMENTS) {
-    const old = localSegments.pop();
-    const oldDir = path.join(STORAGE_DIR, old.id);
-    try {
-      fs.rmSync(oldDir, { recursive: true, force: true });
-      logger.info({ segId: old.id }, 'Pruned old segment');
-    } catch (e) {
-      logger.warn({ segId: old.id, err: e.message }, 'Failed to prune segment dir');
-    }
-  }
-}
-
-function _loadLocalSegments() {
+async function _loadLocalSegments() {
   try {
-    if (!fs.existsSync(STORAGE_DIR)) return;
+    try { await fsp.access(STORAGE_DIR); } catch { return; }
 
-    const dirs = fs.readdirSync(STORAGE_DIR)
-      .filter(d => fs.statSync(path.join(STORAGE_DIR, d)).isDirectory())
+    const entries = await fsp.readdir(STORAGE_DIR, { withFileTypes: true });
+    const dirs = entries
+      .filter(d => d.isDirectory())
+      .map(d => d.name)
       .sort()
       .reverse();
 
-    localSegments = [];
+    const segments = [];
     for (const dir of dirs.slice(0, MAX_SEGMENTS)) {
       const metaPath = path.join(STORAGE_DIR, dir, 'metadata.json');
+      const videoPath = path.join(STORAGE_DIR, dir, 'video.mp4');
       let start_gps = [null, null], end_gps = [null, null];
       let start_speed_mps = 0, end_speed_mps = 0, points = 60;
 
-      if (fs.existsSync(metaPath)) {
-        try {
-          const metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-          points = metadata.length;
-          if (metadata.length > 0) {
-            const first = metadata[0];
-            const last = metadata[metadata.length - 1];
-            start_gps = [first.latitude || null, first.longitude || null];
-            end_gps = [last.latitude || null, last.longitude || null];
-            start_speed_mps = first.speed_mps || 0;
-            end_speed_mps = last.speed_mps || 0;
-          }
-        } catch (e) { /* ignore */ }
-      }
-
       // Only include if video exists
-      if (fs.existsSync(path.join(STORAGE_DIR, dir, 'video.mp4'))) {
-        localSegments.push({ id: dir, points, start_gps, end_gps, start_speed_mps, end_speed_mps });
-      }
+      try { await fsp.access(videoPath); } catch { continue; }
+
+      try {
+        const raw = await fsp.readFile(metaPath, 'utf8');
+        const metadata = JSON.parse(raw);
+        points = metadata.length;
+        if (metadata.length > 0) {
+          const first = metadata[0];
+          const last = metadata[metadata.length - 1];
+          start_gps = [first.latitude || null, first.longitude || null];
+          end_gps = [last.latitude || null, last.longitude || null];
+          start_speed_mps = first.speed_mps || 0;
+          end_speed_mps = last.speed_mps || 0;
+        }
+      } catch { /* metadata missing or corrupt — use defaults */ }
+
+      segments.push({ id: dir, points, start_gps, end_gps, start_speed_mps, end_speed_mps });
     }
 
+    localSegments = segments;
+
+    // Prune excess segments
     for (const dir of dirs.slice(MAX_SEGMENTS)) {
-      try { fs.rmSync(path.join(STORAGE_DIR, dir), { recursive: true, force: true }); } catch (e) { /* ignore */ }
+      try {
+        await fsp.rm(path.join(STORAGE_DIR, dir), { recursive: true, force: true });
+      } catch { /* ignore */ }
     }
 
     logger.info({ count: localSegments.length }, 'Loaded local TeslaCAM segments');
