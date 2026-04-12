@@ -86,6 +86,14 @@ async function onvifRoutes(fastify, options) {
     const { id, name, host, port, username, password } = request.body;
 
     try {
+      // [SEC-10] Only users who own at least one camera may register ONVIF
+      // devices. Without this gate any authenticated user can make the
+      // internal ONVIF service connect to arbitrary host:port combos (SSRF).
+      const userCameras = await db.getUserCameras(request.user.userId);
+      if (!userCameras || userCameras.length === 0) {
+        return reply.code(403).send({ error: 'You must own a camera to register ONVIF devices' });
+      }
+
       const onvifServiceUrl = services.onvifServiceUrl;
 
       const response = await fetchWithTimeout(`${onvifServiceUrl}/cameras`, {
