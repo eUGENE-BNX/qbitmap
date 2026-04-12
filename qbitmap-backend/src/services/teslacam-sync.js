@@ -18,7 +18,10 @@ const { pipeline } = require('stream/promises');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'teslacam-sync' });
 
-const TESLACAM_API = 'https://teslacam.qbitmap.com';
+// [ARCH-16] Configurable via env — dev no longer polls the prod Tesla Pi.
+// Set TESLACAM_SYNC_ENABLED=false (or omit TESLACAM_API_URL) to disable.
+const TESLACAM_API = process.env.TESLACAM_API_URL || 'https://teslacam.qbitmap.com';
+const SYNC_ENABLED = process.env.TESLACAM_SYNC_ENABLED !== 'false';
 const SYNC_INTERVAL = 30 * 1000;
 const MAX_SEGMENTS = 10;
 const VIDEO_TIMEOUT = 90 * 1000; // 90s for ~13MB video download
@@ -30,12 +33,16 @@ let localSegments = [];
 let syncing = false;
 
 function start() {
+  if (!SYNC_ENABLED) {
+    logger.info('TeslaCAM sync disabled (TESLACAM_SYNC_ENABLED=false)');
+    return;
+  }
   // mkdirSync at boot is fine — happens once before server listens.
   fs.mkdirSync(STORAGE_DIR, { recursive: true });
   _loadLocalSegments();
   syncTimer = setInterval(tick, SYNC_INTERVAL);
   setTimeout(tick, 3000);
-  logger.info('TeslaCAM sync service started');
+  logger.info({ api: TESLACAM_API }, 'TeslaCAM sync service started');
 }
 
 function stop() {
