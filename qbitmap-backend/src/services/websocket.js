@@ -299,6 +299,7 @@ class WebSocketService {
    * Removes entries where all WebSocket connections are closed
    */
   cleanupStaleClients() {
+    const now = Date.now();
     let cleanedCount = 0;
 
     for (const [userId, wsSet] of this.clients.entries()) {
@@ -333,6 +334,15 @@ class WebSocketService {
     for (const ws of connectionRateLimits.keys()) {
       if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
         connectionRateLimits.delete(ws);
+      }
+    }
+
+    // [PERF-14] Sweep expired _authCache entries so the Map doesn't grow
+    // unbounded. Each entry has a 30s TTL; we piggyback on the 30s
+    // cleanupStaleClients interval that already runs.
+    if (this._authCache) {
+      for (const [deviceId, entry] of this._authCache) {
+        if (now - entry.time > 30000) this._authCache.delete(deviceId);
       }
     }
 
@@ -701,6 +711,9 @@ class WebSocketService {
       this.wss = null;
     }
     this.clients.clear();
+    // [PERF-14] Drop auth cache on shutdown so a hot-reload doesn't
+    // carry stale authorization data into the new instance.
+    if (this._authCache) { this._authCache.clear(); this._authCache = null; }
     logger.info('WebSocket service shutdown complete');
   }
 }
