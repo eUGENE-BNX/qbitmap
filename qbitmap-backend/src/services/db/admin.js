@@ -120,27 +120,26 @@ DatabaseService.prototype.getUserEffectiveLimits = async function(userId) {
 
 DatabaseService.prototype.getUserTodayUsage = async function(userId) {
   const today = new Date().toISOString().split('T')[0];
-  const [rows] = await this.pool.execute(
-    'SELECT * FROM user_usage WHERE user_id = ? AND usage_date = ?',
+  // [PERF-15] Single upsert instead of SELECT → conditional INSERT.
+  // INSERT IGNORE guarantees the row exists without a race window.
+  await this.pool.execute(
+    'INSERT IGNORE INTO user_usage (user_id, usage_date) VALUES (?, ?)',
     [userId, today]
   );
-
-  if (!rows[0]) {
-    await this.pool.execute(
-      'INSERT INTO user_usage (user_id, usage_date) VALUES (?, ?)',
-      [userId, today]
-    );
-    return { ai_analysis_count: 0, face_recognition_count: 0, recording_minutes: 0, voice_call_count: 0 };
-  }
-
+  const [rows] = await this.pool.execute(
+    'SELECT ai_analysis_count, face_recognition_count, recording_minutes, voice_call_count FROM user_usage WHERE user_id = ? AND usage_date = ?',
+    [userId, today]
+  );
   return rows[0];
 };
 
+// [PERF-15] Atomic increment via INSERT ... ON DUPLICATE KEY UPDATE.
+// The old implementation called getUserTodayUsage() first (SELECT + conditional
+// INSERT = 2-3 round-trips) then UPDATE — 3-4 queries total with a race window
+// where two concurrent increments could both see count=0 and both INSERT. Now
+// it's a single statement: if the row doesn't exist yet it's created with the
+// initial amount; if it does, the counter is atomically incremented.
 DatabaseService.prototype.incrementUsage = async function(userId, feature, amount = 1) {
-  const today = new Date().toISOString().split('T')[0];
-
-  await this.getUserTodayUsage(userId);
-
   const columnMap = {
     ai_analysis: 'ai_analysis_count',
     face_recognition: 'face_recognition_count',
@@ -151,9 +150,12 @@ DatabaseService.prototype.incrementUsage = async function(userId, feature, amoun
   const column = columnMap[feature];
   if (!column) return false;
 
+  const today = new Date().toISOString().split('T')[0];
   await this.pool.execute(
-    `UPDATE user_usage SET ${column} = ${column} + ? WHERE user_id = ? AND usage_date = ?`,
-    [amount, userId, today]
+    `INSERT INTO user_usage (user_id, usage_date, ${column})
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE ${column} = ${column} + VALUES(${column})`,
+    [userId, today, amount]
   );
 
   return true;
