@@ -177,7 +177,6 @@ async function authRoutes(fastify, options) {
       role: limits?.role || 'user',
       isActive: limits?.is_active ?? true,
       features: {
-        voiceControl: limits?.voice_control_enabled || false,
         publicSharing: limits?.public_sharing_enabled || false
       }
     };

@@ -16,7 +16,6 @@ import '../css/auth.css';
 import './config.js';
 import './utils.js';
 import './analytics.js';
-import './voice-commands.js';
 import './labels.js';
 
 // Map and visualization
@@ -27,8 +26,6 @@ import './h3-tron-trails.js';
 // Auth and user features
 import './auth.js';
 import './user-location.js';
-import './voice-control.js';
-
 // Camera system (index.js imports all mixins)
 import { CameraSystem, startCameraSystem } from './camera-system/index.js';
 

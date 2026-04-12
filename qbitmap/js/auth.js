@@ -244,7 +244,7 @@ const AuthSystem = {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
               </svg>
-              Foto Mesaj
+              Fotoğraf Mesaj
             </button>
             <button class="dropdown-item" id="broadcast-dropdown-item" role="menuitem">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -296,10 +296,6 @@ const AuthSystem = {
     // Create right-side menu (toggle + dropdown panel with all buttons)
     this._createRightSideMenu();
 
-    // Rebind mic button after dynamic HTML creation
-    import('/js/voice-control.js').then(m => {
-      if (m.VoiceControl?.bindMicButton) m.VoiceControl.bindMicButton();
-    }).catch(() => {});
     // Lazy-load map features (visible to everyone)
     import('/js/video-message/index.js').then(m => {
       if (m.VideoMessage) {
@@ -375,21 +371,6 @@ const AuthSystem = {
     }
 
     // --- Auth-specific buttons ---
-
-    // Mic button
-    const micBtn = document.createElement('button');
-    micBtn.id = 'mic-button';
-    micBtn.className = 'mic-button-right';
-    micBtn.title = 'Sesli Komut';
-    micBtn.setAttribute('aria-label', 'Sesli komut');
-    micBtn.setAttribute('aria-pressed', 'false');
-    micBtn.innerHTML = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-      </svg>
-    `;
-    panel.appendChild(micBtn);
 
     // Broadcast float controls
     const floatContainer = document.createElement('div');

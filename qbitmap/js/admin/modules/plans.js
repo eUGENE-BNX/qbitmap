@@ -72,7 +72,6 @@ export const PlansMixin = {
       document.getElementById('plan-max-recording').value = plan.max_recording_hours;
       document.getElementById('plan-retention-days').value = plan.recording_retention_days;
       document.getElementById('plan-voice-call').checked = !!plan.voice_call_enabled;
-      document.getElementById('plan-voice-control').checked = !!plan.voice_control_enabled;
       document.getElementById('plan-public-sharing').checked = !!plan.public_sharing_enabled;
       document.getElementById('plan-priority-support').checked = !!plan.priority_support;
     } else {
@@ -91,7 +90,6 @@ export const PlansMixin = {
       document.getElementById('plan-max-recording').value = 0;
       document.getElementById('plan-retention-days').value = 7;
       document.getElementById('plan-voice-call').checked = false;
-      document.getElementById('plan-voice-control').checked = false;
       document.getElementById('plan-public-sharing').checked = false;
       document.getElementById('plan-priority-support').checked = false;
     }
@@ -117,7 +115,6 @@ export const PlansMixin = {
       max_recording_hours: parseInt(document.getElementById('plan-max-recording').value),
       recording_retention_days: parseInt(document.getElementById('plan-retention-days').value),
       voice_call_enabled: document.getElementById('plan-voice-call').checked,
-      voice_control_enabled: document.getElementById('plan-voice-control').checked,
       public_sharing_enabled: document.getElementById('plan-public-sharing').checked,
       priority_support: document.getElementById('plan-priority-support').checked
     };

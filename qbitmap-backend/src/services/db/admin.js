@@ -245,9 +245,6 @@ DatabaseService.prototype.checkFeatureLimit = async function(userId, feature) {
     case 'face_login':
       return { allowed: limits.face_login_enabled, reason: !limits.face_login_enabled ? 'FaceID login not enabled for your plan' : null };
 
-    case 'voice_control':
-      return { allowed: limits.voice_control_enabled, reason: !limits.voice_control_enabled ? 'Voice control not enabled for your plan' : null };
-
     case 'public_sharing':
       return { allowed: limits.public_sharing_enabled, reason: !limits.public_sharing_enabled ? 'Public sharing not enabled for your plan' : null };
 

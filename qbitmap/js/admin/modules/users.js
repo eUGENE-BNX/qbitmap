@@ -113,7 +113,6 @@ export const UsersMixin = {
       document.getElementById('override-recording-enabled').checked = overrides.max_recording_hours != null;
       document.getElementById('override-recording').value = overrides.max_recording_hours ?? '';
       document.getElementById('override-voice-call').checked = !!overrides.voice_call_enabled;
-      document.getElementById('override-voice-control').checked = !!overrides.voice_control_enabled;
       document.getElementById('override-public-sharing').checked = !!overrides.public_sharing_enabled;
 
       const usage = user.usage || {};
@@ -160,7 +159,6 @@ export const UsersMixin = {
       if (document.getElementById('override-face-enabled').checked) { overrides.face_recognition_enabled = 1; overrides.max_faces_per_camera = parseInt(document.getElementById('override-faces').value) || 0; }
       if (document.getElementById('override-recording-enabled').checked) { overrides.recording_enabled = 1; overrides.max_recording_hours = parseInt(document.getElementById('override-recording').value) || 0; }
       if (document.getElementById('override-voice-call').checked) overrides.voice_call_enabled = 1;
-      if (document.getElementById('override-voice-control').checked) overrides.voice_control_enabled = 1;
       if (document.getElementById('override-public-sharing').checked) overrides.public_sharing_enabled = 1;
 
       if (Object.keys(overrides).length > 0) {

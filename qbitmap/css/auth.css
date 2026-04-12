@@ -132,7 +132,7 @@
   box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
 }
 
-/* Right side button (shared style for mic, broadcast, camera-switch, resolution) */
+/* Right side button (shared style for broadcast, camera-switch, resolution, etc.) */
 .mic-button-right {
   width: 29px;
   height: 29px;
@@ -308,44 +308,6 @@
 
 .auth-notification.error {
   background: #d93025;
-}
-
-/* Voice Feedback Toast */
-.voice-feedback {
-  position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%) translateY(20px);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: #1a1a1a;
-  color: white;
-  border-radius: 8px;
-  font-size: 14px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  opacity: 0;
-  transition: all 0.3s ease;
-  z-index: 10000;
-  max-width: 90vw;
-}
-
-.voice-feedback.show {
-  transform: translateX(-50%) translateY(0);
-  opacity: 1;
-}
-
-.voice-feedback.error {
-  background: #d93025;
-}
-
-.voice-feedback.info {
-  background: #1a73e8;
-}
-
-.voice-feedback svg {
-  flex-shrink: 0;
 }
 
 /* Responsive */

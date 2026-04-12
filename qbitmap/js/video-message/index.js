@@ -128,7 +128,7 @@ const VideoMessage = {
           <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
         </svg>
         <h3>Mobil Cihaz Gerekli</h3>
-        <p>Video ve foto mesaj özellikleri yalnızca cep telefonlarında kullanılabilir.</p>
+        <p>Video ve fotoğraf mesaj özellikleri yalnızca cep telefonlarında kullanılabilir.</p>
         <button class="vmsg-desktop-warning-close">Tamam</button>
       </div>
     `;
@@ -177,7 +177,7 @@ const VideoMessage = {
     overlay.className = 'vmsg-source-picker-overlay';
     overlay.innerHTML = `
       <div class="vmsg-source-picker-box">
-        <h3>Foto Mesaj</h3>
+        <h3>Fotoğraf Mesaj</h3>
         <button class="vmsg-source-btn" data-source="camera">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>

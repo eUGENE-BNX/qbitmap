@@ -142,8 +142,8 @@ const CoreMixin = {
       // 1. Request camera + mic permissions (use currentResolution, back camera preferred)
       const savedId = getSavedCameraId();
       const videoConstraints = {
-        width: { exact: this.currentResolution.width },
-        height: { exact: this.currentResolution.height },
+        width: { ideal: this.currentResolution.width },
+        height: { ideal: this.currentResolution.height },
         frameRate: { ideal: 24 },
         focusMode: { ideal: 'continuous' }
       };
@@ -285,6 +285,7 @@ const CoreMixin = {
 
       let msg = 'Yayın başlatılamadı';
       if (error.name === 'NotAllowedError') msg = 'Kamera izni reddedildi';
+      else if (error.name === 'NotFoundError') msg = 'Kamera veya mikrofon bulunamadı';
       else if (error.code === 1) msg = 'Konum izni reddedildi';
       else if (error.message) msg = error.message;
 
