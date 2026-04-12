@@ -13,16 +13,24 @@ async function adminRoutes(fastify, options) {
   // First apply auth hook to all routes
   fastify.addHook('preHandler', authHook);
 
-  // Then check admin role
+  // [ARCH-02] Admin role check — pure in-memory from JWT claim.
+  // Old JWTs issued before the role claim was added won't have
+  // request.user.role; for those we fall back to a one-time DB lookup
+  // so existing admin sessions aren't locked out. The fallback is
+  // self-expiring: once all pre-deploy tokens rotate (≤7 days) the DB
+  // branch never fires again.
   fastify.addHook('preHandler', async (request, reply) => {
-    // Check if user is authenticated (authHook sets request.user)
     if (!request.user?.userId) {
       return reply.code(401).send({ error: 'Authentication required' });
     }
 
-    // Then check admin role
-    const user = await db.getUserById(request.user.userId);
-    if (!user || user.role !== 'admin') {
+    let role = request.user.role;
+    if (role === undefined) {
+      // Transitional: JWT without role claim (issued before ARCH-02)
+      const user = await db.getUserById(request.user.userId);
+      role = user?.role;
+    }
+    if (role !== 'admin') {
       return reply.code(403).send({ error: 'Admin access required' });
     }
   });
@@ -111,6 +119,9 @@ async function adminRoutes(fastify, options) {
       if (!result.success) {
         return reply.code(400).send({ error: result.error });
       }
+      // [ARCH-02] updateUserRole bumps token_version in DB; drop the
+      // local version cache so this worker revokes the old JWT immediately.
+      invalidateUserVersionCache(parseInt(userId));
     }
 
     // Update active status

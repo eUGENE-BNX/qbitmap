@@ -45,6 +45,11 @@ function generateToken(user) {
     userId: user.id,
     email: user.email,
     displayName: user.display_name,
+    // [ARCH-02] Embed role so admin checks are pure in-memory — no DB
+    // round-trip on every admin request. Role changes bump token_version
+    // (see db/users.js updateUserRole) which forces re-login and a
+    // fresh JWT with the new role.
+    role: user.role || 'user',
     // [SEC-01] Stamp token with user's current version. Bumping the DB value
     // (logout / deactivation) invalidates every JWT that still carries the old
     // number, even if the JWT's cryptographic expiry is days away.

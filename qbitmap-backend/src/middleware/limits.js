@@ -76,27 +76,9 @@ async function checkFaceLimitMiddleware(request, reply) {
   request.faceLimit = result;
 }
 
-/**
- * Admin only middleware
- * Requires user to have role='admin'
- */
-async function requireAdmin(request, reply) {
-  const userId = request.user?.userId || request.user?.id;
-  if (!userId) {
-    return reply.status(401).send({ error: 'Authentication required' });
-  }
-
-  const limits = await db.getUserEffectiveLimits(userId);
-
-  if (!limits || limits.role !== 'admin') {
-    return reply.status(403).send({ error: 'Admin access required' });
-  }
-
-  // Check if account is active
-  if (!limits.is_active) {
-    return reply.status(403).send({ error: 'Account deactivated' });
-  }
-}
+// [ARCH-02] requireAdmin removed — admin role check now runs inline
+// in routes/admin.js using the JWT role claim (zero DB hit). The old
+// middleware was never imported by any route file anyway.
 
 /**
  * Check if user account is active
@@ -143,7 +125,6 @@ async function getUserLimitsAndUsage(userId) {
 module.exports = {
   checkFeatureLimit,
   checkFaceLimitMiddleware,
-  requireAdmin,
   requireActive,
   incrementUsage,
   getUserLimitsAndUsage

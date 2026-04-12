@@ -111,7 +111,13 @@ DatabaseService.prototype.updateUserRole = async function(userId, role) {
   if (!['user', 'admin'].includes(role)) {
     return { success: false, error: 'Invalid role' };
   }
-  await this.pool.execute('UPDATE users SET role = ? WHERE id = ?', [role, userId]);
+  // [ARCH-02] Bump token_version alongside role change so the old JWT
+  // (which carries the previous role claim) is revoked. The user must
+  // re-login and receives a fresh JWT with the new role embedded.
+  await this.pool.execute(
+    'UPDATE users SET role = ?, token_version = token_version + 1 WHERE id = ?',
+    [role, userId]
+  );
   return { success: true };
 };
 
