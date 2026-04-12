@@ -91,13 +91,35 @@ DatabaseService.prototype.endLiveBroadcast = async function(broadcastId, userId)
   );
 };
 
+// [PERF-09] Enumerate columns (skip ended_at, which is always NULL for
+// active rows) and cap with LIMIT 100 so a stale-cleanup failure can't
+// produce an unbounded result set on a query that runs every 15s (cleanup)
+// and on every WS connect (initial_state). The idx_live_broadcasts_status
+// index covers the WHERE; ORDER BY started_at DESC is a trivial filesort
+// with <100 active broadcasts.
 DatabaseService.prototype.getActiveBroadcasts = async function() {
-  const [rows] = await this.pool.execute("SELECT * FROM live_broadcasts WHERE status = 'active' ORDER BY started_at DESC");
+  const [rows] = await this.pool.execute(
+    `SELECT broadcast_id, user_id, display_name, avatar_url, mediamtx_path,
+            whep_url, lng, lat, accuracy_radius_m, location_source,
+            orientation, status, started_at
+     FROM live_broadcasts
+     WHERE status = 'active'
+     ORDER BY started_at DESC
+     LIMIT 100`
+  );
   return rows;
 };
 
 DatabaseService.prototype.getActiveBroadcastByUser = async function(userId) {
-  const [rows] = await this.pool.execute("SELECT * FROM live_broadcasts WHERE user_id = ? AND status = 'active'", [userId]);
+  const [rows] = await this.pool.execute(
+    `SELECT broadcast_id, user_id, display_name, avatar_url, mediamtx_path,
+            whep_url, lng, lat, accuracy_radius_m, location_source,
+            orientation, status, started_at
+     FROM live_broadcasts
+     WHERE user_id = ? AND status = 'active'
+     LIMIT 1`,
+    [userId]
+  );
   return rows[0];
 };
 
