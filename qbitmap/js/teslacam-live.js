@@ -834,4 +834,3 @@ var TeslaCamLive = {
 })();
 
 export { TeslaCamLive };
-window.TeslaCamLive = TeslaCamLive;

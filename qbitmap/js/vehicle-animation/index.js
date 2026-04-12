@@ -82,7 +82,6 @@ const VehicleAnimation = {
 Object.assign(VehicleAnimation, CameraStreamMixin, PopupMixin, AnimationMixin, MapLayerMixin);
 
 export { VehicleAnimation };
-window.VehicleAnimation = VehicleAnimation;
 
 // Initialize
 (function initVehicleAnimation() {

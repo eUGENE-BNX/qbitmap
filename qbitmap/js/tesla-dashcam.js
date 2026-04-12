@@ -960,4 +960,3 @@ const TeslaDashcam = {
 })();
 
 export { TeslaDashcam };
-window.TeslaDashcam = TeslaDashcam;

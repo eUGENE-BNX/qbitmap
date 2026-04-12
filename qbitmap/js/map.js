@@ -8,6 +8,9 @@ import { CameraSystem } from './camera-system/index.js';
 import { setMap, layers, satelliteMode, setSatelliteMode } from './state.js';
 import { LocationService } from './services/location-service.js';
 
+// [ARCH-10] Lazy-loaded module cache — replaces window.VehicleAnimation global
+let _VehicleAnimation = null;
+
 // Global unhandled promise rejection handler for video play errors
 window.addEventListener('unhandledrejection', (event) => {
     if (event.reason && event.reason.name === 'AbortError') {
@@ -184,13 +187,10 @@ class LayersDropdownControl {
                 uploadBtn.addEventListener('click', async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (!window.TeslaDashcam) {
-                        await import('/js/tesla-dashcam.js');
-                    }
-                    if (window.TeslaDashcam) {
-                        if (!TeslaDashcam.map) TeslaDashcam.init(map);
-                        TeslaDashcam.showUploadDialog();
-                    }
+                    // [ARCH-10] ESM dynamic import — no window.* global
+                    const { TeslaDashcam } = await import('/js/tesla-dashcam.js');
+                    if (!TeslaDashcam.map) TeslaDashcam.init(map);
+                    TeslaDashcam.showUploadDialog();
                 });
                 row.appendChild(uploadBtn);
             }
@@ -225,7 +225,7 @@ class LayersDropdownControl {
         this._dropdown.classList.remove('open');
     }
 
-    _toggleLayer(layerId) {
+    async _toggleLayer(layerId) {
         Analytics.event('map_layer_change', { layer_name: layerId });
         const toggle = this._toggles[layerId];
         switch (layerId) {
@@ -276,13 +276,12 @@ class LayersDropdownControl {
                 toggle.classList.toggle('active', layers.vehiclesVisible);
                 if (layers.vehiclesVisible) {
                     if (this._map.getLayer('vehicles')) this._map.setLayoutProperty('vehicles', 'visibility', 'visible');
-                    if (window.VehicleAnimation) {
-                        VehicleAnimation.start();
-                    } else {
-                        import('/js/vehicle-animation/index.js').then(() => {
-                            if (window.VehicleAnimation) VehicleAnimation.start();
-                        });
+                    // [ARCH-10] ESM dynamic import — no window.* global
+                    if (!_VehicleAnimation) {
+                        const mod = await import('/js/vehicle-animation/index.js');
+                        _VehicleAnimation = mod.VehicleAnimation;
                     }
+                    _VehicleAnimation.start();
                     // Fly to Ataşehir where vehicles are (layer minzoom:14, maxzoom:17)
                     const zoom = this._map.getZoom();
                     const center = this._map.getCenter();
@@ -292,7 +291,7 @@ class LayersDropdownControl {
                     }
                 } else {
                     if (this._map.getLayer('vehicles')) this._map.setLayoutProperty('vehicles', 'visibility', 'none');
-                    if (window.VehicleAnimation) VehicleAnimation.stop();
+                    _VehicleAnimation?.stop();
                 }
                 break;
             case 'tesla-vehicles':
