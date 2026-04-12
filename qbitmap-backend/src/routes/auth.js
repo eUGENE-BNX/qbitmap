@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const config = require('../config');
 const db = require('../services/database');
 const { generateToken, verifyToken, verifyTokenWithVersion, extractToken, invalidateTokenCache, invalidateUserVersionCache } = require('../utils/jwt');
@@ -7,19 +8,50 @@ const logger = require('../utils/logger').child({ module: 'auth' });
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// [SEC-09] secure:true everywhere except NODE_ENV=test (where there's no
-// TLS terminator). Dev runs behind Vite's HTTPS proxy or localhost with
-// the browser's "Secure cookies on localhost" exception, so secure:true
-// works fine. Plain-HTTP dev without TLS should set NODE_ENV=test.
+// [SEC-11] SameSite: Strict blocks cookies on ALL cross-site navigations,
+// including the OAuth callback redirect from Google/Tesla. To make login
+// work, the callback no longer sets the cookie directly. Instead it stores
+// a short-lived one-time auth code server-side and redirects to the
+// frontend with ?auth_code=xxx. The frontend's auth.js init() detects the
+// code and exchanges it via a same-site POST /auth/exchange — which IS
+// allowed by Strict because both sides are *.qbitmap.com.
 function getCookieOptions() {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV !== 'test',
-    sameSite: 'lax',
+    sameSite: 'strict',
     path: '/',
     maxAge: 7 * 24 * 60 * 60, // 7 days
     ...(isProduction && { domain: '.qbitmap.com' })
   };
+}
+
+// [SEC-11] One-time auth code store. Codes expire after 60s and are
+// single-use (deleted on exchange). The map is process-local which is fine
+// for a single-process deployment; multi-process would need Redis.
+const AUTH_CODE_TTL_MS = 60_000;
+const pendingAuthCodes = new Map(); // code → { jwt, expiresAt }
+
+// Cleanup expired codes every 30s
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, entry] of pendingAuthCodes) {
+    if (now > entry.expiresAt) pendingAuthCodes.delete(code);
+  }
+}, 30_000);
+
+function createAuthCode(jwt) {
+  const code = crypto.randomBytes(32).toString('hex');
+  pendingAuthCodes.set(code, { jwt, expiresAt: Date.now() + AUTH_CODE_TTL_MS });
+  return code;
+}
+
+function consumeAuthCode(code) {
+  const entry = pendingAuthCodes.get(code);
+  if (!entry) return null;
+  pendingAuthCodes.delete(code);
+  if (Date.now() > entry.expiresAt) return null;
+  return entry.jwt;
 }
 
 async function authRoutes(fastify, options) {
@@ -91,8 +123,13 @@ async function authRoutes(fastify, options) {
 
       logger.info({ email: user.email, userId: user.id }, 'User logged in');
 
-      // Set HttpOnly cookie and redirect to frontend
-      reply.setCookie('qbitmap_token', jwtToken, getCookieOptions()).redirect(config.frontend.url);
+      // [SEC-11] Don't set the cookie here — this response arrives via a
+      // cross-site redirect from Google and SameSite=Strict would prevent
+      // the browser from sending it on the subsequent same-site navigation.
+      // Instead, park the JWT behind a one-time code and let the frontend
+      // exchange it via a same-site POST.
+      const authCode = createAuthCode(jwtToken);
+      reply.redirect(`${config.frontend.url}?auth_code=${authCode}`);
 
     } catch (error) {
       logger.error({ err: error }, 'Google callback error');
@@ -158,6 +195,28 @@ async function authRoutes(fastify, options) {
     // and prompts re-login instead of hanging on to a dead session.
     const decoded = await verifyTokenWithVersion(token);
     return { valid: !!decoded };
+  });
+
+  // [SEC-11] Exchange a one-time auth code for an HttpOnly session cookie.
+  // Called by the frontend after an OAuth redirect lands with ?auth_code=xxx.
+  // This is a same-site POST, so SameSite=Strict allows the Set-Cookie.
+  fastify.post('/auth/exchange', {
+    config: {
+      rateLimit: { max: 10, timeWindow: '1 minute' }
+    }
+  }, async (request, reply) => {
+    const { code } = request.body || {};
+    if (!code || typeof code !== 'string') {
+      return reply.code(400).send({ error: 'Missing auth code' });
+    }
+
+    const jwt = consumeAuthCode(code);
+    if (!jwt) {
+      return reply.code(401).send({ error: 'Invalid or expired auth code' });
+    }
+
+    reply.setCookie('qbitmap_token', jwt, getCookieOptions());
+    return { success: true };
   });
 
   // [REMOVED] /auth/ws-token endpoint - Security risk (exposed token to JS)

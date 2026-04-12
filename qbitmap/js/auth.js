@@ -27,7 +27,17 @@ const AuthSystem = {
       return;
     }
 
-    // Clean URL if redirected from OAuth (token is now in cookie)
+    // [SEC-11] OAuth callback now redirects with ?auth_code=xxx instead of
+    // setting a cookie directly (SameSite=Strict blocks cross-site cookie
+    // setting). Exchange the one-time code for a session cookie via a
+    // same-site POST, then proceed normally.
+    const authCode = urlParams.get('auth_code');
+    if (authCode) {
+      this._exchangeAuthCode(authCode);
+      return;
+    }
+
+    // Clean URL if redirected from OAuth
     // Preserve deep link params like ?vmsg=
     if (window.location.search) {
       const keep = new URLSearchParams();
@@ -41,6 +51,42 @@ const AuthSystem = {
 
     // Check if logged in via cookie by calling /auth/me
     this.verifyAndLoadUser();
+  },
+
+  /**
+   * [SEC-11] Exchange a one-time auth code for a session cookie.
+   * Called when the page loads with ?auth_code=xxx after OAuth redirect.
+   */
+  async _exchangeAuthCode(code) {
+    // Clean the code from the URL immediately so it can't be reused/leaked
+    const keep = new URLSearchParams();
+    const current = new URLSearchParams(window.location.search);
+    for (const key of ['vmsg']) {
+      if (current.has(key)) keep.set(key, current.get(key));
+    }
+    const qs = keep.toString();
+    window.history.replaceState({}, document.title, window.location.pathname + (qs ? '?' + qs : ''));
+
+    try {
+      const response = await fetch(`${this.apiBase}/auth/exchange`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+
+      if (!response.ok) {
+        Logger.error('[Auth] Code exchange failed:', response.status);
+        this.showNotification('Giriş başarısız oldu', 'error');
+        return;
+      }
+
+      // Cookie is now set — proceed with normal auth flow
+      this.verifyAndLoadUser();
+    } catch (e) {
+      Logger.error('[Auth] Code exchange error:', e);
+      this.showNotification('Giriş başarısız oldu', 'error');
+    }
   },
 
   /**
