@@ -12,7 +12,7 @@ const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'photo-ai-queue' });
 const { getVllmUrl, getVllmApiKey, getModelName } = require('../utils/ai-config');
 const { resolveLanguageForCoords } = require('../utils/geo-language');
-const circuitBreaker = require('./ai-circuit-breaker');
+const circuitBreaker = require('./ai-circuit-breaker').photo;
 
 const FFMPEG_PATH = '/usr/bin/ffmpeg';
 const UPLOADS_DIR = path.resolve(__dirname, '../../uploads/video-messages');

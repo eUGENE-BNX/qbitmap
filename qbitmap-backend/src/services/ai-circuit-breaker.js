@@ -18,7 +18,8 @@ const logger = require('../utils/logger').child({ module: 'ai-circuit-breaker' }
 const STATE = { CLOSED: 'closed', OPEN: 'open', HALF_OPEN: 'half_open' };
 
 class AiCircuitBreaker {
-  constructor() {
+  constructor(name = 'default') {
+    this.name = name;
     this.state = STATE.CLOSED;
     this.failureCount = 0;
     this.failureThreshold = 5;       // Open after 5 consecutive failures
@@ -36,7 +37,7 @@ class AiCircuitBreaker {
       // Check if cooldown has passed
       if (Date.now() - this.openedAt >= this.cooldownMs) {
         this.state = STATE.HALF_OPEN;
-        logger.info({ cooldownMs: this.cooldownMs }, 'Circuit breaker → HALF_OPEN (probing)');
+        logger.info({ name: this.name, cooldownMs: this.cooldownMs }, 'Circuit breaker → HALF_OPEN (probing)');
         return true;
       }
       return false;
@@ -48,7 +49,7 @@ class AiCircuitBreaker {
 
   onSuccess() {
     if (this.state !== STATE.CLOSED) {
-      logger.info('Circuit breaker → CLOSED (service recovered)');
+      logger.info({ name: this.name }, 'Circuit breaker → CLOSED (service recovered)');
     }
     this.state = STATE.CLOSED;
     this.failureCount = 0;
@@ -65,14 +66,14 @@ class AiCircuitBreaker {
       this.cooldownMs = Math.min(this.cooldownMs * 2, this.maxCooldownMs);
       this.state = STATE.OPEN;
       this.openedAt = Date.now();
-      logger.warn({ cooldownMs: this.cooldownMs, error }, 'Circuit breaker → OPEN (probe failed, backoff increased)');
+      logger.warn({ name: this.name, cooldownMs: this.cooldownMs, error }, 'Circuit breaker → OPEN (probe failed, backoff increased)');
       return;
     }
 
     if (this.failureCount >= this.failureThreshold) {
       this.state = STATE.OPEN;
       this.openedAt = Date.now();
-      logger.warn({ failures: this.failureCount, cooldownMs: this.cooldownMs, error }, 'Circuit breaker → OPEN (threshold reached)');
+      logger.warn({ name: this.name, failures: this.failureCount, cooldownMs: this.cooldownMs, error }, 'Circuit breaker → OPEN (threshold reached)');
     }
   }
 
@@ -87,5 +88,12 @@ class AiCircuitBreaker {
   }
 }
 
-// Singleton — shared across both photo and video queues
-module.exports = new AiCircuitBreaker();
+// [PERF-13] Per-queue instances so video failures don't block photo analysis
+// and vice versa. If vLLM is truly down, each queue independently reaches
+// its own failure threshold and opens its own circuit.
+module.exports = {
+  photo: new AiCircuitBreaker('photo'),
+  video: new AiCircuitBreaker('video'),
+  translate: new AiCircuitBreaker('translate'),
+  AiCircuitBreaker
+};

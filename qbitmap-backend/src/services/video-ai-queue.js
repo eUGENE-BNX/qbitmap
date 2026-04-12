@@ -8,7 +8,7 @@ const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'video-ai-queue' });
 const { getVllmUrl, getVllmApiKey, getModelName, getBackendUrl } = require('../utils/ai-config');
 const { resolveLanguageForCoords } = require('../utils/geo-language');
-const circuitBreaker = require('./ai-circuit-breaker');
+const circuitBreaker = require('./ai-circuit-breaker').video;
 
 const TIMEOUT = 180000; // 180s for video analysis
 const MAX_CONCURRENCY = 2;

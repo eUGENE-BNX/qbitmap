@@ -7,7 +7,7 @@
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const { getVllmUrl, getVllmApiKey, getModelName } = require('../utils/ai-config');
 const { languageDisplayName } = require('../utils/geo-language');
-const circuitBreaker = require('./ai-circuit-breaker');
+const circuitBreaker = require('./ai-circuit-breaker').translate;
 const logger = require('../utils/logger').child({ module: 'ai-translate' });
 
 const TIMEOUT = 30000;
