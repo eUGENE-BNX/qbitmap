@@ -16,6 +16,10 @@ EXCLUDES=(
   --exclude='3d'
   --exclude='model'
   --exclude='videos'
+  # [ARCH-05] Source maps expose the original source to anyone who can
+  # guess the URL. Vite's sourcemap:'hidden' omits the //# sourceMappingURL
+  # comment from the JS bundles, but the .map files were still deployed.
+  --exclude='*.js.map'
 )
 
 echo "=== QBitmap Frontend Deploy ==="
