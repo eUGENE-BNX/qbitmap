@@ -11,10 +11,10 @@ class SettingsCache {
     this.cache = new Map();
     this.TTL = 5 * 60 * 1000; // 5 minutes
 
-    // Periodic cleanup of expired entries to prevent memory leak
-    setInterval(() => {
+    // [PERF-18] Store interval ID so shutdown() can clear it.
+    this._cleanupInterval = setInterval(() => {
       this.cleanupExpired();
-    }, 5 * 60 * 1000); // Clean every 5 minutes
+    }, 5 * 60 * 1000);
   }
 
   /**
@@ -90,6 +90,18 @@ class SettingsCache {
       size: this.cache.size,
       ttl: this.TTL
     };
+  }
+
+  /**
+   * [PERF-18] Stop the cleanup interval. Call on process shutdown or
+   * test teardown to prevent the timer from keeping the process alive.
+   */
+  shutdown() {
+    if (this._cleanupInterval) {
+      clearInterval(this._cleanupInterval);
+      this._cleanupInterval = null;
+    }
+    this.cache.clear();
   }
 }
 

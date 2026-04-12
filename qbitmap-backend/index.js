@@ -10,6 +10,8 @@ const frameCache = require('./src/services/frame-cache');
 const cleanupService = require('./src/services/cleanup');
 const teslacamSync = require('./src/services/teslacam-sync');
 const voiceCallService = require('./src/services/voice-call');
+const settingsCache = require('./src/services/settings-cache');
+const db = require('./src/services/database');
 const logger = require('./src/utils/logger').child({ module: 'main' });
 
 let fastify;
@@ -76,6 +78,12 @@ async function shutdown(signal) {
   cleanupTokenCache();
   frameCache.shutdown();
   streamCache.shutdown();
+  // [PERF-18] Clear interval-based caches that would leak on hot reload
+  settingsCache.shutdown();
+  if (db.accessCacheCleanupInterval) {
+    clearInterval(db.accessCacheCleanupInterval);
+    db.accessCacheCleanupInterval = null;
+  }
 
   // Close WebSocket connections
   wsService.shutdown();
