@@ -37,11 +37,40 @@ class DatabaseService {
 
   async _initialize() {
     await this._runMigrations();
+    await this._migrateEncryptionKey();
     await this.seedUserPlans();
     await this.seedOnvifTemplates();
     await this.seedSystemSettings();
     await this.setAdminUser();
     logger.info('Database initialized successfully');
+  }
+
+  // [SEC-12] One-time re-encryption of Tesla tokens from SHA-256 key
+  // derivation to raw base64-decoded key. Idempotent — tokens already
+  // encrypted with the new key are silently skipped.
+  async _migrateEncryptionKey() {
+    try {
+      // Check if tesla_accounts table exists
+      const [tables] = await this.pool.execute(
+        "SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'tesla_tokens' LIMIT 1"
+      );
+      if (tables.length === 0) return; // No Tesla integration yet
+
+      const { reEncryptAllTokens } = require('../../utils/encryption');
+      const result = await reEncryptAllTokens(this.pool);
+
+      if (result.migrated > 0) {
+        logger.info({ migrated: result.migrated, skipped: result.skipped, errors: result.errors }, 'Tesla tokens re-encrypted (SEC-12)');
+      }
+    } catch (e) {
+      // Non-fatal: if the encryption key isn't set (no Tesla configured),
+      // or the table doesn't have the expected columns, just log and move on.
+      if (e.message?.includes('TESLA_ENCRYPTION_KEY')) {
+        logger.info('Tesla encryption key not configured, skipping token migration');
+      } else {
+        logger.warn({ err: e.message }, 'Tesla token migration skipped (non-fatal)');
+      }
+    }
   }
 
   // [ARCH-06] Lightweight migration runner.
