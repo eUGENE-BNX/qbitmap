@@ -112,31 +112,10 @@ module.exports = async function(fastify) {
     return await db.getUserDetail(parseInt(userId));
   });
 
-  /**
-   * DELETE /api/admin/users/:userId
-   * Delete a user (soft delete by deactivating)
-   */
-  fastify.delete('/users/:userId', async (request, reply) => {
-    const { userId } = request.params;
-
-    // Don't allow deleting self
-    if (parseInt(userId) === request.user.userId) {
-      return reply.code(400).send({ error: 'Cannot delete your own account' });
-    }
-
-    const user = await db.getUserById(parseInt(userId));
-    if (!user) {
-      return reply.code(404).send({ error: 'User not found' });
-    }
-
-    // Soft delete by deactivating
-    await db.setUserActive(parseInt(userId), false);
-    // [SEC-01] token_version was bumped inside setUserActive(false); drop
-    // the local version cache so this worker revokes immediately.
-    invalidateUserVersionCache(parseInt(userId));
-
-    return { success: true, message: 'User deactivated' };
-  });
+  // [ARCH-15] DELETE /api/admin/users/:userId removed — it was a misleading
+  // REST endpoint that didn't actually delete, just called setUserActive(false).
+  // PUT /api/admin/users/:userId with { is_active: false } does the same thing
+  // with correct HTTP semantics. No frontend caller existed.
 
   // ==================== USER OVERRIDES ====================
 
