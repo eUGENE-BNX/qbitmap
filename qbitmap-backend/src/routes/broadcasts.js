@@ -120,8 +120,8 @@ async function processBroadcastRecording(broadcast, activeRec, userId) {
       if (oldest) {
         const oldFile = path.join(__dirname, '../../uploads', oldest.file_path);
         const oldThumb = oldest.thumbnail_path ? path.join(__dirname, '../../uploads', oldest.thumbnail_path) : null;
-        try { fs.unlinkSync(oldFile); } catch (e) {}
-        if (oldThumb) try { fs.unlinkSync(oldThumb); } catch (e) {}
+        try { fs.unlinkSync(oldFile); } catch (e) { logger.warn({ err: e.message, path: oldFile }, 'Failed to delete old recording file'); }
+        if (oldThumb) try { fs.unlinkSync(oldThumb); } catch (e) { logger.warn({ err: e.message, path: oldThumb }, 'Failed to delete old thumbnail'); }
         await db.deleteBroadcastRecording(oldest.recording_id, userId);
         logger.info({ userId, deletedRecordingId: oldest.recording_id }, 'Deleted oldest recording (quota exceeded)');
       }
@@ -137,8 +137,8 @@ async function processBroadcastRecording(broadcast, activeRec, userId) {
   } catch (err) {
     logger.error({ err, broadcastId, recordingId }, 'Failed to process broadcast recording');
     // Cleanup partial file
-    try { fs.unlinkSync(videoFile); } catch (e) {}
-    try { fs.unlinkSync(thumbFile); } catch (e) {}
+    try { fs.unlinkSync(videoFile); } catch (e) { logger.warn({ err: e.message, path: videoFile }, 'Failed to cleanup partial video'); }
+    try { fs.unlinkSync(thumbFile); } catch (e) { logger.warn({ err: e.message, path: thumbFile }, 'Failed to cleanup partial thumbnail'); }
   }
 }
 
@@ -185,7 +185,7 @@ async function broadcastRoutes(fastify, options) {
 
       if (isStale) {
         // Auto-cleanup the stale broadcast so user can start fresh
-        try { await mediamtx.removePath(existing.mediamtx_path); } catch (e) {}
+        try { await mediamtx.removePath(existing.mediamtx_path); } catch (e) { logger.warn({ err: e.message, path: existing.mediamtx_path }, 'Failed to remove stale MediaMTX path — may become orphan'); }
         await db.endLiveBroadcast(existing.broadcast_id, userId);
         wsService.broadcast({
           type: 'broadcast_ended',

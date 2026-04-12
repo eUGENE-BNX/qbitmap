@@ -206,7 +206,7 @@ async function videoMessageRoutes(fastify, options) {
           generatePhotoThumbnail(filePath, previewFilePath, { width: PREVIEW_WIDTH, quality: PREVIEW_QUALITY })
         ]).then(async ([thumbOk]) => {
           if (thumbOk) {
-            try { await db.updateVideoMessageThumbnail(messageId, thumbRelPath); } catch {}
+            try { await db.updateVideoMessageThumbnail(messageId, thumbRelPath); } catch (e) { logger.warn({ err: e.message, messageId }, 'Failed to save thumbnail path to DB'); }
           }
         }).catch(() => {});
       } else {
@@ -217,7 +217,7 @@ async function videoMessageRoutes(fastify, options) {
           generateThumbnail(filePath, previewFilePath, { width: PREVIEW_WIDTH, quality: PREVIEW_QUALITY, durationMs: vidDurationMs })
         ]).then(async ([thumbOk]) => {
           if (thumbOk) {
-            try { await db.updateVideoMessageThumbnail(messageId, thumbRelPath); } catch {}
+            try { await db.updateVideoMessageThumbnail(messageId, thumbRelPath); } catch (e) { logger.warn({ err: e.message, messageId }, 'Failed to save thumbnail path to DB'); }
           }
         }).catch(() => {});
       }

@@ -143,7 +143,9 @@ class CleanupService {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ record: false })
           });
-        } catch (e) {}
+        } catch (e) {
+          logger.warn({ err: e.message, path: broadcast.mediamtx_path }, 'Failed to disable recording on MediaMTX path');
+        }
       }
     } catch (e) {
       // No active recording or already stopped
