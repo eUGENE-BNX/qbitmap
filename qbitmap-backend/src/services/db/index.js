@@ -1,6 +1,11 @@
 const pool = require('../db-pool');
 const settingsCache = require('../settings-cache');
 const logger = require('../../utils/logger').child({ module: 'db' });
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+const MIGRATIONS_DIR = path.resolve(__dirname, '../../../migrations');
 
 // [PERF] Access cache configuration
 const ACCESS_CACHE_TTL = 60000; // 1 minute cache
@@ -31,11 +36,92 @@ class DatabaseService {
   }
 
   async _initialize() {
+    await this._runMigrations();
     await this.seedUserPlans();
     await this.seedOnvifTemplates();
     await this.seedSystemSettings();
     await this.setAdminUser();
     logger.info('Database initialized successfully');
+  }
+
+  // [ARCH-06] Lightweight migration runner.
+  //
+  // Reads .sql files from migrations/ sorted by filename (date-prefixed),
+  // tracks applied migrations in a `schema_migrations` table, and applies
+  // any that haven't been recorded yet. Each file is split on semicolons
+  // and each statement is executed individually.
+  //
+  // Error handling:
+  //   - MySQL 1060 (duplicate column) and 1061 (duplicate key/index) are
+  //     treated as "already applied" — the migration is recorded and the
+  //     runner moves on. This handles the common case where a migration
+  //     was applied manually before the runner existed.
+  //   - Any other error aborts the boot. Partial schema is worse than
+  //     refusing to start.
+  //
+  // Checksums are recorded for audit but not enforced — modifying a
+  // migration file after it's been applied doesn't trigger a re-run.
+  async _runMigrations() {
+    // Ensure tracking table exists
+    await this.pool.execute(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        name VARCHAR(255) PRIMARY KEY,
+        applied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        checksum VARCHAR(64)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    // Read migration files
+    if (!fs.existsSync(MIGRATIONS_DIR)) return;
+    const files = fs.readdirSync(MIGRATIONS_DIR)
+      .filter(f => f.endsWith('.sql'))
+      .sort();
+    if (files.length === 0) return;
+
+    // Which migrations are already applied?
+    const [applied] = await this.pool.execute('SELECT name FROM schema_migrations');
+    const appliedSet = new Set(applied.map(r => r.name));
+
+    for (const file of files) {
+      if (appliedSet.has(file)) continue;
+
+      const filePath = path.join(MIGRATIONS_DIR, file);
+      const sql = fs.readFileSync(filePath, 'utf8');
+      const checksum = crypto.createHash('sha256').update(sql).digest('hex').slice(0, 16);
+
+      // Split on semicolons, strip comment lines within each chunk, drop empties.
+      // A chunk like "-- comment\nALTER TABLE..." must keep the ALTER after
+      // stripping the comment lines — the original filter dropped the whole
+      // chunk if it started with '--'.
+      const statements = sql
+        .split(';')
+        .map(s => s.split('\n').filter(l => !l.trim().startsWith('--')).join('\n').trim())
+        .filter(s => s.length > 0);
+
+      try {
+        for (const stmt of statements) {
+          await this.pool.execute(stmt);
+        }
+        await this.pool.execute(
+          'INSERT INTO schema_migrations (name, checksum) VALUES (?, ?)',
+          [file, checksum]
+        );
+        logger.info({ migration: file }, 'Migration applied successfully');
+      } catch (err) {
+        // 1060 = Duplicate column name, 1061 = Duplicate key name
+        // These mean the DDL was already applied manually — safe to skip.
+        if (err.errno === 1060 || err.errno === 1061) {
+          await this.pool.execute(
+            'INSERT IGNORE INTO schema_migrations (name, checksum) VALUES (?, ?)',
+            [file, checksum]
+          );
+          logger.info({ migration: file, errno: err.errno }, 'Migration already applied (schema matches), recorded');
+        } else {
+          logger.error({ migration: file, err: err.message, errno: err.errno }, 'Migration failed — aborting startup');
+          throw err;
+        }
+      }
+    }
   }
 
   // System settings
