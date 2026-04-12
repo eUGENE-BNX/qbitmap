@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS cameras (
   INDEX idx_cameras_user_public (user_id, is_public),
   INDEX idx_cameras_user_type (user_id, camera_type),
   INDEX idx_cameras_last_seen (last_seen),
+  INDEX idx_cameras_public_geo (is_public, camera_type, lng, lat),
   CONSTRAINT fk_cameras_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

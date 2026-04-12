@@ -132,6 +132,13 @@ async function buildServer() {
       });
     }
 
+    // [PERF-17] DB pool queue overflow → 503 instead of 500
+    if (error.code === 'POOL_ENQUEUELIMIT') {
+      return reply.code(503).send({
+        error: { code: 'SERVICE_UNAVAILABLE', message: 'Server busy, try again shortly' }
+      });
+    }
+
     const statusCode = error.statusCode || 500;
     if (statusCode >= 500) {
       request.log.error({ err: error }, 'Unhandled route error');

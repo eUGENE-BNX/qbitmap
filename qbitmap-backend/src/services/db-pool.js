@@ -8,7 +8,11 @@ const pool = mysql.createPool({
   port: parseInt(process.env.DB_PORT || '3306'),
   connectionLimit: 50,
   waitForConnections: true,
-  queueLimit: 0,
+  // [PERF-17] Bound the wait queue so a burst can't pile up unbounded
+  // pending queries in memory (the old queueLimit:0 meant infinite).
+  // When the queue is full, mysql2 throws POOL_ENQUEUELIMIT which the
+  // global error handler maps to 503 via the status code on the error.
+  queueLimit: 200,
   maxIdle: 10,
   idleTimeout: 60000,
   enableKeepAlive: true,
