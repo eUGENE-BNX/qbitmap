@@ -1,6 +1,7 @@
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'voice-call' });
 const db = require('./database');
+const { services } = require('../config');
 
 /**
  * Voice Call Service - Matrix integration for ONVIF events
@@ -26,7 +27,7 @@ class VoiceCallService {
   // ==================== SETTINGS GETTERS (from database) ====================
 
   async getBaseUrl() {
-    return (await db.getSystemSetting('voice_api_url')) || 'http://91.98.131.74:8000';
+    return (await db.getSystemSetting('voice_api_url')) || services.voiceApiUrl;
   }
 
   async getRoomId() {

@@ -18,6 +18,7 @@
  */
 
 const db = require('../services/database');
+const { services } = require('../config');
 
 const CACHE_TTL_MS = 60_000;
 
@@ -26,10 +27,8 @@ let _cachedAt = 0;
 let _inflight = null;
 
 function buildConfig({ serviceUrl, apiKey, model, backendUrl }) {
-  // Mirror the original env-fallback + default logic from the pre-cache
-  // per-function implementations so callers see identical values.
-  const envServiceUrl = process.env.AI_SERVICE_URL || 'http://212.253.82.220:8000';
-  const baseUrl = serviceUrl || envServiceUrl;
+  // [ARCH-09] AI service URL from config.js (was hardcoded IP fallback).
+  const baseUrl = serviceUrl || services.aiServiceUrl;
   return {
     vllmUrl: `${baseUrl.replace(/\/$/, '')}/v1/chat/completions`,
     apiKey: apiKey || process.env.AI_SERVICE_API_KEY || '',

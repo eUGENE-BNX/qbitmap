@@ -1,6 +1,7 @@
 const pool = require('../db-pool');
 const settingsCache = require('../settings-cache');
 const logger = require('../../utils/logger').child({ module: 'db' });
+const { services } = require('../../config');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -179,7 +180,7 @@ class DatabaseService {
     const [rows] = await this.pool.execute('SELECT COUNT(*) as count FROM system_settings');
     if (rows[0].count === 0) {
       const defaults = [
-        ['ai_service_url', 'http://92.44.163.139:8001'],
+        ['ai_service_url', services.aiServiceUrl],
         ['ai_vision_model', 'Qwen/Qwen3-VL-8B-Instruct-FP8'],
         ['ai_max_tokens', '1024'],
         ['ai_temperature', '0.7']

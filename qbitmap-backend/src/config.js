@@ -79,6 +79,8 @@ module.exports = {
     // Hard-required in production, dev gets a loud-warning fallback.
     const mtxHost = requireEnvWithDevFallback('MEDIAMTX_HOST', '91.98.90.57');
     const qHost = requireEnvWithDevFallback('QBITMAP_HOST', '91.99.219.248');
+    const voiceHost = requireEnvWithDevFallback('VOICE_HOST', '91.98.131.74');
+    const aiServiceUrl = requireEnvWithDevFallback('AI_SERVICE_URL', 'http://92.44.163.139:8001');
     const allowedWhep = requireEnvWithDevFallback('ALLOWED_WHEP_HOSTS', mtxHost);
     const webhookIps = requireEnvWithDevFallback('ONVIF_WEBHOOK_IPS', `${mtxHost},127.0.0.1,::1`);
     return {
@@ -94,6 +96,11 @@ module.exports = {
       qbitmapHost: qHost,
       allowedWhepHosts: allowedWhep.split(',').map(s => s.trim()),
       webhookAllowedIps: webhookIps.split(',').map(s => s.trim()),
+      // [ARCH-09] Voice + AI service URLs — previously hardcoded in
+      // voice-call.js, health-checker.js, ai-config.js, db/index.js.
+      voiceHost,
+      voiceApiUrl: process.env.ENTANGLE_API_URL || `http://${voiceHost}:8000`,
+      aiServiceUrl,
     };
   })()
 };

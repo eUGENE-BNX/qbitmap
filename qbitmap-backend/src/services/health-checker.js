@@ -10,13 +10,14 @@ const { services } = require('../config');
 
 const QBITMAP_HOST = services.qbitmapHost;
 const MEDIAMTX_HOST = services.mediamtxHost;
-const VOICE_HOST = process.env.VOICE_HOST || '91.98.131.74';
+// [ARCH-09] Voice host + URL now from config.js (was hardcoded IP).
+const VOICE_HOST = services.voiceHost;
+const VOICE_API_URL = services.voiceApiUrl;
 
 const ONVIF_SERVICE_URL = services.onvifServiceUrl;
 const CAPTURE_SERVICE_URL = services.captureServiceUrl;
 const MEDIAMTX_WHEP_BASE = services.mediamtxWhepBase;
 const MEDIAMTX_API = services.mediamtxApi;
-const VOICE_API_URL = process.env.ENTANGLE_API_URL || `http://${VOICE_HOST}:8000`;
 
 // Service configurations
 const SERVICES = [
