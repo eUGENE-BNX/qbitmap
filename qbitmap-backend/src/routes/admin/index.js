@@ -1,0 +1,42 @@
+/**
+ * Admin API Routes
+ * All routes require admin role
+ */
+
+const db = require('../../services/database');
+const { authHook } = require('../../utils/jwt');
+
+async function adminRoutes(fastify, options) {
+  // First apply auth hook to all routes
+  fastify.addHook('preHandler', authHook);
+
+  // [ARCH-02] Admin role check — pure in-memory from JWT claim.
+  // Old JWTs issued before the role claim was added won't have
+  // request.user.role; for those we fall back to a one-time DB lookup
+  // so existing admin sessions aren't locked out. The fallback is
+  // self-expiring: once all pre-deploy tokens rotate (≤7 days) the DB
+  // branch never fires again.
+  fastify.addHook('preHandler', async (request, reply) => {
+    if (!request.user?.userId) {
+      return reply.code(401).send({ error: 'Authentication required' });
+    }
+
+    let role = request.user.role;
+    if (role === undefined) {
+      // Transitional: JWT without role claim (issued before ARCH-02)
+      const user = await db.getUserById(request.user.userId);
+      role = user?.role;
+    }
+    if (role !== 'admin') {
+      return reply.code(403).send({ error: 'Admin access required' });
+    }
+  });
+
+  // [ARCH-07] Register route groups
+  await require('./users')(fastify);
+  await require('./cameras')(fastify);
+  await require('./settings')(fastify);
+  await require('./content')(fastify);
+}
+
+module.exports = adminRoutes;
