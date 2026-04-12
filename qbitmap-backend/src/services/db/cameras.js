@@ -422,7 +422,7 @@ DatabaseService.prototype.deleteCamera = async function(cameraId, userId) {
     await conn.execute('DELETE FROM face_detection_log WHERE camera_id = ?', [cameraId]);
     await conn.execute('DELETE FROM camera_faces WHERE camera_id = ?', [cameraId]);
     await conn.execute('DELETE FROM ai_monitoring WHERE camera_id = ?', [cameraId]);
-    await conn.execute('DELETE FROM frames WHERE camera_id = ?', [cameraId]);
+
     await conn.execute('DELETE FROM alarms WHERE camera_id = ?', [cameraId]);
     await conn.execute('DELETE FROM camera_settings WHERE camera_id = ?', [cameraId]);
     await conn.execute('DELETE FROM camera_shares WHERE camera_id = ?', [cameraId]);
@@ -473,7 +473,7 @@ DatabaseService.prototype.adminDeleteCamera = async function(cameraId) {
     await conn.execute('DELETE FROM face_detection_log WHERE camera_id = ?', [cameraId]);
     await conn.execute('DELETE FROM camera_faces WHERE camera_id = ?', [cameraId]);
     await conn.execute('DELETE FROM ai_monitoring WHERE camera_id = ?', [cameraId]);
-    await conn.execute('DELETE FROM frames WHERE camera_id = ?', [cameraId]);
+
     await conn.execute('DELETE FROM alarms WHERE camera_id = ?', [cameraId]);
     await conn.execute('DELETE FROM camera_settings WHERE camera_id = ?', [cameraId]);
     await conn.execute('DELETE FROM camera_shares WHERE camera_id = ?', [cameraId]);

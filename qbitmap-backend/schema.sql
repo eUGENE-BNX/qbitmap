@@ -131,18 +131,8 @@ CREATE TABLE IF NOT EXISTS camera_settings (
   CONSTRAINT fk_settings_camera FOREIGN KEY (camera_id) REFERENCES cameras(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- =================================================================
--- 6. frames (deprecated - memory cache only, kept for schema compat)
--- =================================================================
-CREATE TABLE IF NOT EXISTS frames (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  camera_id INT UNSIGNED NOT NULL,
-  jpeg_data LONGBLOB NOT NULL,
-  file_size INT,
-  captured_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_frames_camera_time (camera_id, captured_at DESC),
-  CONSTRAINT fk_frames_camera FOREIGN KEY (camera_id) REFERENCES cameras(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- 6. frames — DROPPED (ARCH-18). Was deprecated (memory cache only).
+-- See migrations/2026-04-12_drop_frames.sql.
 
 -- =================================================================
 -- 7. user_usage
