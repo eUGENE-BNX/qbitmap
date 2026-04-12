@@ -253,6 +253,12 @@ DatabaseService.prototype.deleteComment = async function(commentId, userId) {
   return comment;
 };
 
+// [ARCH-04] Admin variant — no ownership check. Used by admin report
+// resolution to delete reported comments regardless of author.
+DatabaseService.prototype.deleteCommentAdmin = async function(commentId) {
+  await this.pool.execute('DELETE FROM comments WHERE id = ?', [commentId]);
+};
+
 DatabaseService.prototype.getPlacesCacheCell = async function(cellLat, cellLng, radius) {
   const [rows] = await this.pool.execute(
     'SELECT id, queried_at FROM places_cache_cells WHERE cell_lat = ? AND cell_lng = ? AND radius_m = ?',

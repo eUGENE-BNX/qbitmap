@@ -39,6 +39,25 @@ DatabaseService.prototype.getUserByEmail = async function(email) {
   return rows[0];
 };
 
+// [ARCH-04] Moved from inline db.pool.execute in routes/video-messages.js.
+// Returns only the id — the caller just needs to resolve recipient for a
+// private message and shouldn't receive the full user row.
+DatabaseService.prototype.getActiveUserIdByEmail = async function(email) {
+  const [rows] = await this.pool.execute(
+    'SELECT id FROM users WHERE email = ? AND is_active = 1',
+    [email]
+  );
+  return rows[0]?.id ?? null;
+};
+
+// [ARCH-04] H3 sync: lightweight profile list for bulk push
+DatabaseService.prototype.getAllUserProfiles = async function() {
+  const [rows] = await this.pool.execute(
+    'SELECT id, display_name, avatar_url FROM users'
+  );
+  return rows;
+};
+
 DatabaseService.prototype.getUserByDisplayName = async function(displayName) {
   const [rows] = await this.pool.execute('SELECT * FROM users WHERE display_name = ?', [displayName]);
   return rows[0];

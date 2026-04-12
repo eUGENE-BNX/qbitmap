@@ -610,7 +610,7 @@ async function adminRoutes(fastify, options) {
       }
 
       // Update source URL in database
-      await db.pool.execute('UPDATE cameras SET rtsp_source_url = ? WHERE id = ?', [hls_url, cameraId]);
+      await db.updateCameraRtspSourceUrl(cameraId, hls_url);
     }
 
     // Build update query for cameras table
@@ -964,7 +964,7 @@ async function adminRoutes(fastify, options) {
           }
         }
       } else if (entity_type === 'comment') {
-        await db.pool.execute('DELETE FROM comments WHERE id = ?', [entity_id]);
+        await db.deleteCommentAdmin(entity_id);
       }
       // camera and broadcast reports: admin reviews but content stays (cameras are infrastructure)
       // Admin can manually remove cameras from their respective tabs
@@ -998,7 +998,7 @@ async function adminRoutes(fastify, options) {
     const results = { users: 0, cameras: 0, messages: 0, errors: [] };
 
     // 1. Sync all user profiles
-    const [users] = await db.pool.execute('SELECT id, display_name, avatar_url FROM users');
+    const users = await db.getAllUserProfiles();
     const userProfiles = users.map(u => ({ id: u.id, displayName: u.display_name, avatarUrl: u.avatar_url }));
     try {
       const res = await fetch(`${H3_SERVICE_URL}/api/v1/sync/user-profiles`, {
@@ -1013,18 +1013,14 @@ async function adminRoutes(fastify, options) {
     }
 
     // 2. Sync all cameras (excluding CITY_)
-    const [cameras] = await db.pool.execute(
-      "SELECT device_id, user_id, lat, lng FROM cameras WHERE lat IS NOT NULL AND lng IS NOT NULL AND user_id IS NOT NULL AND device_id NOT LIKE 'CITY_%'"
-    );
+    const cameras = await db.getCamerasForH3Sync();
     const cameraItems = cameras.map(c => ({
       itemType: 'camera', itemId: c.device_id, userId: c.user_id,
       lat: c.lat, lng: c.lng, points: 50
     }));
 
     // 3. Sync all video/photo messages
-    const [messages] = await db.pool.execute(
-      'SELECT message_id, sender_id, lat, lng, media_type FROM video_messages WHERE lat IS NOT NULL AND lng IS NOT NULL'
-    );
+    const messages = await db.getVideoMessagesForH3Sync();
     const messageItems = messages.map(m => ({
       itemType: m.media_type === 'photo' ? 'photo' : 'video',
       itemId: m.message_id, userId: m.sender_id,

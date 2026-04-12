@@ -894,9 +894,7 @@ async function publicRoutes(fastify, options) {
       return reply.code(403).send({ error: 'Forbidden' });
     }
 
-    const [rows] = await db.pool.query(
-      'SELECT id, device_id, lat, lng, name, camera_type, is_public FROM cameras WHERE lat IS NOT NULL AND lng IS NOT NULL'
-    );
+    const rows = await db.getCamerasWithGeolocation();
     return { cameras: rows };
   });
 }

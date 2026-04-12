@@ -466,11 +466,56 @@ DatabaseService.prototype.getUserWhepCameraCount = async function(userId) {
 };
 
 DatabaseService.prototype.adminDeleteCamera = async function(cameraId) {
-  await this.pool.execute('DELETE FROM cameras WHERE id = ?', [cameraId]);
+  const camera = await this.getCameraById(cameraId);
+  const conn = await this.pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.execute('DELETE FROM face_detection_log WHERE camera_id = ?', [cameraId]);
+    await conn.execute('DELETE FROM camera_faces WHERE camera_id = ?', [cameraId]);
+    await conn.execute('DELETE FROM ai_monitoring WHERE camera_id = ?', [cameraId]);
+    await conn.execute('DELETE FROM frames WHERE camera_id = ?', [cameraId]);
+    await conn.execute('DELETE FROM alarms WHERE camera_id = ?', [cameraId]);
+    await conn.execute('DELETE FROM camera_settings WHERE camera_id = ?', [cameraId]);
+    await conn.execute('DELETE FROM camera_shares WHERE camera_id = ?', [cameraId]);
+    await conn.execute('DELETE FROM camera_onvif_links WHERE qbitmap_camera_id = ?', [cameraId]);
+    await conn.execute('DELETE FROM clickable_zones WHERE camera_id = ?', [camera?.device_id]);
+    await conn.execute('DELETE FROM cameras WHERE id = ?', [cameraId]);
+    await conn.commit();
+    if (camera) {
+      notifyH3CameraRemove(camera.device_id).catch(() => {});
+      notifyH3ContentItemRemove(camera.device_id).catch(() => {});
+    }
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 };
 
 DatabaseService.prototype.adminUpdateCamera = async function(cameraId, updates, params) {
   await this.pool.execute(`UPDATE cameras SET ${updates.join(', ')} WHERE id = ?`, params);
+};
+
+// [ARCH-04] Moved from inline db.pool.execute in routes/admin.js
+DatabaseService.prototype.updateCameraRtspSourceUrl = async function(cameraId, url) {
+  await this.pool.execute('UPDATE cameras SET rtsp_source_url = ? WHERE id = ?', [url, cameraId]);
+};
+
+// [ARCH-04] Moved from inline db.pool.query in routes/public.js
+DatabaseService.prototype.getCamerasWithGeolocation = async function() {
+  const [rows] = await this.pool.execute(
+    'SELECT id, device_id, lat, lng, name, camera_type, is_public FROM cameras WHERE lat IS NOT NULL AND lng IS NOT NULL'
+  );
+  return rows;
+};
+
+// [ARCH-04] H3 sync: cameras with location, excluding city cameras
+DatabaseService.prototype.getCamerasForH3Sync = async function() {
+  const [rows] = await this.pool.execute(
+    "SELECT device_id, user_id, lat, lng FROM cameras WHERE lat IS NOT NULL AND lng IS NOT NULL AND user_id IS NOT NULL AND device_id NOT LIKE 'CITY_%'"
+  );
+  return rows;
 };
 
 };

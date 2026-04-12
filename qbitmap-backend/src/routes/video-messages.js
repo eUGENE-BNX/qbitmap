@@ -103,15 +103,11 @@ async function videoMessageRoutes(fastify, options) {
     // Resolve recipient if private message
     let recipientId = null;
     if (recipientEmail) {
-      const [recipients] = await db.pool.execute(
-        'SELECT id FROM users WHERE email = ? AND is_active = 1',
-        [recipientEmail]
-      );
-      if (recipients.length === 0) {
+      recipientId = await db.getActiveUserIdByEmail(recipientEmail);
+      if (!recipientId) {
         data.file.resume();
         return reply.code(404).send({ error: 'Recipient not found' });
       }
-      recipientId = recipients[0].id;
       if (recipientId === userId) {
         data.file.resume();
         return reply.code(400).send({ error: 'Cannot send a message to yourself' });

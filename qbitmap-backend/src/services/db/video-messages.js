@@ -387,4 +387,12 @@ DatabaseService.prototype.adminDeleteVideoMessage = async function(messageId) {
   return msg;
 };
 
+// [ARCH-04] H3 sync: all geolocated messages for bulk push
+DatabaseService.prototype.getVideoMessagesForH3Sync = async function() {
+  const [rows] = await this.pool.execute(
+    'SELECT message_id, sender_id, lat, lng, media_type FROM video_messages WHERE lat IS NOT NULL AND lng IS NOT NULL'
+  );
+  return rows;
+};
+
 };
