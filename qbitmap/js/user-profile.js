@@ -890,7 +890,7 @@ const UserProfileSystem = {
         method: 'PUT', credentials: 'include', body: formData
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Yüz kaydedilemedi');
+      if (!response.ok) throw new Error((result.error?.message ?? result.error) || 'Yüz kaydedilemedi');
 
       this.hasFaceRegistered = true;
       AuthSystem.showNotification('Yüzünüz başarıyla kaydedildi!', 'success');
@@ -920,7 +920,7 @@ const UserProfileSystem = {
         method: 'DELETE', credentials: 'include'
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Kayıt silinemedi');
+      if (!response.ok) throw new Error((result.error?.message ?? result.error) || 'Kayıt silinemedi');
 
       this.hasFaceRegistered = false;
       AuthSystem.showNotification('Yüz kaydı silindi', 'success');

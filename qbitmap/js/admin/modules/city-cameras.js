@@ -87,7 +87,7 @@ export const CityCamerasMixin = {
         });
       }
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Kayıt başarısız');
+      if (!res.ok) throw new Error((data.error?.message ?? data.error) || 'Kayıt başarısız');
       this.closeCityCameraModal();
       this.loadCityCameras();
     } catch (err) { alert('Hata: ' + err.message); }
@@ -98,7 +98,7 @@ export const CityCamerasMixin = {
     if (!confirm('Bu kamerayı silmek istediğinize emin misiniz?')) return;
     try {
       const res = await fetch(`${QBitmapConfig.api.admin}/cameras/city/${this.editingCityCameraId}`, { method: 'DELETE', credentials: 'include' });
-      if (!res.ok) { const data = await res.json(); throw new Error(data.error || 'Silme başarısız'); }
+      if (!res.ok) { const data = await res.json(); throw new Error((data.error?.message ?? data.error) || 'Silme başarısız'); }
       this.closeCityCameraModal();
       this.loadCityCameras();
     } catch (err) { alert('Hata: ' + err.message); }

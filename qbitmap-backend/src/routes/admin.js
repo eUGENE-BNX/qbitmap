@@ -17,13 +17,13 @@ async function adminRoutes(fastify, options) {
   fastify.addHook('preHandler', async (request, reply) => {
     // Check if user is authenticated (authHook sets request.user)
     if (!request.user?.userId) {
-      return reply.status(401).send({ error: 'Authentication required' });
+      return reply.code(401).send({ error: 'Authentication required' });
     }
 
     // Then check admin role
     const user = await db.getUserById(request.user.userId);
     if (!user || user.role !== 'admin') {
-      return reply.status(403).send({ error: 'Admin access required' });
+      return reply.code(403).send({ error: 'Admin access required' });
     }
   });
 
@@ -66,7 +66,7 @@ async function adminRoutes(fastify, options) {
     const user = await db.getUserDetail(parseInt(userId));
 
     if (!user) {
-      return reply.status(404).send({ error: 'User not found' });
+      return reply.code(404).send({ error: 'User not found' });
     }
 
     return user;
@@ -84,19 +84,19 @@ async function adminRoutes(fastify, options) {
 
     const user = await db.getUserById(parseInt(userId));
     if (!user) {
-      return reply.status(404).send({ error: 'User not found' });
+      return reply.code(404).send({ error: 'User not found' });
     }
 
     // Don't allow modifying own admin status
     if (parseInt(userId) === request.user.userId && role && role !== 'admin') {
-      return reply.status(400).send({ error: 'Cannot remove your own admin role' });
+      return reply.code(400).send({ error: 'Cannot remove your own admin role' });
     }
 
     // Update plan
     if (plan_id !== undefined) {
       const plan = await db.getPlanById(parseInt(plan_id));
       if (!plan) {
-        return reply.status(400).send({ error: 'Invalid plan ID' });
+        return reply.code(400).send({ error: 'Invalid plan ID' });
       }
       await db.updateUserPlan(parseInt(userId), parseInt(plan_id));
     }
@@ -105,11 +105,11 @@ async function adminRoutes(fastify, options) {
     if (role !== undefined) {
       const validRoles = ['user', 'admin'];
       if (!validRoles.includes(role)) {
-        return reply.status(400).send({ error: 'Invalid role. Must be: user or admin' });
+        return reply.code(400).send({ error: 'Invalid role. Must be: user or admin' });
       }
       const result = await db.updateUserRole(parseInt(userId), role);
       if (!result.success) {
-        return reply.status(400).send({ error: result.error });
+        return reply.code(400).send({ error: result.error });
       }
     }
 
@@ -141,12 +141,12 @@ async function adminRoutes(fastify, options) {
 
     // Don't allow deleting self
     if (parseInt(userId) === request.user.userId) {
-      return reply.status(400).send({ error: 'Cannot delete your own account' });
+      return reply.code(400).send({ error: 'Cannot delete your own account' });
     }
 
     const user = await db.getUserById(parseInt(userId));
     if (!user) {
-      return reply.status(404).send({ error: 'User not found' });
+      return reply.code(404).send({ error: 'User not found' });
     }
 
     // Soft delete by deactivating
@@ -172,13 +172,13 @@ async function adminRoutes(fastify, options) {
 
     const user = await db.getUserById(parseInt(userId));
     if (!user) {
-      return reply.status(404).send({ error: 'User not found' });
+      return reply.code(404).send({ error: 'User not found' });
     }
 
     const result = await db.setUserOverrides(parseInt(userId), overrides);
 
     if (!result.success) {
-      return reply.status(400).send({ error: result.error });
+      return reply.code(400).send({ error: result.error });
     }
 
     // Return updated limits
@@ -195,7 +195,7 @@ async function adminRoutes(fastify, options) {
 
     const user = await db.getUserById(parseInt(userId));
     if (!user) {
-      return reply.status(404).send({ error: 'User not found' });
+      return reply.code(404).send({ error: 'User not found' });
     }
 
     await db.clearUserOverrides(parseInt(userId));
@@ -238,7 +238,7 @@ async function adminRoutes(fastify, options) {
     const plan = await db.getPlanById(parseInt(planId));
 
     if (!plan) {
-      return reply.status(404).send({ error: 'Plan not found' });
+      return reply.code(404).send({ error: 'Plan not found' });
     }
 
     // Add user count
@@ -259,13 +259,13 @@ async function adminRoutes(fastify, options) {
     // Check if name already exists
     const existing = await db.getPlanByName(planData.name);
     if (existing) {
-      return reply.status(400).send({ error: 'Plan name already exists' });
+      return reply.code(400).send({ error: 'Plan name already exists' });
     }
 
     const result = await db.createPlan(planData);
 
     if (!result.success) {
-      return reply.status(400).send({ error: result.error });
+      return reply.code(400).send({ error: result.error });
     }
 
     const plan = await db.getPlanById(result.planId);
@@ -284,18 +284,18 @@ async function adminRoutes(fastify, options) {
 
     const plan = await db.getPlanById(parseInt(planId));
     if (!plan) {
-      return reply.status(404).send({ error: 'Plan not found' });
+      return reply.code(404).send({ error: 'Plan not found' });
     }
 
     // Don't allow changing the name of default plans
     if (planId <= 4 && planData.name && planData.name !== plan.name) {
-      return reply.status(400).send({ error: 'Cannot change name of default plans' });
+      return reply.code(400).send({ error: 'Cannot change name of default plans' });
     }
 
     const result = await db.updatePlan(parseInt(planId), planData);
 
     if (!result.success) {
-      return reply.status(400).send({ error: result.error });
+      return reply.code(400).send({ error: result.error });
     }
 
     return { success: true, plan: await db.getPlanById(parseInt(planId)) };
@@ -311,7 +311,7 @@ async function adminRoutes(fastify, options) {
     const result = await db.deletePlan(parseInt(planId));
 
     if (!result.success) {
-      return reply.status(400).send({ error: result.error });
+      return reply.code(400).send({ error: result.error });
     }
 
     return { success: true };
@@ -346,7 +346,7 @@ async function adminRoutes(fastify, options) {
     const template = await db.getOnvifTemplateById(parseInt(templateId));
 
     if (!template) {
-      return reply.status(404).send({ error: 'Template not found' });
+      return reply.code(404).send({ error: 'Template not found' });
     }
 
     return {
@@ -368,7 +368,7 @@ async function adminRoutes(fastify, options) {
     const { modelName, manufacturer, onvifPort, supportedEvents } = request.body;
 
     if (!modelName || !manufacturer) {
-      return reply.status(400).send({ error: 'modelName and manufacturer are required' });
+      return reply.code(400).send({ error: 'modelName and manufacturer are required' });
     }
 
     const result = await db.createOnvifTemplate({
@@ -379,7 +379,7 @@ async function adminRoutes(fastify, options) {
     });
 
     if (!result.success) {
-      return reply.status(400).send({ error: result.error });
+      return reply.code(400).send({ error: result.error });
     }
 
     return { success: true, template: result.template };
@@ -395,7 +395,7 @@ async function adminRoutes(fastify, options) {
 
     const template = await db.getOnvifTemplateById(parseInt(templateId));
     if (!template) {
-      return reply.status(404).send({ error: 'Template not found' });
+      return reply.code(404).send({ error: 'Template not found' });
     }
 
     const result = await db.updateOnvifTemplate(parseInt(templateId), {
@@ -406,7 +406,7 @@ async function adminRoutes(fastify, options) {
     });
 
     if (!result.success) {
-      return reply.status(400).send({ error: result.error });
+      return reply.code(400).send({ error: result.error });
     }
 
     return { success: true, template: await db.getOnvifTemplateById(parseInt(templateId)) };
@@ -421,18 +421,18 @@ async function adminRoutes(fastify, options) {
 
     // Don't allow deleting default template (id=1)
     if (parseInt(templateId) === 1) {
-      return reply.status(400).send({ error: 'Cannot delete default template' });
+      return reply.code(400).send({ error: 'Cannot delete default template' });
     }
 
     const template = await db.getOnvifTemplateById(parseInt(templateId));
     if (!template) {
-      return reply.status(404).send({ error: 'Template not found' });
+      return reply.code(404).send({ error: 'Template not found' });
     }
 
     const result = await db.deleteOnvifTemplate(parseInt(templateId));
 
     if (!result.success) {
-      return reply.status(400).send({ error: result.error });
+      return reply.code(400).send({ error: result.error });
     }
 
     return { success: true };
@@ -459,20 +459,20 @@ async function adminRoutes(fastify, options) {
 
     // Validate HLS URL
     if (!hls_url) {
-      return reply.status(400).send({ error: 'hls_url is required' });
+      return reply.code(400).send({ error: 'hls_url is required' });
     }
 
     // Basic URL validation
     try {
       const url = new URL(hls_url);
       if (!url.pathname.endsWith('.m3u8')) {
-        return reply.status(400).send({ error: 'URL must end with .m3u8' });
+        return reply.code(400).send({ error: 'URL must end with .m3u8' });
       }
       if (!['http:', 'https:'].includes(url.protocol)) {
-        return reply.status(400).send({ error: 'URL must use HTTP or HTTPS' });
+        return reply.code(400).send({ error: 'URL must use HTTP or HTTPS' });
       }
     } catch (e) {
-      return reply.status(400).send({ error: 'Invalid URL format' });
+      return reply.code(400).send({ error: 'Invalid URL format' });
     }
 
     // Generate MediaMTX path
@@ -484,7 +484,7 @@ async function adminRoutes(fastify, options) {
       const mediamtxResult = await mediamtx.addHlsPath(pathName, hls_url);
 
       if (!mediamtxResult.success) {
-        return reply.status(502).send({
+        return reply.code(502).send({
           error: 'Failed to add HLS source to streaming server',
           details: mediamtxResult.error
         });
@@ -504,7 +504,7 @@ async function adminRoutes(fastify, options) {
       if (!result.success) {
         // Rollback MediaMTX path
         await mediamtx.removePath(pathName);
-        return reply.status(500).send({ error: result.error });
+        return reply.code(500).send({ error: result.error });
       }
 
       fastify.log.info({
@@ -518,7 +518,7 @@ async function adminRoutes(fastify, options) {
 
     } catch (error) {
       fastify.log.error({ err: error }, 'City camera creation failed');
-      return reply.status(500).send({ error: 'Failed to create city camera' });
+      return reply.code(500).send({ error: 'Failed to create city camera' });
     }
   });
 
@@ -532,11 +532,11 @@ async function adminRoutes(fastify, options) {
 
     const camera = await db.getCameraById(cameraId);
     if (!camera) {
-      return reply.status(404).send({ error: 'Camera not found' });
+      return reply.code(404).send({ error: 'Camera not found' });
     }
 
     if (camera.camera_type !== 'city') {
-      return reply.status(400).send({ error: 'Not a city camera' });
+      return reply.code(400).send({ error: 'Not a city camera' });
     }
 
     // Cleanup MediaMTX path
@@ -566,11 +566,11 @@ async function adminRoutes(fastify, options) {
 
     const camera = await db.getCameraById(cameraId);
     if (!camera) {
-      return reply.status(404).send({ error: 'Camera not found' });
+      return reply.code(404).send({ error: 'Camera not found' });
     }
 
     if (camera.camera_type !== 'city') {
-      return reply.status(400).send({ error: 'Not a city camera' });
+      return reply.code(400).send({ error: 'Not a city camera' });
     }
 
     // Handle HLS source URL update
@@ -578,13 +578,13 @@ async function adminRoutes(fastify, options) {
       try {
         const url = new URL(hls_url);
         if (!url.pathname.endsWith('.m3u8')) {
-          return reply.status(400).send({ error: 'URL must end with .m3u8' });
+          return reply.code(400).send({ error: 'URL must end with .m3u8' });
         }
         if (!['http:', 'https:'].includes(url.protocol)) {
-          return reply.status(400).send({ error: 'URL must use HTTP or HTTPS' });
+          return reply.code(400).send({ error: 'URL must use HTTP or HTTPS' });
         }
       } catch (e) {
-        return reply.status(400).send({ error: 'Invalid URL format' });
+        return reply.code(400).send({ error: 'Invalid URL format' });
       }
 
       const mediamtx = require('../services/mediamtx');
@@ -594,7 +594,7 @@ async function adminRoutes(fastify, options) {
         await mediamtx.removePath(camera.mediamtx_path);
         const result = await mediamtx.addHlsPath(camera.mediamtx_path, hls_url);
         if (!result.success) {
-          return reply.status(502).send({ error: 'Failed to update HLS source', details: result.error });
+          return reply.code(502).send({ error: 'Failed to update HLS source', details: result.error });
         }
       }
 
@@ -672,7 +672,7 @@ async function adminRoutes(fastify, options) {
 
     // Check if any updates were made
     if (updates.length === 0 && !hasAiSettings && hls_url === undefined) {
-      return reply.status(400).send({ error: 'No updates provided' });
+      return reply.code(400).send({ error: 'No updates provided' });
     }
 
     fastify.log.info({
@@ -719,7 +719,7 @@ async function adminRoutes(fastify, options) {
     const updates = request.body;
 
     if (!updates || typeof updates !== 'object') {
-      return reply.status(400).send({ error: 'Invalid settings object' });
+      return reply.code(400).send({ error: 'Invalid settings object' });
     }
 
     // Allowed settings keys
@@ -750,10 +750,10 @@ async function adminRoutes(fastify, options) {
 
     for (const [key, value] of Object.entries(updates)) {
       if (!allowedKeys.includes(key)) {
-        return reply.status(400).send({ error: `Invalid setting key: ${key}` });
+        return reply.code(400).send({ error: `Invalid setting key: ${key}` });
       }
       if (typeof value !== 'string' || value.trim() === '') {
-        return reply.status(400).send({ error: `Invalid value for ${key}` });
+        return reply.code(400).send({ error: `Invalid value for ${key}` });
       }
       await db.setSystemSetting(key, value.trim());
     }
@@ -795,7 +795,7 @@ async function adminRoutes(fastify, options) {
 
     const deleted = await db.adminDeleteVideoMessage(messageId);
     if (!deleted) {
-      return reply.status(404).send({ error: 'Message not found' });
+      return reply.code(404).send({ error: 'Message not found' });
     }
 
     // Delete file from disk
@@ -858,7 +858,7 @@ async function adminRoutes(fastify, options) {
 
     const place = await db.getPlaceById(placeId);
     if (!place) {
-      return reply.status(404).send({ error: 'Place not found' });
+      return reply.code(404).send({ error: 'Place not found' });
     }
 
     await db.updatePlaceIcon(placeId, icon_url || null);
@@ -875,7 +875,7 @@ async function adminRoutes(fastify, options) {
     if (placeId === null) return reply.code(400).send({ error: 'Invalid placeId' });
     const place = await db.getPlaceById(placeId);
     if (!place) {
-      return reply.status(404).send({ error: 'Place not found' });
+      return reply.code(404).send({ error: 'Place not found' });
     }
 
     await db.deletePlace(placeId);
@@ -910,12 +910,12 @@ async function adminRoutes(fastify, options) {
     const { action } = request.body || {};
 
     if (!action || !['resolve', 'dismiss'].includes(action)) {
-      return reply.status(400).send({ error: 'Invalid action. Use resolve or dismiss.' });
+      return reply.code(400).send({ error: 'Invalid action. Use resolve or dismiss.' });
     }
 
     const updated = await db.resolveReport(reportId, request.user.userId, action);
     if (!updated) {
-      return reply.status(404).send({ error: 'Report not found or already processed' });
+      return reply.code(404).send({ error: 'Report not found or already processed' });
     }
 
     fastify.log.info({ reportId, action, admin: request.user.email }, 'Admin processed report');
@@ -932,7 +932,7 @@ async function adminRoutes(fastify, options) {
 
     const report = await db.getReportById(reportId);
     if (!report) {
-      return reply.status(404).send({ error: 'Report not found' });
+      return reply.code(404).send({ error: 'Report not found' });
     }
 
     const { entity_type, entity_id } = report;
@@ -965,7 +965,7 @@ async function adminRoutes(fastify, options) {
       return { success: true };
     } catch (error) {
       fastify.log.error({ err: error, reportId }, 'Delete reported content failed');
-      return reply.status(500).send({ error: 'Failed to delete content' });
+      return reply.code(500).send({ error: 'Failed to delete content' });
     }
   });
 
@@ -981,7 +981,7 @@ async function adminRoutes(fastify, options) {
     const H3_SERVICE_KEY = process.env.H3_SERVICE_KEY;
 
     if (!H3_SERVICE_URL || !H3_SERVICE_KEY) {
-      return reply.status(400).send({ error: 'H3_SERVICE_URL or H3_SERVICE_KEY not configured' });
+      return reply.code(400).send({ error: 'H3_SERVICE_URL or H3_SERVICE_KEY not configured' });
     }
 
     const results = { users: 0, cameras: 0, messages: 0, errors: [] };

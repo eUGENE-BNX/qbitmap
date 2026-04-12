@@ -398,7 +398,7 @@ const FaceRecognitionMixin = {
       const data = await response.json();
 
       if (!response.ok) {
-        errorDiv.textContent = data.error || 'Yüz eklenemedi';
+        errorDiv.textContent = (data.error?.message ?? data.error) || 'Yüz eklenemedi';
         return;
       }
 

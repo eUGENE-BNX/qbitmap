@@ -225,7 +225,7 @@ const CoreMixin = {
 
       if (!startResponse.ok) {
         const err = await startResponse.json().catch(() => ({}));
-        throw new Error(err.error || `Server error: ${startResponse.status}`);
+        throw new Error((err.error?.message ?? err.error) || `Server error: ${startResponse.status}`);
       }
 
       const data = await startResponse.json();

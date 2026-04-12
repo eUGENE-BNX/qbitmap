@@ -80,7 +80,7 @@ export const MessagesMixin = {
     if (!confirm('Bu mesajı silmek istediğinize emin misiniz? Dosya da diskten silinecek.')) return;
     try {
       const response = await fetch(`${QBitmapConfig.api.admin}/messages/${messageId}`, { method: 'DELETE', credentials: 'include' });
-      if (!response.ok) { const data = await response.json(); throw new Error(data.error || 'Failed to delete'); }
+      if (!response.ok) { const data = await response.json(); throw new Error((data.error?.message ?? data.error) || 'Failed to delete'); }
       this.showToast('Message deleted', 'success');
       this.loadMessages();
       this.loadStats();

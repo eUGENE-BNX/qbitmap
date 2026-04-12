@@ -121,7 +121,7 @@ const ControlsMixin = {
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || 'Recording start failed');
+        throw new Error((err.error?.message ?? err.error) || 'Recording start failed');
       }
 
       this.broadcastRecording = true;

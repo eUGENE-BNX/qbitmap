@@ -639,12 +639,12 @@ const ClaimMixin = {
       if (!response.ok) {
         setLoading(false);
         // Show field-specific error if applicable
-        if (cameraType === 'rtsp' && (data.error?.includes('URL') || data.error?.includes('RTSP') || data.error?.includes('IP'))) {
-          showFieldError('rtsp-url', 'rtsp-url-error', data.error || data.details || 'Kamera eklenemedi');
-        } else if (cameraType === 'device' && data.error?.includes('Device')) {
-          showFieldError('claim-device-id', 'device-id-error', data.error || data.details || 'Cihaz eklenemedi');
+        if (cameraType === 'rtsp' && ((data.error?.message ?? data.error)?.includes('URL') || (data.error?.message ?? data.error)?.includes('RTSP') || (data.error?.message ?? data.error)?.includes('IP'))) {
+          showFieldError('rtsp-url', 'rtsp-url-error', (data.error?.message ?? data.error) || data.details || 'Kamera eklenemedi');
+        } else if (cameraType === 'device' && (data.error?.message ?? data.error)?.includes('Device')) {
+          showFieldError('claim-device-id', 'device-id-error', (data.error?.message ?? data.error) || data.details || 'Cihaz eklenemedi');
         } else {
-          errorDiv.textContent = data.error || data.details || 'Kamera eklenemedi';
+          errorDiv.textContent = (data.error?.message ?? data.error) || data.details || 'Kamera eklenemedi';
         }
         return;
       }

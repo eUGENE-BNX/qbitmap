@@ -145,6 +145,45 @@ async function buildServer() {
     });
   });
 
+  // [ARCH-01] Normalize error envelopes at the wire level.
+  //
+  // The global error handler (above) already produces {error:{code,message}},
+  // but every route handler in the codebase returns {error:'string'} instead.
+  // Rather than touching 350+ call sites across 20 route files, this hook
+  // catches responses with a flat string `error` field and wraps it in the
+  // structured shape before serialization. The result: every 4xx/5xx the
+  // client receives is consistently {error:{code,message}}, no matter which
+  // code path produced it.
+  //
+  // - Route sends  {error:'Camera not found'}          → hook transforms
+  // - Route sends  {error:{code:'CUSTOM',message:'…'}} → already structured, skip
+  // - Global handler sends {error:{code,message}}       → already structured, skip
+  // - 2xx success payloads                              → no `error` field, skip
+  //
+  // Status-to-code map matches the codes the global error handler uses.
+  const STATUS_TO_CODE = {
+    400: 'BAD_REQUEST',
+    401: 'UNAUTHORIZED',
+    403: 'FORBIDDEN',
+    404: 'NOT_FOUND',
+    409: 'CONFLICT',
+    413: 'PAYLOAD_TOO_LARGE',
+    429: 'RATE_LIMIT',
+    500: 'INTERNAL_ERROR',
+    502: 'BAD_GATEWAY',
+    503: 'SERVICE_UNAVAILABLE'
+  };
+
+  fastify.addHook('preSerialization', (request, reply, payload, done) => {
+    if (payload?.error && typeof payload.error === 'string') {
+      payload.error = {
+        code: STATUS_TO_CODE[reply.statusCode] || 'ERROR',
+        message: payload.error
+      };
+    }
+    done(null, payload);
+  });
+
   // Wait for MySQL connection pool and seed data
   await db.ensureReady();
 

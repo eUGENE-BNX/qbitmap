@@ -147,7 +147,7 @@ const SharingMixin = {
       const data = await response.json();
 
       if (!response.ok) {
-        errorDiv.textContent = data.error || 'Paylaşım başarısız';
+        errorDiv.textContent = (data.error?.message ?? data.error) || 'Paylaşım başarısız';
         return;
       }
 
@@ -175,7 +175,7 @@ const SharingMixin = {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to remove share');
+        throw new Error((data.error?.message ?? data.error) || 'Failed to remove share');
       }
 
       // Remove from list

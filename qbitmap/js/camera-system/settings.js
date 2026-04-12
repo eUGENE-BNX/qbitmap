@@ -1185,7 +1185,7 @@ const SettingsMixin = {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Profil degistirilemedi');
+        throw new Error((data.error?.message ?? data.error) || 'Profil degistirilemedi');
       }
 
       alert(`Profil degistirildi: ${data.template.manufacturer} - ${data.template.modelName}`);

@@ -150,7 +150,7 @@ const CameraActionsMixin = {
           }
         } else {
           const data = await response.json();
-          AuthSystem.showNotification(data.error || 'Konum kaydedilemedi', 'error');
+          AuthSystem.showNotification((data.error?.message ?? data.error) || 'Konum kaydedilemedi', 'error');
         }
       } catch (err) {
         console.error('Error saving camera location:', err);
@@ -366,7 +366,7 @@ const CameraActionsMixin = {
       const data = await response.json();
 
       if (!response.ok) {
-        errorDiv.textContent = data.error || 'Kamera silinemedi';
+        errorDiv.textContent = (data.error?.message ?? data.error) || 'Kamera silinemedi';
         return;
       }
 

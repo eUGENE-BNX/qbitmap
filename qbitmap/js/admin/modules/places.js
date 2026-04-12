@@ -52,7 +52,7 @@ export const PlacesMixin = {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ places_radius: radius, places_max_results: maxResults, places_included_types: typesJson, places_fallback_types: fallbackJson })
       });
-      if (!response.ok) { const data = await response.json(); throw new Error(data.error || 'Failed'); }
+      if (!response.ok) { const data = await response.json(); throw new Error((data.error?.message ?? data.error) || 'Failed'); }
       if (statusEl) { statusEl.textContent = 'Kaydedildi!'; statusEl.className = 'save-status success'; }
       setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2000);
     } catch (error) {

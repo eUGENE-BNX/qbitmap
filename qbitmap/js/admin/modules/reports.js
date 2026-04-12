@@ -129,7 +129,7 @@ export const ReportsMixin = {
         credentials: 'include',
         body: JSON.stringify({ action: 'dismiss' })
       });
-      if (!response.ok) { const data = await response.json(); throw new Error(data.error || 'Failed'); }
+      if (!response.ok) { const data = await response.json(); throw new Error((data.error?.message ?? data.error) || 'Failed'); }
       this.showToast('Report dismissed', 'success');
       this.loadReports();
     } catch (error) {
@@ -145,7 +145,7 @@ export const ReportsMixin = {
         method: 'DELETE',
         credentials: 'include'
       });
-      if (!response.ok) { const data = await response.json(); throw new Error(data.error || 'Failed'); }
+      if (!response.ok) { const data = await response.json(); throw new Error((data.error?.message ?? data.error) || 'Failed'); }
       this.showToast('Content deleted & report resolved', 'success');
       this.loadReports();
     } catch (error) {

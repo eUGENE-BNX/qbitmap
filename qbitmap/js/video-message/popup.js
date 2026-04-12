@@ -616,7 +616,7 @@ const PopupMixin = {
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || 'Delete failed');
+        throw new Error((err.error?.message ?? err.error) || 'Delete failed');
       }
 
       this.videoMessages.delete(messageId);
