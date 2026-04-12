@@ -3,18 +3,66 @@ const { notifyH3ContentItem, notifyH3ContentItemRemove } = require('../../utils/
 module.exports = function(DatabaseService) {
 
 DatabaseService.prototype.createVideoMessage = async function(senderId, { messageId, recipientId, lng, lat, accuracyRadiusM, locationSource, filePath, fileSize, durationMs, mimeType, description, mediaType, photoMetadata, placeId }) {
-  await this.pool.execute(
+  // [PERF-19] The old code called getVideoMessageById after INSERT, which
+  // ran a 5-table JOIN + a getVideoMessageTags SELECT that always returned
+  // [] (tags are assigned after creation). Now we build the return object
+  // directly from the insert params + insertId + a minimal sender lookup.
+  const [result] = await this.pool.execute(
     `INSERT INTO video_messages (message_id, sender_id, recipient_id, lng, lat, accuracy_radius_m, location_source, file_path, file_size, duration_ms, mime_type, media_type, description, photo_metadata, place_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [messageId, senderId, recipientId || null, lng, lat, accuracyRadiusM || null, locationSource || null, filePath, fileSize, durationMs || null, mimeType, mediaType || 'video', description || null, photoMetadata || null, placeId || null]
   );
+
   // Ownership sync
+  const type = (mediaType || 'video') === 'photo' ? 'photo' : 'video';
   if (lat && lng) {
-    const type = (mediaType || 'video') === 'photo' ? 'photo' : 'video';
     const points = type === 'video' ? 5 : 1;
     notifyH3ContentItem({ itemType: type, itemId: messageId, userId: senderId, lat, lng, points }).catch(() => {});
   }
-  return this.getVideoMessageById(messageId);
+
+  // Minimal sender lookup (2 columns vs the old 5-table JOIN)
+  const [senderRows] = await this.pool.execute(
+    'SELECT display_name, avatar_url FROM users WHERE id = ?', [senderId]
+  );
+  const sender = senderRows[0] || {};
+
+  // Place name if linked
+  let placeName = null, placeAddress = null;
+  if (placeId) {
+    const place = await this.getPlaceById(placeId);
+    if (place) { placeName = place.display_name; placeAddress = place.formatted_address; }
+  }
+
+  return {
+    id: result.insertId,
+    message_id: messageId,
+    sender_id: senderId,
+    sender_name: sender.display_name || null,
+    sender_avatar: sender.avatar_url || null,
+    recipient_id: recipientId || null,
+    lng, lat,
+    accuracy_radius_m: accuracyRadiusM || null,
+    location_source: locationSource || null,
+    file_path: filePath,
+    file_size: fileSize,
+    duration_ms: durationMs || null,
+    mime_type: mimeType,
+    media_type: type,
+    description: description || null,
+    ai_description: null,
+    ai_description_lang: null,
+    thumbnail_path: null,
+    photo_metadata: photoMetadata || null,
+    place_id: placeId || null,
+    place_name: placeName,
+    place_address: placeAddress,
+    view_count: 0,
+    like_count: 0,
+    liked: false,
+    tags: [],
+    is_read: 0,
+    created_at: new Date().toISOString()
+  };
 };
 
 DatabaseService.prototype.getVideoMessageById = async function(messageId, userId = null) {
