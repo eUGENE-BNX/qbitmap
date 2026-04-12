@@ -41,18 +41,15 @@ function cleanupTokenCache() {
  * Generate JWT token for user
  */
 function generateToken(user) {
+  // [SEC-15] Minimal JWT payload — only data needed for auth decisions.
+  // displayName removed (zero consumers, pure PII). email kept because
+  // 25+ logger calls use request.user.email for human-readable audit
+  // trails; replacing with userId would degrade operational readability.
+  // email is never sent to the client — it stays in server-side logs.
   const payload = {
     userId: user.id,
     email: user.email,
-    displayName: user.display_name,
-    // [ARCH-02] Embed role so admin checks are pure in-memory — no DB
-    // round-trip on every admin request. Role changes bump token_version
-    // (see db/users.js updateUserRole) which forces re-login and a
-    // fresh JWT with the new role.
     role: user.role || 'user',
-    // [SEC-01] Stamp token with user's current version. Bumping the DB value
-    // (logout / deactivation) invalidates every JWT that still carries the old
-    // number, even if the JWT's cryptographic expiry is days away.
     tokenVersion: user.token_version ?? 1
   };
 
