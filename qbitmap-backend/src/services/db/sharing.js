@@ -3,20 +3,31 @@ const ACCESS_CACHE_MAX_SIZE = 5000;
 
 module.exports = function(DatabaseService) {
 
+// [PERF-10] O(K) invalidation via reverse indexes instead of O(N) scan.
 DatabaseService.prototype.invalidateAccessCache = function(cameraId) {
-  for (const key of this.accessCache.keys()) {
-    if (key.endsWith(`:${cameraId}`)) {
-      this.accessCache.delete(key);
-    }
+  const keys = this._cameraAccessKeys.get(String(cameraId));
+  if (!keys) return;
+  for (const key of keys) this.accessCache.delete(key);
+  // Clear user-side reverse entries too
+  for (const key of keys) {
+    const userId = key.split(':')[0];
+    const userSet = this._userAccessKeys.get(userId);
+    if (userSet) { userSet.delete(key); if (userSet.size === 0) this._userAccessKeys.delete(userId); }
   }
+  this._cameraAccessKeys.delete(String(cameraId));
 };
 
 DatabaseService.prototype.invalidateUserAccessCache = function(userId) {
-  for (const key of this.accessCache.keys()) {
-    if (key.startsWith(`${userId}:`)) {
-      this.accessCache.delete(key);
-    }
+  const keys = this._userAccessKeys.get(String(userId));
+  if (!keys) return;
+  for (const key of keys) this.accessCache.delete(key);
+  // Clear camera-side reverse entries too
+  for (const key of keys) {
+    const camId = key.split(':')[1];
+    const camSet = this._cameraAccessKeys.get(camId);
+    if (camSet) { camSet.delete(key); if (camSet.size === 0) this._cameraAccessKeys.delete(camId); }
   }
+  this._userAccessKeys.delete(String(userId));
 };
 
 DatabaseService.prototype.shareCamera = async function(cameraId, ownerUserId, shareWithEmail) {
@@ -146,16 +157,15 @@ DatabaseService.prototype.hasAccessToCamera = async function(userId, cameraIdOrD
     }
   }
 
-  // Evict oldest entries when cache is full
+  // [PERF-10] Evict the oldest entry (Map insertion order = FIFO) when full.
+  // The old O(N) scan for the min timestamp is replaced by a single
+  // .keys().next() since Map preserves insertion order.
   if (this.accessCache.size >= ACCESS_CACHE_MAX_SIZE) {
-    const now = Date.now();
-    let oldestKey = null, oldestTime = Infinity;
-    for (const [key, entry] of this.accessCache.entries()) {
-      if (entry.time < oldestTime) { oldestTime = entry.time; oldestKey = key; }
-    }
-    if (oldestKey) this.accessCache.delete(oldestKey);
+    const oldestKey = this.accessCache.keys().next().value;
+    if (oldestKey) this._removeAccessCacheKey(oldestKey);
   }
   this.accessCache.set(cacheKey, { result, time: Date.now() });
+  this._addAccessCacheKey(cacheKey, userId, cameraId);
 
   return result;
 };

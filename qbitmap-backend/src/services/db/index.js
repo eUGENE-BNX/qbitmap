@@ -17,18 +17,39 @@ class DatabaseService {
 
     // [PERF] Camera access cache: Map<"userId:cameraId" -> { result, time }>
     this.accessCache = new Map();
+    // [PERF-10] Reverse indexes for O(K) invalidation instead of O(N) scan.
+    // K = entries for that camera/user, N = total cache size (up to 5000).
+    this._cameraAccessKeys = new Map(); // cameraId → Set<cacheKey>
+    this._userAccessKeys = new Map();   // userId → Set<cacheKey>
 
     // Periodic cleanup of expired access cache entries (every 5 minutes)
     this.accessCacheCleanupInterval = setInterval(() => {
       const now = Date.now();
       for (const [key, entry] of this.accessCache.entries()) {
         if (now - entry.time > ACCESS_CACHE_TTL) {
-          this.accessCache.delete(key);
+          this._removeAccessCacheKey(key);
         }
       }
     }, 5 * 60 * 1000);
 
     this._ready = this._initialize();
+  }
+
+  // [PERF-10] Access cache key management — keeps reverse indexes in sync.
+  _addAccessCacheKey(key, userId, cameraId) {
+    if (!this._cameraAccessKeys.has(cameraId)) this._cameraAccessKeys.set(cameraId, new Set());
+    this._cameraAccessKeys.get(cameraId).add(key);
+    if (!this._userAccessKeys.has(userId)) this._userAccessKeys.set(userId, new Set());
+    this._userAccessKeys.get(userId).add(key);
+  }
+
+  _removeAccessCacheKey(key) {
+    this.accessCache.delete(key);
+    const [userId, cameraId] = key.split(':');
+    const camSet = this._cameraAccessKeys.get(cameraId);
+    if (camSet) { camSet.delete(key); if (camSet.size === 0) this._cameraAccessKeys.delete(cameraId); }
+    const userSet = this._userAccessKeys.get(userId);
+    if (userSet) { userSet.delete(key); if (userSet.size === 0) this._userAccessKeys.delete(userId); }
   }
 
   async ensureReady() {
