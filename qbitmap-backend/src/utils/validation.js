@@ -40,7 +40,7 @@ const webhookEventSchema = z.object({
   onvifCameraId: z.string().min(1).max(100),
   eventType: z.string().min(1).max(100),
   eventState: z.union([z.boolean(), z.number()]),
-  eventData: z.record(z.unknown()).optional()
+  eventData: z.record(z.string(), z.unknown()).optional()
 }).refine(
   (data) => !data.eventData || JSON.stringify(data.eventData).length < 10000,
   { message: 'eventData too large (max 10KB)' }
