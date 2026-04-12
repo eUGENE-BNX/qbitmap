@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const fsp = fs.promises;
 const db = require('../services/database');
 const { authHook } = require('../utils/jwt');
 const logger = require('../utils/logger').child({ module: 'broadcast-recordings' });
@@ -30,11 +31,10 @@ async function broadcastRecordingsRoutes(fastify, options) {
     }
 
     const filePath = path.join(UPLOADS_DIR, recording.file_path);
-    if (!fs.existsSync(filePath)) {
+    let stat;
+    try { stat = await fsp.stat(filePath); } catch {
       return reply.code(404).send({ error: 'Video file not found' });
     }
-
-    const stat = fs.statSync(filePath);
     const fileSize = stat.size;
 
     const range = request.headers.range;
@@ -75,7 +75,7 @@ async function broadcastRecordingsRoutes(fastify, options) {
     }
 
     const filePath = path.join(UPLOADS_DIR, recording.thumbnail_path);
-    if (!fs.existsSync(filePath)) {
+    try { await fsp.access(filePath); } catch {
       return reply.code(404).send({ error: 'Thumbnail file not found' });
     }
 
@@ -117,10 +117,10 @@ async function broadcastRecordingsRoutes(fastify, options) {
     // Delete files
     const { recording } = result;
     if (recording.file_path) {
-      try { fs.unlinkSync(path.join(UPLOADS_DIR, recording.file_path)); } catch (e) {}
+      fsp.unlink(path.join(UPLOADS_DIR, recording.file_path)).catch(() => {});
     }
     if (recording.thumbnail_path) {
-      try { fs.unlinkSync(path.join(UPLOADS_DIR, recording.thumbnail_path)); } catch (e) {}
+      fsp.unlink(path.join(UPLOADS_DIR, recording.thumbnail_path)).catch(() => {});
     }
 
     logger.info({ userId, recordingId }, 'Broadcast recording deleted');

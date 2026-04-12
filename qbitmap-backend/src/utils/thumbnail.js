@@ -9,6 +9,8 @@ const fs = require('fs');
 const logger = require('./logger').child({ module: 'thumbnail' });
 
 const FFMPEG_PATH = '/usr/bin/ffmpeg';
+// [PERF-12] Check once at module load instead of fs.existsSync on every call.
+const FFMPEG_AVAILABLE = fs.existsSync(FFMPEG_PATH);
 const THUMB_WIDTH = 320;
 const PREVIEW_WIDTH = 800;
 const WEBP_QUALITY = 40;
@@ -26,7 +28,7 @@ const PREVIEW_QUALITY = 70;
  * @returns {Promise<boolean>} true if successful
  */
 function generateThumbnail(videoPath, thumbPath, opts = {}) {
-  if (!fs.existsSync(FFMPEG_PATH)) {
+  if (!FFMPEG_AVAILABLE) {
     logger.warn('ffmpeg not found at %s, skipping thumbnail', FFMPEG_PATH);
     return Promise.resolve(false);
   }
@@ -94,7 +96,7 @@ function generateThumbnail(videoPath, thumbPath, opts = {}) {
  * @returns {Promise<boolean>} true if successful
  */
 function generatePhotoThumbnail(imagePath, thumbPath, opts = {}) {
-  if (!fs.existsSync(FFMPEG_PATH)) {
+  if (!FFMPEG_AVAILABLE) {
     logger.warn('ffmpeg not found at %s, skipping photo thumbnail', FFMPEG_PATH);
     return Promise.resolve(false);
   }

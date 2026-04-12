@@ -4,6 +4,7 @@
  */
 
 const fs = require('fs');
+const fsp = fs.promises;
 const path = require('path');
 const teslacamSync = require('../services/teslacam-sync');
 
@@ -25,7 +26,7 @@ async function teslacamRoutes(fastify) {
     const { id } = request.params;
     const filePath = path.join(teslacamSync.getSegmentDir(id), 'metadata.json');
 
-    if (!fs.existsSync(filePath)) {
+    try { await fsp.access(filePath); } catch {
       return reply.code(404).send({ error: 'Segment metadata not found' });
     }
 
@@ -39,11 +40,11 @@ async function teslacamRoutes(fastify) {
     const { id } = request.params;
     const filePath = path.join(teslacamSync.getSegmentDir(id), 'video.mp4');
 
-    if (!fs.existsSync(filePath)) {
+    let stat;
+    try { stat = await fsp.stat(filePath); } catch {
       return reply.code(404).send({ error: 'Segment video not found' });
     }
 
-    const stat = fs.statSync(filePath);
     const fileSize = stat.size;
     const range = request.headers.range;
 

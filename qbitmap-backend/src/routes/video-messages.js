@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const fsp = fs.promises;
 const { pipeline } = require('stream/promises');
 const db = require('../services/database');
 const wsService = require('../services/websocket');
@@ -301,7 +302,7 @@ async function videoMessageRoutes(fastify, options) {
 
     } catch (error) {
       // Cleanup file on error
-      try { fs.unlinkSync(filePath); } catch {}
+      fsp.unlink(filePath).catch(() => {});
       logger.error({ err: error, messageId }, 'Video message upload failed');
       return reply.code(500).send({ error: 'Upload failed' });
     }
@@ -432,13 +433,15 @@ async function videoMessageRoutes(fastify, options) {
       // Try preview version if requested
       if (wantPreview && thumbPath) {
         const previewPath = thumbPath.replace('_thumb.webp', '_preview.webp');
-        if (fs.existsSync(previewPath)) {
-          thumbPath = previewPath;
+        try { await fsp.access(previewPath); thumbPath = previewPath; } catch {
+          // Falls back to regular thumb if preview doesn't exist
         }
-        // Falls back to regular thumb if preview doesn't exist
       }
 
-      if (!thumbPath || !fs.existsSync(thumbPath)) {
+      if (!thumbPath) {
+        return reply.code(404).send({ error: 'Thumbnail file not found' });
+      }
+      try { await fsp.access(thumbPath); } catch {
         return reply.code(404).send({ error: 'Thumbnail file not found' });
       }
 
@@ -547,11 +550,13 @@ async function videoMessageRoutes(fastify, options) {
       }
 
       const filePath = safePath(msg.file_path, 'uploads');
-      if (!filePath || !fs.existsSync(filePath)) {
+      if (!filePath) {
         return reply.code(404).send({ error: 'Video file not found' });
       }
-
-      const stat = fs.statSync(filePath);
+      let stat;
+      try { stat = await fsp.stat(filePath); } catch {
+        return reply.code(404).send({ error: 'Video file not found' });
+      }
       const fileSize = stat.size;
 
       // Handle Range request for mobile video seeking
@@ -664,22 +669,17 @@ async function videoMessageRoutes(fastify, options) {
         return reply.code(404).send({ error: 'Message not found or not yours' });
       }
 
-      // Delete file from disk (path traversal safe)
+      // Delete files from disk (fire-and-forget, path traversal safe)
       const filePath = safePath(deleted.file_path, 'uploads');
-      if (filePath) { try { fs.unlinkSync(filePath); } catch {} }
-      // Delete original archive if exists
       if (filePath) {
-        const origPath = path.resolve(ORIGINALS_DIR, path.basename(filePath));
-        try { fs.unlinkSync(origPath); } catch {}
+        fsp.unlink(filePath).catch(() => {});
+        fsp.unlink(path.resolve(ORIGINALS_DIR, path.basename(filePath))).catch(() => {});
       }
-      // Delete thumbnail + preview if exist
       if (deleted.thumbnail_path) {
         const thumbPath = safePath(deleted.thumbnail_path, 'uploads');
         if (thumbPath) {
-          try { fs.unlinkSync(thumbPath); } catch {}
-          // Preview uses same pattern: _thumb.webp → _preview.webp
-          const previewPath = thumbPath.replace('_thumb.webp', '_preview.webp');
-          try { fs.unlinkSync(previewPath); } catch {}
+          fsp.unlink(thumbPath).catch(() => {});
+          fsp.unlink(thumbPath.replace('_thumb.webp', '_preview.webp')).catch(() => {});
         }
       }
 
