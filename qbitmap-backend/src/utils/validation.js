@@ -96,9 +96,13 @@ const adminPlanSchema = z.object({
 
 // ==================== AI SCHEMAS ====================
 
+// [SEC-14] Tighten image limits: 500KB base64 per image (~375KB decoded),
+// max 3 images. The previous 10MB × 4 allowed a single authenticated user
+// to push ~40MB of image data per request to the vLLM backend, which could
+// exhaust GPU memory or queue capacity for other users.
 const aiAnalyzeSchema = z.object({
   prompt: z.string().min(1).max(10000),
-  images: z.array(z.string().max(10_000_000)).max(4).optional(),
+  images: z.array(z.string().max(500_000)).max(3).optional(),
   options: z.object({
     num_predict: z.number().int().min(256).max(4096).optional(),
     temperature: z.number().min(0).max(2).optional()
