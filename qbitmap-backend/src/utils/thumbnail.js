@@ -43,13 +43,21 @@ function generateThumbnail(videoPath, thumbPath, opts = {}) {
     seekTime = `${h}:${m}:${s}`;
   }
 
+  // [ARCH-03] Auto-detect output format from file extension so callers
+  // can request .webp (video-messages) or .jpg (broadcast recordings)
+  // via the same function. `-2` rounds the scaled dimension to an even
+  // number, which is safer across codecs than `-1`.
+  const isWebp = thumbPath.endsWith('.webp');
+  const codecArgs = isWebp
+    ? ['-c:v', 'libwebp', '-quality', String(quality)]
+    : ['-q:v', '5'];
+
   const args = [
     '-i', videoPath,
     '-ss', seekTime,
     '-vframes', '1',
-    '-vf', `scale=${width}:-1`,
-    '-c:v', 'libwebp',
-    '-quality', String(quality),
+    '-vf', `scale=${width}:-2`,
+    ...codecArgs,
     '-y',
     thumbPath
   ];
@@ -94,11 +102,17 @@ function generatePhotoThumbnail(imagePath, thumbPath, opts = {}) {
   const width = opts.width || THUMB_WIDTH;
   const quality = opts.quality || WEBP_QUALITY;
 
+  // [ARCH-03] Same format auto-detection and even-dimension rounding as
+  // generateThumbnail above.
+  const isWebp = thumbPath.endsWith('.webp');
+  const codecArgs = isWebp
+    ? ['-c:v', 'libwebp', '-quality', String(quality)]
+    : ['-q:v', '5'];
+
   const args = [
     '-i', imagePath,
-    '-vf', `scale=${width}:-1`,
-    '-c:v', 'libwebp',
-    '-quality', String(quality),
+    '-vf', `scale=${width}:-2`,
+    ...codecArgs,
     '-y',
     thumbPath
   ];

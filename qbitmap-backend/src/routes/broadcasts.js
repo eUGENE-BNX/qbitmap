@@ -1,12 +1,12 @@
 const path = require('path');
 const fs = require('fs');
 const { pipeline } = require('stream/promises');
-const { execFile } = require('child_process');
 const db = require('../services/database');
 const mediamtx = require('../services/mediamtx');
 const wsService = require('../services/websocket');
 const faceApi = require('../services/face-api');
 const { authHook } = require('../utils/jwt');
+const { generateThumbnail } = require('../utils/thumbnail');
 const logger = require('../utils/logger').child({ module: 'broadcasts' });
 const { services } = require('../config');
 
@@ -45,25 +45,9 @@ function clearAutoStopTimer(broadcastId) {
   broadcastAutoStopTimers.delete(broadcastId);
 }
 
-/**
- * Generate thumbnail from video file using ffmpeg
- */
-function generateThumbnail(videoPath, outputPath) {
-  return new Promise((resolve, reject) => {
-    execFile('ffmpeg', [
-      '-i', videoPath,
-      '-ss', '1',
-      '-vframes', '1',
-      '-vf', 'scale=320:-2',
-      '-q:v', '5',
-      '-y',
-      outputPath
-    ], { timeout: 15000 }, (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
-}
+// [ARCH-03] Inline generateThumbnail removed — now imported from
+// utils/thumbnail.js which uses the absolute /usr/bin/ffmpeg path,
+// graceful fallback on failure, and consistent format detection.
 
 /**
  * Process and save a broadcast recording after broadcast stops.
@@ -107,13 +91,11 @@ async function processBroadcastRecording(broadcast, activeRec, userId) {
       return;
     }
 
-    // Generate thumbnail
+    // Generate thumbnail (utility returns false on failure instead of throwing)
     let thumbnailPath = null;
-    try {
-      await generateThumbnail(videoFile, thumbFile);
+    const thumbOk = await generateThumbnail(videoFile, thumbFile);
+    if (thumbOk) {
       thumbnailPath = `broadcast-recordings/${recordingId}_thumb.jpg`;
-    } catch (e) {
-      logger.warn({ broadcastId, err: e }, 'Thumbnail generation failed');
     }
 
     // Save to DB
