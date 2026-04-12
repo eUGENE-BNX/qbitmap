@@ -419,9 +419,11 @@ const AIMonitoringMixin = {
         }
       });
 
+      // [ARCH-11] credentials:'include' was missing — /api/ai/analyze requires auth.
       const response = await aiRequestQueue.enqueue(async () => {
         const resp = await fetch(`${QBitmapConfig.api.ai}/analyze`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: requestBody
         });
@@ -432,6 +434,7 @@ const AIMonitoringMixin = {
           await new Promise(r => setTimeout(r, retryAfter * 1000));
           return fetch(`${QBitmapConfig.api.ai}/analyze`, {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: requestBody
           });
