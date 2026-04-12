@@ -7,11 +7,14 @@ const logger = require('../utils/logger').child({ module: 'auth' });
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// [SF-2] Cookie options that work in both dev (localhost) and production
+// [SEC-09] secure:true everywhere except NODE_ENV=test (where there's no
+// TLS terminator). Dev runs behind Vite's HTTPS proxy or localhost with
+// the browser's "Secure cookies on localhost" exception, so secure:true
+// works fine. Plain-HTTP dev without TLS should set NODE_ENV=test.
 function getCookieOptions() {
   return {
     httpOnly: true,
-    secure: isProduction,
+    secure: process.env.NODE_ENV !== 'test',
     sameSite: 'lax',
     path: '/',
     maxAge: 7 * 24 * 60 * 60, // 7 days
