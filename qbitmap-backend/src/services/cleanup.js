@@ -44,7 +44,7 @@ class CleanupService {
         SELECT SUM(data_length + index_length) / 1024 / 1024 AS size_mb
         FROM information_schema.tables WHERE table_schema = ?
       `, [process.env.DB_NAME || 'qbitmap']);
-      const dbSizeMB = rows[0]?.size_mb?.toFixed(2) || '0';
+      const dbSizeMB = Number(rows[0]?.size_mb || 0).toFixed(2);
       logger.info({ sizeMB: dbSizeMB }, 'Database size');
 
       // Cleanup old onvif_events (90 day retention)
