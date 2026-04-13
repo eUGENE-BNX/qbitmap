@@ -53,6 +53,25 @@ module.exports = async function(fastify) {
     return { success: true };
   });
 
+  /**
+   * PUT /api/admin/messages/:messageId/ai-description
+   * Admin edit the AI-generated description of a message
+   */
+  fastify.put('/messages/:messageId/ai-description', async (request, reply) => {
+    const { messageId } = request.params;
+    const { text, lang } = request.body || {};
+
+    if (typeof text !== 'string' || text.length > 2000) {
+      return reply.code(400).send({ error: 'Invalid text (max 2000 chars)' });
+    }
+
+    await db.updateVideoMessageAiDescription(messageId, text.trim(), lang || null);
+    await db.clearVideoMessageTranslations(messageId);
+
+    logger.info({ messageId, admin: request.user.email }, 'Admin edited AI description');
+    return { success: true };
+  });
+
   // ==================== GOOGLE PLACES ====================
 
   /**

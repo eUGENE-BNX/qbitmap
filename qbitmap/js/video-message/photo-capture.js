@@ -1,6 +1,6 @@
 import { Logger } from "../utils.js";
 import { AuthSystem } from "../auth.js";
-import { applyAutofocus, getSavedCameraId, saveCameraId } from "./media.js";
+import { applyAutofocus, bindTapToFocus, getSavedCameraId, saveCameraId } from "./media.js";
 
 function _haptic(style) {
   if (!navigator.vibrate) return;
@@ -24,7 +24,6 @@ const PhotoCaptureMixin = {
       const videoConstraints = {
         width: { ideal: res.width },
         height: { ideal: res.height },
-        aspectRatio: { ideal: 16 / 9 },
         focusMode: { ideal: 'continuous' }
       };
       if (savedId) {
@@ -128,6 +127,9 @@ const PhotoCaptureMixin = {
     this._bindPhotoZoom(modal);
     this._bindPhotoResolution(modal);
     this._bindPhotoFlash(modal);
+
+    // Tap-to-focus on video element
+    bindTapToFocus(video, this.mediaStream);
   },
 
   async capturePhoto() {
@@ -138,8 +140,14 @@ const PhotoCaptureMixin = {
 
     const track = this.mediaStream.getVideoTracks()[0];
     const res = this.PHOTO_RESOLUTIONS[this._photoResolution];
-    const targetW = res.width;
-    const targetH = res.height; // Already 16:9 (1920x1080, 2560x1440, 3840x2160)
+
+    // Detect portrait: check if the container has portrait class (set by _applyVideoOrientation)
+    // We can't rely on video.videoWidth/Height — mobile browsers report sensor dimensions
+    // (always landscape) even when the phone is held in portrait.
+    const container = this._modalEl?.querySelector('#vmsg-video-container');
+    const isPortrait = container?.classList.contains('vmsg-portrait') || false;
+    const targetW = isPortrait ? res.height : res.width;
+    const targetH = isPortrait ? res.width : res.height;
 
     // Always use canvas capture — ImageCapture.takePhoto() produces black frames
     // on many mobile devices due to GPU-only video decode paths
@@ -151,7 +159,7 @@ const PhotoCaptureMixin = {
         Logger.log('[VideoMessage] Canvas capture failed, trying grabFrame()');
         const imageCapture = new ImageCapture(track);
         const bitmap = await imageCapture.grabFrame();
-        this.capturedPhotoBlob = await this._cropTo16x9(bitmap, targetW, targetH);
+        this.capturedPhotoBlob = await this._cropToAspect(bitmap, targetW, targetH);
         bitmap.close();
       } catch (e) {
         Logger.warn('[VideoMessage] grabFrame also failed:', e);
@@ -175,24 +183,23 @@ const PhotoCaptureMixin = {
     this.showPhotoPreview();
   },
 
-  // Crop any source (ImageBitmap) to 16:9 center-crop
-  _cropTo16x9(source, targetW, targetH) {
+  // Crop any source (ImageBitmap) to target aspect ratio (center-crop, with rotation for portrait)
+  _cropToAspect(source, targetW, targetH) {
     const srcW = source.width;
     const srcH = source.height;
-    const targetRatio = 16 / 9;
+    const needsRotation = targetW < targetH && srcW > srcH;
+    const cropRatio = needsRotation ? (targetH / targetW) : (targetW / targetH);
     const srcRatio = srcW / srcH;
 
     let sx, sy, sw, sh;
-    if (srcRatio > targetRatio) {
-      // Source wider than 16:9 → crop sides
+    if (srcRatio > cropRatio) {
       sh = srcH;
-      sw = Math.round(srcH * targetRatio);
+      sw = Math.round(srcH * cropRatio);
       sx = Math.round((srcW - sw) / 2);
       sy = 0;
     } else {
-      // Source taller than 16:9 (4:3, 1:1) → crop top/bottom
       sw = srcW;
-      sh = Math.round(srcW / targetRatio);
+      sh = Math.round(srcW / cropRatio);
       sx = 0;
       sy = Math.round((srcH - sh) / 2);
     }
@@ -201,14 +208,21 @@ const PhotoCaptureMixin = {
     canvas.width = targetW;
     canvas.height = targetH;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(source, sx, sy, sw, sh, 0, 0, targetW, targetH);
+
+    if (needsRotation) {
+      ctx.translate(targetW / 2, targetH / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(source, sx, sy, sw, sh, -targetH / 2, -targetW / 2, targetH, targetW);
+    } else {
+      ctx.drawImage(source, sx, sy, sw, sh, 0, 0, targetW, targetH);
+    }
 
     return new Promise((resolve) => {
       canvas.toBlob(resolve, 'image/jpeg', 0.92);
     });
   },
 
-  // Canvas capture from video element, cropped to 16:9
+  // Canvas capture from video element, with optional portrait rotation
   async _canvasCapture(video, targetW, targetH) {
     // Ensure video has a rendered frame before capture
     if (video.readyState < 2) { // HAVE_CURRENT_DATA
@@ -226,26 +240,31 @@ const PhotoCaptureMixin = {
       return null;
     }
 
-    const targetRatio = 16 / 9;
+    // On mobile, videoWidth/Height are always the sensor's native (landscape) dims.
+    // If targetW < targetH (portrait), we need to rotate the captured frame 90° CW.
+    const needsRotation = targetW < targetH && vw > vh;
+
+    // Source dimensions for cropping (before rotation)
+    // If rotating, the target aspect ratio in source space is inverted
+    const cropRatio = needsRotation ? (targetH / targetW) : (targetW / targetH);
     const srcRatio = vw / vh;
 
     let sx, sy, sw, sh;
-    if (srcRatio > targetRatio) {
+    if (srcRatio > cropRatio) {
       sh = vh;
-      sw = Math.round(vh * targetRatio);
+      sw = Math.round(vh * cropRatio);
       sx = Math.round((vw - sw) / 2);
       sy = 0;
     } else {
       sw = vw;
-      sh = Math.round(vw / targetRatio);
+      sh = Math.round(vw / cropRatio);
       sx = 0;
       sy = Math.round((vh - sh) / 2);
     }
 
-    // Use a smaller canvas matching video dimensions first, then scale
-    // This avoids mobile GPU limits with large canvases (e.g. 3840x2160)
-    const captureW = Math.min(targetW, vw);
-    const captureH = Math.min(targetH, vh);
+    // Capture at source resolution first (avoid mobile GPU limits)
+    const captureW = Math.min(needsRotation ? targetH : targetW, sw);
+    const captureH = Math.min(needsRotation ? targetW : targetH, sh);
 
     const canvas = document.createElement('canvas');
     canvas.width = captureW;
@@ -265,12 +284,11 @@ const PhotoCaptureMixin = {
       );
       const d = sample.data;
       let nonBlack = 0;
-      for (let i = 0; i < d.length; i += 16) { // Sample every 4th pixel
+      for (let i = 0; i < d.length; i += 16) {
         if (d[i] > 5 || d[i + 1] > 5 || d[i + 2] > 5) nonBlack++;
       }
       if (nonBlack === 0) {
         Logger.warn('[VideoMessage] Canvas captured all-black frame, retrying after delay');
-        // Wait and retry once — GPU may need a tick to make pixels readable
         await new Promise(r => setTimeout(r, 200));
         ctx.drawImage(video, sx, sy, sw, sh, 0, 0, captureW, captureH);
 
@@ -288,24 +306,33 @@ const PhotoCaptureMixin = {
         }
       }
     } catch (e) {
-      // getImageData may fail on tainted canvas — proceed anyway
       Logger.warn('[VideoMessage] Pixel check failed:', e);
     }
 
-    // If we captured at smaller size, scale up to target
-    if (captureW < targetW || captureH < targetH) {
-      const finalCanvas = document.createElement('canvas');
-      finalCanvas.width = targetW;
-      finalCanvas.height = targetH;
-      const fctx = finalCanvas.getContext('2d');
+    // Final canvas: apply rotation if portrait + scale to target
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = targetW;
+    finalCanvas.height = targetH;
+    const fctx = finalCanvas.getContext('2d');
+
+    if (needsRotation) {
+      // Rotate 90° CW: translate to center, rotate, draw
+      fctx.translate(targetW / 2, targetH / 2);
+      fctx.rotate(Math.PI / 2);
+      // After rotation, draw centered (swapped dimensions)
+      fctx.drawImage(canvas, -targetH / 2, -targetW / 2, targetH, targetW);
+    } else if (captureW < targetW || captureH < targetH) {
+      // Scale up to target
       fctx.drawImage(canvas, 0, 0, targetW, targetH);
+    } else {
+      // No transform needed, use capture canvas directly
       return new Promise((resolve) => {
-        finalCanvas.toBlob(resolve, 'image/jpeg', 0.92);
+        canvas.toBlob(resolve, 'image/jpeg', 0.92);
       });
     }
 
     return new Promise((resolve) => {
-      canvas.toBlob(resolve, 'image/jpeg', 0.92);
+      finalCanvas.toBlob(resolve, 'image/jpeg', 0.92);
     });
   },
 
@@ -419,7 +446,6 @@ const PhotoCaptureMixin = {
             deviceId: this._selectedCameraId ? { exact: this._selectedCameraId } : undefined,
             width: { ideal: res.width },
             height: { ideal: res.height },
-            aspectRatio: { ideal: 16 / 9 },
             facingMode: !this._selectedCameraId ? { ideal: this.currentFacingMode } : undefined,
             focusMode: { ideal: 'continuous' }
           },

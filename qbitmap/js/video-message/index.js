@@ -261,7 +261,6 @@ const VideoMessage = {
       const videoConstraints = {
         width: { ideal: this.RESOLUTION.width },
         height: { ideal: this.RESOLUTION.height },
-        aspectRatio: { ideal: 16 / 9 },
         frameRate: { ideal: 25, max: 25 },
         focusMode: { ideal: 'continuous' }
       };

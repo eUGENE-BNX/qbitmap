@@ -1,6 +1,7 @@
 import { Logger } from "../utils.js";
 import { AuthSystem } from "../auth.js";
 import { _haptic } from "./photo-capture.js";
+import { bindTapToFocus } from "./media.js";
 
 const RecordingMixin = {
   showRecordingModal() {
@@ -54,6 +55,9 @@ const RecordingMixin = {
     const container = modal.querySelector('#vmsg-video-container');
     this._applyVideoOrientation(container, this.mediaStream, video);
 
+    // Tap-to-focus on video element
+    bindTapToFocus(video, this.mediaStream);
+
     // Bind buttons
     modal.querySelector('#vmsg-cancel').onclick = () => this.cancelFlow();
     modal.querySelector('#vmsg-record').onclick = () => this.startRecording();
@@ -97,8 +101,8 @@ const RecordingMixin = {
 
     const mimeType = this.getPreferredMimeType();
     const options = mimeType
-      ? { mimeType, videoBitsPerSecond: 2500000, audioBitsPerSecond: 32000 }
-      : { videoBitsPerSecond: 2500000, audioBitsPerSecond: 32000 };
+      ? { mimeType, videoBitsPerSecond: 5000000, audioBitsPerSecond: 64000 }
+      : { videoBitsPerSecond: 5000000, audioBitsPerSecond: 64000 };
 
     try {
       this.mediaRecorder = new MediaRecorder(this.mediaStream, options);

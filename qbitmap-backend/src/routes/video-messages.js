@@ -21,7 +21,8 @@ const MAX_DURATION_MS = 30000;
 
 const ORIGINALS_DIR = path.resolve(UPLOADS_DIR, 'originals');
 const OPTIMIZED_MAX_DIM = 2048;
-const OPTIMIZED_QUALITY = 85;
+const OPTIMIZED_QUALITY_JPEG = 3;  // ffmpeg JPEG: 2=best, 31=worst
+const OPTIMIZED_QUALITY_WEBP = 85; // WebP: 0=worst, 100=best
 
 // Ensure uploads directories exist
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -160,9 +161,9 @@ async function videoMessageRoutes(fastify, options) {
               '-i', originalPath,
               '-vf', `scale='min(${OPTIMIZED_MAX_DIM},iw)':'min(${OPTIMIZED_MAX_DIM},ih)':force_original_aspect_ratio=decrease`,
               '-map_metadata', '-1',
-              ...(mimeType === 'image/jpeg' ? ['-q:v', String(OPTIMIZED_QUALITY)] : []),
+              ...(mimeType === 'image/jpeg' ? ['-q:v', String(OPTIMIZED_QUALITY_JPEG)] : []),
               ...(mimeType === 'image/png' ? ['-compression_level', '6'] : []),
-              ...(mimeType === 'image/webp' ? ['-quality', String(OPTIMIZED_QUALITY)] : []),
+              ...(mimeType === 'image/webp' ? ['-quality', String(OPTIMIZED_QUALITY_WEBP)] : []),
               '-y', filePath
             ];
             execFile('/usr/bin/ffmpeg', args, { timeout: 15000 }, (err) => err ? reject(err) : resolve());
@@ -591,6 +592,49 @@ async function videoMessageRoutes(fastify, options) {
 
     } catch (error) {
       logger.error({ err: error }, 'Video serve failed');
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // GET /:messageId/original - Serve original (uncompressed) photo
+  fastify.get('/:messageId/original', { preHandler: optionalAuthHook }, async (request, reply) => {
+    try {
+      const { messageId } = request.params;
+      const msg = await db.getVideoMessageById(messageId);
+
+      if (!msg || msg.media_type !== 'photo') {
+        return reply.code(404).send({ error: 'Photo not found' });
+      }
+
+      if (msg.recipient_id !== null) {
+        const userId = request.user?.userId;
+        if (!userId || (msg.sender_id !== userId && msg.recipient_id !== userId)) {
+          return reply.code(403).send({ error: 'Access denied' });
+        }
+      }
+
+      // Try original first, fall back to optimized
+      const baseName = path.basename(msg.file_path);
+      const originalPath = path.resolve(ORIGINALS_DIR, baseName);
+      let filePath;
+      try {
+        await fsp.stat(originalPath);
+        filePath = originalPath;
+      } catch {
+        filePath = safePath(msg.file_path, 'uploads');
+      }
+
+      if (!filePath) {
+        return reply.code(404).send({ error: 'File not found' });
+      }
+
+      const stat = await fsp.stat(filePath);
+      reply.header('Content-Length', stat.size);
+      reply.header('Content-Type', msg.mime_type);
+      reply.header('Cache-Control', 'public, max-age=86400');
+      return reply.send(fs.createReadStream(filePath));
+    } catch (error) {
+      logger.error({ err: error }, 'Original photo serve failed');
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });

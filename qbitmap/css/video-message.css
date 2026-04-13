@@ -95,6 +95,28 @@
   object-fit: contain;
 }
 
+/* Tap-to-focus indicator */
+.vmsg-focus-dot {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  margin-left: -24px;
+  margin-top: -24px;
+  border: 2px solid rgba(255,255,255,0.9);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(1.5);
+}
+.vmsg-focus-dot.vmsg-focus-animate {
+  animation: vmsg-focus-ring 0.8s ease-out forwards;
+}
+@keyframes vmsg-focus-ring {
+  0% { opacity: 1; transform: scale(1.5); }
+  30% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
 /* Recording indicator - pulsing red border */
 .video-msg-video-container.recording {
   border: 3px solid #d93025;
@@ -581,7 +603,6 @@
 }
 
 .video-msg-popup-body {
-  background: #1a1a1a;
   position: relative;
 }
 
@@ -1256,6 +1277,79 @@
   opacity: 0;
 }
 
+/* Admin AI description edit */
+.video-msg-ai-edit-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 2px 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.video-msg-ai-wrap:hover .video-msg-ai-edit-btn {
+  opacity: 1;
+}
+.video-msg-ai-edit-btn:hover {
+  color: #555;
+}
+.video-msg-ai-edit-area {
+  margin-top: 4px;
+}
+.video-msg-ai-edit-textarea {
+  width: 100%;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #333;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 8px;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.video-msg-ai-edit-textarea:focus {
+  outline: none;
+  border-color: #4a90d9;
+}
+.video-msg-ai-edit-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  justify-content: flex-end;
+}
+.video-msg-ai-edit-save,
+.video-msg-ai-edit-cancel {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.video-msg-ai-edit-save {
+  background: #4a90d9;
+  color: #fff;
+}
+.video-msg-ai-edit-save:hover {
+  background: #3a7bc8;
+}
+.video-msg-ai-edit-cancel {
+  background: #e0e0e0;
+  color: #555;
+}
+.video-msg-ai-edit-cancel:hover {
+  background: #d0d0d0;
+}
+.video-msg-ai-edit-save:disabled,
+.video-msg-ai-edit-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .video-msg-popup-title-row {
   display: flex;
   align-items: center;
@@ -1751,12 +1845,20 @@
 
 /* Popup photo image */
 .vmsg-popup-photo {
-  width: 100%;
   display: block;
-  max-height: 400px;
-  object-fit: contain;
-  background: #1a1a1a;
-  aspect-ratio: 16 / 9;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+/* Portrait photos: crop to a taller-than-landscape window, click to see full */
+.vmsg-portrait-photo-wrap {
+  max-height: 300px;
+  overflow: hidden;
+  position: relative;
+}
+.vmsg-portrait-photo-wrap .vmsg-popup-photo {
+  object-fit: cover;
+  height: 300px;
 }
 
 .vmsg-popup-photo:not([src]),

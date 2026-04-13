@@ -11,12 +11,66 @@ function saveCameraId(deviceId) {
 }
 
 function applyAutofocus(stream) {
-  const track = stream?.getVideoTracks()[0];
+  // No-op: we no longer force continuous autofocus.
+  // Tap-to-focus is handled via bindTapToFocus on the video element.
+}
+
+/**
+ * Bind tap-to-focus on a video element.
+ * Taps trigger single-shot AF at the tapped point, then reverts to manual
+ * so the camera doesn't hunt. Works on devices that support focusMode + pointsOfInterest.
+ */
+function bindTapToFocus(videoEl, stream) {
+  if (!videoEl || !stream) return;
+  const track = stream.getVideoTracks()[0];
   if (!track) return;
   const caps = track.getCapabilities?.();
-  if (caps?.focusMode?.includes('continuous')) {
-    track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+  if (!caps?.focusMode) return;
+
+  let revertTimer = null;
+
+  // After initial focus completes, switch to manual to stop hunting
+  if (caps.focusMode.includes('manual')) {
+    setTimeout(() => {
+      track.applyConstraints({ advanced: [{ focusMode: 'manual' }] }).catch(() => {});
+    }, 2000);
   }
+
+  videoEl.addEventListener('click', (e) => {
+    const rect = videoEl.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+
+    const constraints = { advanced: [{}] };
+    if (caps.focusMode.includes('single-shot')) {
+      constraints.advanced[0].focusMode = 'single-shot';
+    }
+    if (caps.pointsOfInterest) {
+      constraints.advanced[0].pointsOfInterest = [{ x, y }];
+    }
+
+    track.applyConstraints(constraints).catch(() => {});
+
+    // Brief visual indicator
+    let dot = videoEl.parentElement?.querySelector('.vmsg-focus-dot');
+    if (!dot) {
+      dot = document.createElement('div');
+      dot.className = 'vmsg-focus-dot';
+      videoEl.parentElement?.appendChild(dot);
+    }
+    dot.style.left = `${e.clientX - rect.left}px`;
+    dot.style.top = `${e.clientY - rect.top}px`;
+    dot.classList.remove('vmsg-focus-animate');
+    void dot.offsetWidth;
+    dot.classList.add('vmsg-focus-animate');
+
+    clearTimeout(revertTimer);
+    revertTimer = setTimeout(() => {
+      if (caps.focusMode.includes('manual')) {
+        track.applyConstraints({ advanced: [{ focusMode: 'manual' }] }).catch(() => {});
+      }
+    }, 3000);
+  });
 }
 
 const MediaMixin = {
@@ -97,7 +151,6 @@ const MediaMixin = {
     const videoBase = {
       width: { ideal: this.RESOLUTION.width },
       height: { ideal: this.RESOLUTION.height },
-      aspectRatio: { ideal: 16 / 9 },
       frameRate: { ideal: 25, max: 25 },
       focusMode: { ideal: 'continuous' }
     };
@@ -247,7 +300,6 @@ const MediaMixin = {
     const videoBase = {
       width: { ideal: this.RESOLUTION.width },
       height: { ideal: this.RESOLUTION.height },
-      aspectRatio: { ideal: 16 / 9 },
       frameRate: { ideal: 25, max: 25 },
       focusMode: { ideal: 'continuous' }
     };
@@ -358,4 +410,4 @@ const MediaMixin = {
   },
 };
 
-export { MediaMixin, applyAutofocus, getSavedCameraId, saveCameraId };
+export { MediaMixin, applyAutofocus, bindTapToFocus, getSavedCameraId, saveCameraId };

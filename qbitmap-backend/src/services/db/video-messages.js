@@ -356,6 +356,13 @@ DatabaseService.prototype.saveVideoMessageTranslation = async function(messageId
   );
 };
 
+DatabaseService.prototype.clearVideoMessageTranslations = async function(messageId) {
+  await this.pool.execute(
+    'DELETE FROM video_message_translations WHERE message_id = ?',
+    [messageId]
+  );
+};
+
 DatabaseService.prototype.getAdminVideoMessages = async function(page = 1, limit = 20, filters = {}) {
   page = Math.max(1, parseInt(page) || 1);
   limit = Math.min(Math.max(1, parseInt(limit) || 20), 100);

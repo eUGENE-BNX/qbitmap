@@ -23,6 +23,7 @@ const PopupMixin = {
 
     const timeAgo = this.formatTimeAgo(createdAt);
     const isOwn = AuthSystem.isLoggedIn() && AuthSystem.getCurrentUser()?.id === parseInt(props.senderId);
+    const isAdmin = AuthSystem.isLoggedIn() && AuthSystem.getCurrentUser()?.role === 'admin';
     const isPrivateMsg = recipientId !== null;
 
     const esc = escapeHtml;
@@ -102,7 +103,7 @@ const PopupMixin = {
         ${description || aiDescription || placeName || tags.length > 0 || isOwn ? `
         <div class="video-msg-popup-meta">
           ${(description || aiDescription) ? `<div class="video-msg-popup-title-row">${description ? `<div class="video-msg-popup-title">${esc(description)}</div>` : '<div class="video-msg-popup-title-spacer"></div>'}${aiDescription ? `<div class="video-msg-ai-lang-wrap"><button type="button" class="video-msg-ai-lang-btn" data-ai-lang-btn title="Dil seç" aria-label="Dil seç"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></button><div class="video-msg-ai-lang-menu" data-ai-lang-menu hidden>${SUPPORTED_LANGS.map(l => `<button type="button" class="video-msg-ai-lang-item${l.code === aiDescriptionLang ? ' active' : ''}" data-lang="${l.code}">${l.label}</button>`).join('')}</div></div>` : ''}</div>` : ''}
-          ${aiDescription ? `<div class="video-msg-ai-wrap"><div class="video-msg-popup-ai-description" data-ai-desc>${esc(aiDescription)}</div><div class="video-msg-ai-fade" data-ai-fade><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div></div>` : ''}
+          ${aiDescription ? `<div class="video-msg-ai-wrap"><div class="video-msg-popup-ai-description" data-ai-desc>${esc(aiDescription)}</div><div class="video-msg-ai-fade" data-ai-fade><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>${isAdmin ? `<button class="video-msg-ai-edit-btn" data-action="edit-ai-desc" title="AI açıklamayı düzenle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>` : ''}</div>` : ''}
           ${placeName ? `<div class="video-msg-popup-place"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg> ${esc(placeName)}</div>` : ''}
           <div class="video-msg-popup-tags" data-tags-container>
             ${tags.map(t => `<span class="video-msg-popup-tag">${esc(t)}${isOwn ? '<button class="video-msg-tag-remove" data-tag="' + esc(t) + '">&times;</button>' : ''}</span>`).join('')}
@@ -169,14 +170,21 @@ const PopupMixin = {
       if (isPhoto) {
         const imgEl = popupEl.querySelector('.vmsg-popup-photo');
         if (imgEl) {
+          imgEl.onload = () => {
+            if (imgEl.naturalHeight > imgEl.naturalWidth) {
+              const body = imgEl.closest('.video-msg-popup-body');
+              if (body && !body.classList.contains('vmsg-portrait-photo-wrap')) {
+                body.classList.add('vmsg-portrait-photo-wrap');
+              }
+            }
+          };
           this.loadPhotoWithCredentials(imgEl, videoUrl);
 
-          // Click on photo or expand button → open fullscreen overlay
+          // Click on photo or expand button → open fullscreen overlay with original quality
           const expandBtn = popupEl.querySelector('[data-action="expand-photo"]');
+          const originalUrl = `${this.apiBase}/${encodeURIComponent(messageId)}/original`;
           const openOverlay = () => {
-            if (imgEl.src && imgEl.src.startsWith('blob:')) {
-              this.openPhotoOverlay(imgEl.src);
-            }
+            this.openPhotoOverlay(imgEl.src, originalUrl);
           };
           imgEl.style.cursor = 'pointer';
           imgEl.onclick = openOverlay;
@@ -251,6 +259,69 @@ const PopupMixin = {
       if (aiDesc && aiFade) {
         aiDesc.addEventListener('scroll', checkScroll);
         checkScroll();
+      }
+
+      // Admin: AI description edit
+      const editAiBtn = popupEl.querySelector('[data-action="edit-ai-desc"]');
+      if (editAiBtn && aiDesc) {
+        editAiBtn.onclick = () => {
+          const wrap = aiDesc.closest('.video-msg-ai-wrap');
+          if (wrap.querySelector('.video-msg-ai-edit-area')) return;
+          const currentText = aiDesc.textContent;
+          aiDesc.style.display = 'none';
+          if (aiFade) aiFade.style.display = 'none';
+          editAiBtn.style.display = 'none';
+
+          const editArea = document.createElement('div');
+          editArea.className = 'video-msg-ai-edit-area';
+          const textarea = document.createElement('textarea');
+          textarea.className = 'video-msg-ai-edit-textarea';
+          textarea.value = currentText;
+          textarea.rows = 4;
+          const btnRow = document.createElement('div');
+          btnRow.className = 'video-msg-ai-edit-actions';
+          btnRow.innerHTML = '<button class="video-msg-ai-edit-save">Kaydet</button><button class="video-msg-ai-edit-cancel">İptal</button>';
+          editArea.appendChild(textarea);
+          editArea.appendChild(btnRow);
+          wrap.insertBefore(editArea, editAiBtn);
+          textarea.focus();
+
+          const cancel = () => {
+            editArea.remove();
+            aiDesc.style.display = '';
+            if (aiFade) aiFade.style.display = '';
+            editAiBtn.style.display = '';
+          };
+
+          btnRow.querySelector('.video-msg-ai-edit-cancel').onclick = cancel;
+          btnRow.querySelector('.video-msg-ai-edit-save').onclick = async () => {
+            const newText = textarea.value.trim();
+            if (!newText) return;
+            textarea.disabled = true;
+            btnRow.querySelectorAll('button').forEach(b => b.disabled = true);
+            try {
+              const res = await fetch(`${QBitmapConfig.api.admin}/messages/${encodeURIComponent(messageId)}/ai-description`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: newText, lang: aiDescriptionLang })
+              });
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              aiDesc.textContent = newText;
+              cancel();
+              checkScroll();
+            } catch (err) {
+              Logger.warn('[VideoMessage] AI description edit failed:', err);
+              AuthSystem.showNotification('Kaydetme başarısız', 'error');
+              textarea.disabled = false;
+              btnRow.querySelectorAll('button').forEach(b => b.disabled = false);
+            }
+          };
+
+          textarea.onkeydown = (e) => {
+            if (e.key === 'Escape') cancel();
+          };
+        };
       }
 
       // AI description language dropdown
@@ -362,7 +433,7 @@ const PopupMixin = {
     imgEl.src = url;
   },
 
-  openPhotoOverlay(blobUrl) {
+  openPhotoOverlay(previewUrl, originalUrl) {
     // Remove existing overlay if any
     document.querySelector('.vmsg-photo-overlay')?.remove();
 
@@ -380,12 +451,24 @@ const PopupMixin = {
         <button class="vmsg-photo-overlay-btn close" data-action="close-overlay" title="Kapat">&times;</button>
       </div>
       <div class="vmsg-photo-overlay-container">
-        <img src="${blobUrl}" alt="Foto mesaj" draggable="false">
+        <img src="${previewUrl}" alt="Foto mesaj" draggable="false">
       </div>
     `;
     document.body.appendChild(overlay);
 
     const img = overlay.querySelector('img');
+
+    // Load original quality in background, swap when ready
+    if (originalUrl) {
+      fetch(originalUrl, { credentials: 'include' })
+        .then(r => r.ok ? r.blob() : null)
+        .then(blob => {
+          if (blob && blob.size > 0) {
+            img.src = URL.createObjectURL(blob);
+          }
+        })
+        .catch(() => {});
+    }
     const container = overlay.querySelector('.vmsg-photo-overlay-container');
     let scale = 1;
     let panX = 0, panY = 0;
