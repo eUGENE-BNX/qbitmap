@@ -150,7 +150,8 @@ class LayersDropdownControl {
             { id: 'vehicles', label: 'Online Araçlar' },
             { id: 'past-broadcasts', label: 'Yayın Kayıtları' },
             { id: 'tesla-vehicles', label: 'Tesla Mesh' },
-            { id: 'teslacam-live', label: 'TeslaCam' }
+            { id: 'teslacam-live', label: 'TeslaCam' },
+            { id: 'usdt', label: 'USDT' }
         ];
 
         this._toggles = {};
@@ -361,6 +362,15 @@ class LayersDropdownControl {
                     });
                 }
                 break;
+            case 'usdt':
+                layers.usdtVisible = !layers.usdtVisible;
+                toggle.classList.toggle('active', layers.usdtVisible);
+                if (layers.usdtVisible) {
+                    import('/js/usdt-layer.js').then(m => m.UsdtLayer.show(this._map));
+                } else {
+                    import('/js/usdt-layer.js').then(m => m.UsdtLayer.hide(this._map));
+                }
+                break;
         }
         this._updateButtonState();
     }
@@ -394,7 +404,7 @@ class LayersDropdownControl {
     }
 
     _updateButtonState() {
-        const anyActive = _satelliteMode || _videoLayerVisible || _buildings3DVisible || layers.h3GridVisible || layers.vehiclesVisible || layers.teslaVehiclesVisible || layers.teslaCamLiveVisible || _videoMessagesVisible || _photoMessagesVisible;
+        const anyActive = _satelliteMode || _videoLayerVisible || _buildings3DVisible || layers.h3GridVisible || layers.vehiclesVisible || layers.teslaVehiclesVisible || layers.teslaCamLiveVisible || _videoMessagesVisible || _photoMessagesVisible || layers.usdtVisible;
         this._button.style.backgroundColor = anyActive ? '#a0a0a0' : '';
         this._button.style.color = anyActive ? '#fff' : '';
     }
