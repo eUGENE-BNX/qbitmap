@@ -202,8 +202,18 @@
   border: 1px solid #e8eaed;
   border-radius: 10px;
   padding: 12px 14px;
-  margin-top: 14px;
+  margin-top: 6px;
   margin-bottom: 10px;
+}
+
+.profile-tesla-section-label {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #9aa0a6;
+  letter-spacing: 0.5px;
 }
 
 .profile-tesla-temp-corner {
@@ -819,7 +829,7 @@
 
 .profile-recent-section h4,
 .profile-section-title {
-  margin: 0 0 8px 0;
+  margin: 0 0 3px 0;
   font-size: 13px;
   font-weight: 600;
   color: #202124;
@@ -834,7 +844,7 @@
 }
 
 .profile-section-title + .profile-tesla-section {
-  margin-top: 0;
+  margin-top: 6px;
 }
 
 .profile-media-grid {
@@ -881,10 +891,7 @@
 }
 
 .media-card-time {
-  display: block;
-  font-size: 10px;
-  color: #80868b;
-  margin-top: 2px;
+  display: none;
 }
 
 .profile-recent-empty {

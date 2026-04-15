@@ -203,8 +203,8 @@ const UserProfileSystem = {
 
   renderTeslaConnectCard() {
     return `
-      <h4 class="profile-section-title">TESLA</h4>
       <div class="profile-tesla-section profile-tesla-cta">
+        <span class="profile-tesla-section-label">TESLA</span>
         <div class="profile-tesla-cta-row">
           <div class="profile-tesla-logo">T</div>
           <div class="profile-tesla-cta-text">
@@ -258,8 +258,8 @@ const UserProfileSystem = {
     const telemetryOff = vehicle.telemetryEnabled === false;
 
     return `
-      <h4 class="profile-section-title">TESLA</h4>
       <div class="profile-tesla-section">
+        <span class="profile-tesla-section-label">TESLA</span>
         ${telemetryOff ? `
           <div class="profile-tesla-banner" data-vehicle-id="${escapeHtml(vehicleId)}">
             <div class="profile-tesla-banner-text">
@@ -529,7 +529,7 @@ const UserProfileSystem = {
       return `<div class="profile-recent-section">${header}<div class="profile-recent-empty">Henüz paylaşım yok</div></div>`;
     }
 
-    const thumbs = messages.map(msg => {
+    const thumbs = messages.slice(0, 5).map(msg => {
       const isVideo = msg.media_type === 'video';
       const thumbUrl = `${QBitmapConfig.api.base}/api/video-messages/${encodeURIComponent(msg.message_id)}/thumbnail`;
       const timeAgo = this.formatTimeAgo(msg.created_at);
@@ -554,8 +554,8 @@ const UserProfileSystem = {
       return `<div class="profile-recent-section">${header}<div class="profile-recent-empty">Henüz kayıtlı yayın yok</div></div>`;
     }
 
-    // Show last 8
-    const items = recordings.slice(0, 8);
+    // Show last 5 (single row)
+    const items = recordings.slice(0, 5);
     const cards = items.map(rec => {
       const thumbUrl = `${QBitmapConfig.api.base}/api/broadcast-recordings/${encodeURIComponent(rec.recording_id)}/thumbnail`;
       const timeAgo = this.formatTimeAgo(rec.created_at);

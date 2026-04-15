@@ -1,5 +1,5 @@
 import { QBitmapConfig } from "../../config.js";
-import { Logger } from "../../utils.js";
+import { Logger, escapeHtml } from "../../utils.js";
 import { AuthSystem } from "../../auth.js";
 
 const AiMixin = {
@@ -535,8 +535,15 @@ const AiMixin = {
       btn.title = 'AI Analiz';
     }
 
-    // Clear any active alarm for this camera
+    // Clear any active alarm for this camera (also notify backend)
     if (this.activeAlarms.has(deviceId)) {
+      const alarm = this.activeAlarms.get(deviceId);
+      if (alarm?.id) {
+        fetch(`${QBitmapConfig.api.monitoring}/alarms/${alarm.id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        }).catch(e => Logger.error('[AI Analyze] Failed to clear alarm on backend:', e));
+      }
       this.activeAlarms.delete(deviceId);
       this.dismissAlarm();
       this.updateCameraIcon(deviceId);
@@ -659,8 +666,7 @@ const AiMixin = {
             alarmEl.className = 'ai-alarm active';
             alarmEl.innerHTML = `
               <div class="ai-alarm-header">
-                <span class="ai-alarm-icon">\u{1F6A8}</span>
-                <span class="ai-alarm-title">ACIL DURUM</span>
+                <span class="ai-alarm-title">ALARM!</span>
                 <button class="ai-alarm-close">&times;</button>
               </div>
               <div class="ai-alarm-body">

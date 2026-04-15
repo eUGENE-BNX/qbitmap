@@ -996,12 +996,12 @@
 .ai-alarm {
   position: fixed;
   top: 20px;
-  right: 20px;
+  right: 70px;
   width: 360px;
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(220, 53, 69, 0.4);
-  border: 2px solid #dc3545;
+  box-shadow: 0 8px 32px rgba(205, 92, 92, 0.35);
+  border: 2px solid #cd5c5c;
   z-index: 10000;
   opacity: 0;
   transform: translateX(100%);
@@ -1015,16 +1015,16 @@
 }
 
 @keyframes alarm-pulse {
-  0%, 100% { box-shadow: 0 8px 32px rgba(220, 53, 69, 0.4); }
-  50% { box-shadow: 0 8px 48px rgba(220, 53, 69, 0.7); }
+  0%, 100% { box-shadow: 0 8px 32px rgba(205, 92, 92, 0.35); }
+  50% { box-shadow: 0 8px 48px rgba(205, 92, 92, 0.55); }
 }
 
 .ai-alarm-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
-  background: #dc3545;
+  padding: 8px 16px;
+  background: #cd5c5c;
   color: #fff;
   border-radius: 10px 10px 0 0;
 }
@@ -1040,8 +1040,8 @@
 }
 
 .ai-alarm-title {
-  font-weight: 700;
-  font-size: 16px;
+  font-weight: 500;
+  font-size: 14px;
 }
 
 .ai-alarm-close {

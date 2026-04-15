@@ -5,6 +5,7 @@ import * as AppState from '../state.js';
 import { OnvifMixin } from './settings/onvif.js';
 import { LocationMixin } from './settings/location.js';
 import { ActionsMixin } from './settings/actions.js';
+import { buildPromptFromRules } from './ai-prompt.js';
 
 /**
  * QBitmap Camera System - Settings Module
@@ -626,9 +627,7 @@ const SettingsMixin = {
 
     const updatePreview = () => {
       const rules = this._collectDetectionRules();
-      if (typeof buildPromptFromRules === 'function') {
-        preview.value = buildPromptFromRules(rules);
-      }
+      preview.value = buildPromptFromRules(rules);
     };
 
     const addRow = (text = '', alarm = true) => {

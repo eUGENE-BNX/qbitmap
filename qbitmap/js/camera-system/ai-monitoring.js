@@ -1,6 +1,7 @@
 import { QBitmapConfig } from '../config.js';
 import { Logger, TimerManager, escapeHtml } from '../utils.js';
 import { Analytics } from '../analytics.js';
+import { AI_VISION_PROMPT, buildPromptFromRules } from './ai-prompt.js';
 
 /**
  * QBitmap Camera System - AI Monitoring Module
@@ -122,7 +123,7 @@ const AIMonitoringMixin = {
         if (Date.now() - parsed.time < 300000) { data = parsed.data; }
       }
       if (!data) {
-        const resp = await fetch(`${this.apiSettings}/${deviceId}`);
+        const resp = await fetch(`${this.apiSettings}/${deviceId}`, { credentials: 'include' });
         data = await resp.json();
         try { localStorage.setItem(cacheKey, JSON.stringify({ data, time: Date.now() })); } catch (e) {}
       }
@@ -192,8 +193,15 @@ const AIMonitoringMixin = {
     // Clear global state
     this.aiMonitoring.delete(deviceId);
 
-    // Clear any active alarm for this camera
+    // Clear any active alarm for this camera (also notify backend)
     if (this.activeAlarms.has(deviceId)) {
+      const alarm = this.activeAlarms.get(deviceId);
+      if (alarm?.id) {
+        fetch(`${QBitmapConfig.api.monitoring}/alarms/${alarm.id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        }).catch(e => Logger.error('[AI] Failed to clear alarm on backend:', e));
+      }
       this.activeAlarms.delete(deviceId);
       this.dismissAlarm();
     }
@@ -277,7 +285,7 @@ const AIMonitoringMixin = {
     };
 
     try {
-      const resp = await fetch(`${this.apiSettings}/${deviceId}`);
+      const resp = await fetch(`${this.apiSettings}/${deviceId}`, { credentials: 'include' });
       if (resp.ok) {
         const data = await resp.json();
         const s = data.settings || {};
@@ -388,7 +396,7 @@ const AIMonitoringMixin = {
       let temperature = globalAi.temperature || 0.7;
 
       try {
-        const settingsResp = await fetch(`${this.apiSettings}/${deviceId}`);
+        const settingsResp = await fetch(`${this.apiSettings}/${deviceId}`, { credentials: 'include' });
         if (settingsResp.ok) {
           const settingsData = await settingsResp.json();
           const s = settingsData.settings || {};
@@ -696,8 +704,7 @@ const AIMonitoringMixin = {
     alarm.className = 'ai-alarm active';
     alarm.innerHTML = `
       <div class="ai-alarm-header">
-        <span class="ai-alarm-icon">🚨</span>
-        <span class="ai-alarm-title">ACIL DURUM</span>
+        <span class="ai-alarm-title">ALARM!</span>
         <button class="ai-alarm-close">&times;</button>
       </div>
       <div class="ai-alarm-body">
