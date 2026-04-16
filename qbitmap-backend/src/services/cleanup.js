@@ -1,8 +1,19 @@
 const cron = require('node-cron');
+const fs = require('fs');
+const fsp = require('fs').promises;
+const path = require('path');
 const db = require('./database');
 const mediamtx = require('./mediamtx');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const logger = require('../utils/logger').child({ module: 'cleanup' });
+
+const UPLOADS_DIR = path.resolve(__dirname, '../../uploads/video-messages');
+const ORIGINALS_DIR = path.resolve(UPLOADS_DIR, 'originals');
+// Files younger than this are skipped — they may belong to an in-progress
+// upload whose DB row has not been committed yet.
+const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000; // 1 hour
+// Filename format: {pmsg|vmsg}_{userId}_{time36}[_thumb|_preview].{ext}
+const MSG_ID_RE = /^((?:pmsg|vmsg)_\d+_[a-z0-9]+)(?:_thumb|_preview)?\./i;
 
 // [PERF-05] Bound the MediaMTX probe so one slow/unresponsive check can't
 // wedge the whole 15-second broadcast cleanup interval. 5s matches the
@@ -63,8 +74,63 @@ class CleanupService {
         logger.info({ count: faceResult.affectedRows }, 'Cleaned up old face detection logs');
       }
 
+      // Video-message uploads: reclaim files whose DB row is gone.
+      // deleteVideoMessage uses fire-and-forget fs.unlink with a no-op
+      // catch, so a crash / permissions blip leaves files behind. FK CASCADE
+      // on translations handles rows; files are our last drift source.
+      await this.cleanupOrphanUploads();
+
     } catch (error) {
       logger.error({ err: error }, 'Maintenance error');
+    }
+  }
+
+  async cleanupOrphanUploads() {
+    if (!fs.existsSync(UPLOADS_DIR)) return;
+    const now = Date.now();
+    const messageIdsSeen = new Set();
+    const fileEntries = [];
+
+    const scanDir = async (dir) => {
+      const entries = await fsp.readdir(dir, { withFileTypes: true }).catch(() => []);
+      for (const entry of entries) {
+        if (entry.isDirectory()) continue; // originals/ is scanned separately
+        const match = entry.name.match(MSG_ID_RE);
+        if (!match) continue;
+        const filePath = path.join(dir, entry.name);
+        const stat = await fsp.stat(filePath).catch(() => null);
+        if (!stat) continue;
+        if (now - stat.mtimeMs < ORPHAN_MIN_AGE_MS) continue;
+        messageIdsSeen.add(match[1]);
+        fileEntries.push({ filePath, messageId: match[1] });
+      }
+    };
+
+    await scanDir(UPLOADS_DIR);
+    await scanDir(ORIGINALS_DIR);
+
+    if (messageIdsSeen.size === 0) return;
+
+    const ids = Array.from(messageIdsSeen);
+    const placeholders = ids.map(() => '?').join(',');
+    const [rows] = await db.pool.query(
+      `SELECT message_id FROM video_messages WHERE message_id IN (${placeholders})`,
+      ids
+    );
+    const alive = new Set(rows.map(r => r.message_id));
+
+    let deleted = 0;
+    for (const { filePath, messageId } of fileEntries) {
+      if (alive.has(messageId)) continue;
+      try {
+        await fsp.unlink(filePath);
+        deleted++;
+      } catch (err) {
+        logger.warn({ err: err.message, filePath }, 'Orphan upload unlink failed');
+      }
+    }
+    if (deleted > 0) {
+      logger.info({ deleted, scanned: fileEntries.length }, 'Orphan upload files reclaimed');
     }
   }
 

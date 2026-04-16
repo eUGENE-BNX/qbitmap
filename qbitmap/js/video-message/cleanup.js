@@ -1,6 +1,7 @@
 import { Logger, escapeHtml, escapeHtmlAllowFormat } from "../utils.js";
 import { Analytics } from "../analytics.js";
 import * as AppState from '../state.js';
+import { buildMessagePopupProps } from './props.js';
 
 const CleanupMixin = {
   handleNewMessage(payload) {
@@ -266,25 +267,7 @@ const CleanupMixin = {
             setTimeout(() => {
               const msg = this.videoMessages.get(msgId);
               if (msg) {
-                this.openMessagePopup({
-                  messageId: msg.message_id,
-                  senderId: msg.sender_id,
-                  senderName: msg.sender_name,
-                  senderAvatar: msg.sender_avatar,
-                  recipientId: msg.recipient_id,
-                  durationMs: msg.duration_ms,
-                  mimeType: msg.mime_type,
-                  mediaType: msg.media_type || 'video',
-                  isRead: msg.is_read,
-                  createdAt: msg.created_at,
-                  viewCount: msg.view_count || 0,
-                  likeCount: msg.like_count || 0,
-                  liked: msg.liked ? 'true' : 'false',
-                  description: msg.description || '',
-                  aiDescription: msg.ai_description || '',
-                  tags: JSON.stringify(msg.tags || []),
-                  thumbnailPath: msg.thumbnail_path || ''
-                }, [msg.lng, msg.lat]);
+                this.openMessagePopup(buildMessagePopupProps(msg), [msg.lng, msg.lat]);
               }
             }, 1500);
           }

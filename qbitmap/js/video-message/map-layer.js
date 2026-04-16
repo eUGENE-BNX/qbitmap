@@ -2,6 +2,7 @@ import { QBitmapConfig } from "../config.js";
 import { Logger, escapeHtml } from "../utils.js";
 import { AuthSystem } from "../auth.js";
 import * as AppState from '../state.js';
+import { buildMessagePopupProps } from './props.js';
 
 const MapLayerMixin = {
   initMapLayer() {
@@ -358,27 +359,7 @@ const MapLayerMixin = {
     const openMsg = () => {
       AppState.map.flyTo({ center: [msg.lng, msg.lat], zoom: Math.max(AppState.map.getZoom(), 16) });
       setTimeout(() => {
-        this.openMessagePopup({
-          messageId: msg.message_id,
-          senderId: msg.sender_id,
-          senderName: msg.sender_name,
-          senderAvatar: msg.sender_avatar,
-          recipientId: msg.recipient_id,
-          durationMs: msg.duration_ms,
-          mimeType: msg.mime_type,
-          mediaType: msg.media_type || 'video',
-          isRead: msg.is_read,
-          createdAt: msg.created_at,
-          viewCount: msg.view_count || 0,
-          likeCount: msg.like_count || 0,
-          liked: msg.liked ? 'true' : 'false',
-          description: msg.description || '',
-          aiDescription: msg.ai_description || '',
-          aiDescriptionLang: msg.ai_description_lang || '',
-          tags: JSON.stringify(msg.tags || []),
-          thumbnailPath: msg.thumbnail_path || '',
-          placeName: msg.place_name || ''
-        }, [msg.lng, msg.lat]);
+        this.openMessagePopup(buildMessagePopupProps(msg), [msg.lng, msg.lat]);
       }, 1500);
     };
 

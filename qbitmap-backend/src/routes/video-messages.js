@@ -10,7 +10,16 @@ const videoAiQueue = require('../services/video-ai-queue');
 const photoAiQueue = require('../services/photo-ai-queue');
 const { safePath } = require('../utils/validation');
 const { validateMagicBytes } = require('../utils/file-validation');
+const { assertCanViewMessage } = require('../utils/message-access');
+const { Semaphore } = require('../utils/semaphore');
 const { execFile } = require('child_process');
+
+// Cap concurrent FFmpeg optimize processes. Photo optimize is synchronous
+// (the response awaits completion so the caller never races the rename of
+// filePath), so without a cap N concurrent uploads = N FFmpeg processes
+// = CPU thrash + each job taking 5-10x longer. 3 keeps the CPU busy while
+// leaving headroom for video ffprobe/thumbnail work.
+const photoOptimizeSem = new Semaphore(3);
 
 const UPLOADS_DIR = path.resolve(__dirname, '../../uploads/video-messages');
 const ALLOWED_MIME_TYPES = ['video/mp4', 'video/webm', 'image/jpeg', 'image/png', 'image/webp'];
@@ -156,7 +165,7 @@ async function videoMessageRoutes(fastify, options) {
         const originalPath = path.resolve(ORIGINALS_DIR, `${messageId}.${ext}`);
         try {
           await fs.promises.copyFile(filePath, originalPath);
-          await new Promise((resolve, reject) => {
+          await photoOptimizeSem.run(() => new Promise((resolve, reject) => {
             const args = [
               '-i', originalPath,
               '-vf', `scale='min(${OPTIMIZED_MAX_DIM},iw)':'min(${OPTIMIZED_MAX_DIM},ih)':force_original_aspect_ratio=decrease`,
@@ -167,7 +176,7 @@ async function videoMessageRoutes(fastify, options) {
               '-y', filePath
             ];
             execFile('/usr/bin/ffmpeg', args, { timeout: 15000 }, (err) => err ? reject(err) : resolve());
-          });
+          }));
           const optStats = await fs.promises.stat(filePath);
           logger.info({ messageId, originalSize: fileSize, optimizedSize: optStats.size }, 'Photo optimized, original archived');
         } catch (optErr) {
@@ -422,13 +431,8 @@ async function videoMessageRoutes(fastify, options) {
         return reply.code(404).send({ error: 'Thumbnail not found' });
       }
 
-      // Access control for private messages
-      if (msg.recipient_id !== null) {
-        const userId = request.user?.userId;
-        if (!userId || (msg.sender_id !== userId && msg.recipient_id !== userId)) {
-          return reply.code(403).send({ error: 'Access denied' });
-        }
-      }
+      const denied = assertCanViewMessage(msg, request.user);
+      if (denied) return reply.code(denied.code).send(denied.body);
 
       let thumbPath = safePath(msg.thumbnail_path, 'uploads');
       // Try preview version if requested
@@ -466,13 +470,8 @@ async function videoMessageRoutes(fastify, options) {
         return reply.code(404).send({ error: 'Message not found' });
       }
 
-      // Access control for private messages
-      if (msg.recipient_id !== null) {
-        const userId = request.user?.userId;
-        if (!userId || (msg.sender_id !== userId && msg.recipient_id !== userId)) {
-          return reply.code(403).send({ error: 'Access denied' });
-        }
-      }
+      const denied = assertCanViewMessage(msg, request.user);
+      if (denied) return reply.code(denied.code).send(denied.body);
 
       return { message: msg };
     } catch (error) {
@@ -497,13 +496,8 @@ async function videoMessageRoutes(fastify, options) {
       const msg = await db.getVideoMessageById(messageId);
       if (!msg) return reply.code(404).send({ error: 'Message not found' });
 
-      // Access control for private messages
-      if (msg.recipient_id !== null) {
-        const userId = request.user?.userId;
-        if (!userId || (msg.sender_id !== userId && msg.recipient_id !== userId)) {
-          return reply.code(403).send({ error: 'Access denied' });
-        }
-      }
+      const denied = assertCanViewMessage(msg, request.user);
+      if (denied) return reply.code(denied.code).send(denied.body);
 
       if (!msg.ai_description) {
         return reply.code(404).send({ error: 'No AI description yet' });
@@ -542,13 +536,8 @@ async function videoMessageRoutes(fastify, options) {
         return reply.code(404).send({ error: 'Message not found' });
       }
 
-      // Access control for private messages
-      if (msg.recipient_id !== null) {
-        const userId = request.user?.userId;
-        if (!userId || (msg.sender_id !== userId && msg.recipient_id !== userId)) {
-          return reply.code(403).send({ error: 'Access denied' });
-        }
-      }
+      const denied = assertCanViewMessage(msg, request.user);
+      if (denied) return reply.code(denied.code).send(denied.body);
 
       const filePath = safePath(msg.file_path, 'uploads');
       if (!filePath) {
@@ -606,12 +595,8 @@ async function videoMessageRoutes(fastify, options) {
         return reply.code(404).send({ error: 'Photo not found' });
       }
 
-      if (msg.recipient_id !== null) {
-        const userId = request.user?.userId;
-        if (!userId || (msg.sender_id !== userId && msg.recipient_id !== userId)) {
-          return reply.code(403).send({ error: 'Access denied' });
-        }
-      }
+      const denied = assertCanViewMessage(msg, request.user);
+      if (denied) return reply.code(denied.code).send(denied.body);
 
       // Try original first, fall back to optimized
       const baseName = path.basename(msg.file_path);
