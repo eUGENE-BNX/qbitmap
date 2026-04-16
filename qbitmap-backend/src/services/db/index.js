@@ -159,9 +159,10 @@ class DatabaseService {
         );
         logger.info({ migration: file }, 'Migration applied successfully');
       } catch (err) {
-        // 1060 = Duplicate column name, 1061 = Duplicate key name
-        // These mean the DDL was already applied manually — safe to skip.
-        if (err.errno === 1060 || err.errno === 1061) {
+        // Idempotent DDL errors: the change is already in place.
+        // 1060 duplicate column, 1061 duplicate key,
+        // 1826 duplicate foreign key name, 1091 can't drop (already gone).
+        if (err.errno === 1060 || err.errno === 1061 || err.errno === 1826 || err.errno === 1091) {
           await this.pool.execute(
             'INSERT IGNORE INTO schema_migrations (name, checksum) VALUES (?, ?)',
             [file, checksum]

@@ -1,5 +1,5 @@
 import { QBitmapConfig } from '../../config.js';
-import { escapeHtml } from '../../utils.js';
+import { escapeHtml, escapeHtmlAllowFormat } from '../../utils.js';
 import { safeAvatarUrl } from './utils.js';
 
 export const MessagesMixin = {
@@ -43,7 +43,7 @@ export const MessagesMixin = {
       const durationStr = isVideo && msg.duration_ms ? ` / ${(msg.duration_ms / 1000).toFixed(1)}s` : '';
       const visibility = msg.recipient_id ? '<span class="badge badge-private">Private</span>' : '<span class="badge badge-public">Public</span>';
       const tagsHtml = (msg.tags || []).map(t => `<span class="msg-tag">${escapeHtml(t)}</span>`).join('') || '<span class="msg-meta">-</span>';
-      const aiSnippet = msg.ai_description ? `<div class="msg-ai-desc" title="${escapeHtml(msg.ai_description)}">${escapeHtml(msg.ai_description)}</div>` : '';
+      const aiSnippet = msg.ai_description ? `<div class="msg-ai-desc" title="${escapeHtml(msg.ai_description)}">${escapeHtmlAllowFormat(msg.ai_description)}</div>` : '';
 
       return `<tr>
         <td>${thumbHtml}</td>

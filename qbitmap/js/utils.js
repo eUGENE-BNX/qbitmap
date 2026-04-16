@@ -45,6 +45,20 @@ function sanitize(str) {
 }
 
 /**
+ * HTML escape with <b>/<i>/<u> allowlist.
+ * For admin-editable text where simple bold/italic/underline is desired
+ * without opening the door to arbitrary HTML. Safe: tags are matched
+ * exactly after full escape, so attributes or other tags cannot slip through.
+ */
+function escapeHtmlAllowFormat(str) {
+  if (!str) return '';
+  return escapeHtml(str)
+    .replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>')
+    .replace(/&lt;i&gt;/g, '<i>').replace(/&lt;\/i&gt;/g, '</i>')
+    .replace(/&lt;u&gt;/g, '<u>').replace(/&lt;\/u&gt;/g, '</u>');
+}
+
+/**
  * Fetch with timeout and optional retry
  * @param {string} url - URL to fetch
  * @param {object} options - Fetch options
@@ -187,4 +201,4 @@ const TimerManager = {
   }
 };
 
-export { Logger, escapeHtml, sanitize, fetchWithTimeout, loadUserCameras, showNotification, TimerManager };
+export { Logger, escapeHtml, escapeHtmlAllowFormat, sanitize, fetchWithTimeout, loadUserCameras, showNotification, TimerManager };

@@ -557,7 +557,9 @@ CREATE TABLE IF NOT EXISTS video_message_translations (
   text VARCHAR(1200) NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (message_id, lang),
-  FULLTEXT INDEX ft_vmsg_trans (text)
+  FULLTEXT INDEX ft_vmsg_trans (text),
+  CONSTRAINT fk_vmsg_trans_message FOREIGN KEY (message_id)
+    REFERENCES video_messages(message_id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================

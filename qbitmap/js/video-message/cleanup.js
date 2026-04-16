@@ -1,4 +1,4 @@
-import { Logger, escapeHtml } from "../utils.js";
+import { Logger, escapeHtml, escapeHtmlAllowFormat } from "../utils.js";
 import { Analytics } from "../analytics.js";
 import * as AppState from '../state.js';
 
@@ -69,7 +69,7 @@ const CleanupMixin = {
 
         const existing = popupRoot.querySelector('.video-msg-popup-ai-description');
         if (existing) {
-          existing.textContent = aiText;
+          existing.innerHTML = escapeHtmlAllowFormat(aiText);
           existing.style.display = '';
         } else {
           // No ai-description element yet — inject into meta section
@@ -86,7 +86,7 @@ const CleanupMixin = {
           if (meta) {
             const div = document.createElement('div');
             div.className = 'video-msg-popup-ai-description';
-            div.textContent = aiText;
+            div.innerHTML = escapeHtmlAllowFormat(aiText);
             meta.appendChild(div);
           }
         }

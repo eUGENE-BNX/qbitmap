@@ -1,5 +1,5 @@
 import { QBitmapConfig } from "../config.js";
-import { Logger, escapeHtml, sanitize } from "../utils.js";
+import { Logger, escapeHtml, escapeHtmlAllowFormat, sanitize } from "../utils.js";
 import { AuthSystem } from "../auth.js";
 import { Analytics } from "../analytics.js";
 import { ReportSystem } from "../report.js";
@@ -27,6 +27,7 @@ const PopupMixin = {
     const isPrivateMsg = recipientId !== null;
 
     const esc = escapeHtml;
+    const escFmt = escapeHtmlAllowFormat;
 
     const videoUrl = `${this.apiBase}/${encodeURIComponent(messageId)}/video`;
 
@@ -103,7 +104,7 @@ const PopupMixin = {
         ${description || aiDescription || placeName || tags.length > 0 || isOwn ? `
         <div class="video-msg-popup-meta">
           ${(description || aiDescription) ? `<div class="video-msg-popup-title-row">${description ? `<div class="video-msg-popup-title">${esc(description)}</div>` : '<div class="video-msg-popup-title-spacer"></div>'}${aiDescription ? `<div class="video-msg-ai-lang-wrap"><button type="button" class="video-msg-ai-lang-btn" data-ai-lang-btn title="Dil seç" aria-label="Dil seç"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></button><div class="video-msg-ai-lang-menu" data-ai-lang-menu hidden>${SUPPORTED_LANGS.map(l => `<button type="button" class="video-msg-ai-lang-item${l.code === aiDescriptionLang ? ' active' : ''}" data-lang="${l.code}">${l.label}</button>`).join('')}</div></div>` : ''}</div>` : ''}
-          ${aiDescription ? `<div class="video-msg-ai-wrap"><div class="video-msg-popup-ai-description" data-ai-desc>${esc(aiDescription)}</div><div class="video-msg-ai-fade" data-ai-fade><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>${isAdmin ? `<button class="video-msg-ai-edit-btn" data-action="edit-ai-desc" title="AI açıklamayı düzenle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>` : ''}</div>` : ''}
+          ${aiDescription ? `<div class="video-msg-ai-wrap"><div class="video-msg-popup-ai-description" data-ai-desc>${escFmt(aiDescription)}</div><div class="video-msg-ai-fade" data-ai-fade><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>${isAdmin ? `<button class="video-msg-ai-edit-btn" data-action="edit-ai-desc" title="AI açıklamayı düzenle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>` : ''}</div>` : ''}
           ${placeName ? `<div class="video-msg-popup-place"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg> ${esc(placeName)}</div>` : ''}
           <div class="video-msg-popup-tags" data-tags-container>
             ${tags.map(t => `<span class="video-msg-popup-tag">${esc(t)}${isOwn ? '<button class="video-msg-tag-remove" data-tag="' + esc(t) + '">&times;</button>' : ''}</span>`).join('')}
@@ -261,13 +262,20 @@ const PopupMixin = {
         checkScroll();
       }
 
+      // Raw (unrendered) text cache shared by admin-edit and language dropdown.
+      // Tracks current displayed raw text so <b>/<i>/<u> tags survive
+      // edit/lang-switch round-trips (innerHTML render loses source tag info).
+      let currentRawText = aiDescription;
+      const langCache = new Map();
+      langCache.set(aiDescriptionLang, aiDescription);
+
       // Admin: AI description edit
       const editAiBtn = popupEl.querySelector('[data-action="edit-ai-desc"]');
       if (editAiBtn && aiDesc) {
         editAiBtn.onclick = () => {
           const wrap = aiDesc.closest('.video-msg-ai-wrap');
           if (wrap.querySelector('.video-msg-ai-edit-area')) return;
-          const currentText = aiDesc.textContent;
+          const currentText = currentRawText;
           aiDesc.style.display = 'none';
           if (aiFade) aiFade.style.display = 'none';
           editAiBtn.style.display = 'none';
@@ -307,7 +315,9 @@ const PopupMixin = {
                 body: JSON.stringify({ text: newText, lang: aiDescriptionLang })
               });
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              aiDesc.textContent = newText;
+              aiDesc.innerHTML = escFmt(newText);
+              currentRawText = newText;
+              langCache.set(aiDescriptionLang, newText);
               cancel();
               checkScroll();
             } catch (err) {
@@ -329,11 +339,16 @@ const PopupMixin = {
       const langMenu = popupEl.querySelector('[data-ai-lang-menu]');
       const langItems = langMenu ? langMenu.querySelectorAll('[data-lang]') : [];
       if (langBtn && langMenu && aiDesc) {
-        const cache = new Map();
-        cache.set(aiDescriptionLang, aiDescription);
+        // Monotonic request id: lets us ignore stale responses when the user
+        // clicks A→B→A rapidly and an earlier in-flight fetch resolves last.
+        let langReqSeq = 0;
 
-        const closeMenu = () => { langMenu.hidden = true; document.removeEventListener('click', onDocClick, true); };
         const onDocClick = (e) => { if (!langMenu.contains(e.target) && e.target !== langBtn) closeMenu(); };
+        const closeMenu = () => { langMenu.hidden = true; document.removeEventListener('click', onDocClick, true); };
+        // Popup close ≠ menu close — guarantee the document listener is removed
+        // even if the popup is dismissed while the menu is still open.
+        popup.on('close', () => document.removeEventListener('click', onDocClick, true));
+
         langBtn.onclick = (e) => {
           e.stopPropagation();
           if (langMenu.hidden) {
@@ -353,32 +368,40 @@ const PopupMixin = {
             langItems.forEach(b => b.classList.remove('active'));
             item.classList.add('active');
 
-            if (cache.has(target)) {
-              aiDesc.textContent = cache.get(target);
+            if (langCache.has(target)) {
+              const cached = langCache.get(target);
+              aiDesc.innerHTML = escFmt(cached);
+              currentRawText = cached;
               aiDesc.scrollTop = 0;
               checkScroll();
               return;
             }
 
-            const prevText = aiDesc.textContent;
+            const mySeq = ++langReqSeq;
+            const prevRaw = currentRawText;
             aiDesc.style.opacity = '0.5';
             try {
               const res = await fetch(`${this.apiBase}/${encodeURIComponent(messageId)}/description?lang=${target}`, {
                 credentials: 'include'
               });
+              if (mySeq !== langReqSeq) return;
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
               const data = await res.json();
-              cache.set(target, data.text);
-              aiDesc.textContent = data.text;
+              if (mySeq !== langReqSeq) return;
+              langCache.set(target, data.text);
+              aiDesc.innerHTML = escFmt(data.text);
+              currentRawText = data.text;
               aiDesc.scrollTop = 0;
               checkScroll();
             } catch (err) {
+              if (mySeq !== langReqSeq) return;
               Logger.warn('[VideoMessage] Translation fetch failed:', err);
               AuthSystem.showNotification('Çeviri alınamadı', 'error');
-              aiDesc.textContent = prevText;
+              aiDesc.innerHTML = escFmt(prevRaw);
+              currentRawText = prevRaw;
               langItems.forEach(b => b.classList.toggle('active', b.dataset.lang === aiDescriptionLang));
             } finally {
-              aiDesc.style.opacity = '';
+              if (mySeq === langReqSeq) aiDesc.style.opacity = '';
             }
           };
         });
