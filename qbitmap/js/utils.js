@@ -1,4 +1,8 @@
 import { QBitmapConfig } from './config.js';
+// HTML escape helpers live in a dedicated window-free module so the
+// node:test XSS regression suite can import them without a DOM shim.
+// Re-exported here to keep the existing utils.js public API stable.
+import { escapeHtml, sanitize, escapeHtmlAllowFormat } from './html-escape.js';
 
 /**
  * QBitmap Utility Functions
@@ -22,41 +26,6 @@ const Logger = {
     console.error(...args);
   }
 };
-
-/**
- * Escape HTML to prevent XSS attacks
- * Safe for: text content, attribute values, inline JS strings
- */
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/**
- * Sanitize user input for display
- */
-function sanitize(str) {
-  return escapeHtml(str);
-}
-
-/**
- * HTML escape with <b>/<i>/<u> allowlist.
- * For admin-editable text where simple bold/italic/underline is desired
- * without opening the door to arbitrary HTML. Safe: tags are matched
- * exactly after full escape, so attributes or other tags cannot slip through.
- */
-function escapeHtmlAllowFormat(str) {
-  if (!str) return '';
-  return escapeHtml(str)
-    .replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>')
-    .replace(/&lt;i&gt;/g, '<i>').replace(/&lt;\/i&gt;/g, '</i>')
-    .replace(/&lt;u&gt;/g, '<u>').replace(/&lt;\/u&gt;/g, '</u>');
-}
 
 /**
  * Fetch with timeout and optional retry
