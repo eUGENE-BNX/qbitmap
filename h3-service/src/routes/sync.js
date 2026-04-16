@@ -101,7 +101,7 @@ async function syncRoutes(fastify) {
         properties: {
           id: { type: 'integer', minimum: 1 },
           displayName: { type: 'string', minLength: 1, maxLength: 200 },
-          avatarUrl: { type: 'string', maxLength: 500 }
+          avatarUrl: { type: 'string', maxLength: 2048 }
         }
       }
     }

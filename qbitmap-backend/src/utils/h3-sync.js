@@ -81,8 +81,17 @@ async function notifyH3ContentItemRemove(itemId) {
   }
 }
 
+const AVATAR_URL_MAX = 2048;
+
 async function notifyH3UserProfile({ id, displayName, avatarUrl }) {
   if (!H3_SERVICE_URL || !H3_SERVICE_KEY) return;
+
+  const body = { id, displayName };
+  if (avatarUrl && avatarUrl.length <= AVATAR_URL_MAX) {
+    body.avatarUrl = avatarUrl;
+  } else if (avatarUrl) {
+    logger.warn({ userId: id, len: avatarUrl.length }, 'Avatar URL exceeds max, syncing profile without avatar');
+  }
 
   try {
     const response = await fetch(`${H3_SERVICE_URL}/api/v1/sync/user-profile`, {
@@ -91,7 +100,7 @@ async function notifyH3UserProfile({ id, displayName, avatarUrl }) {
         'Content-Type': 'application/json',
         'X-Service-Key': H3_SERVICE_KEY
       },
-      body: JSON.stringify({ id, displayName, avatarUrl })
+      body: JSON.stringify(body)
     });
 
     if (!response.ok) {

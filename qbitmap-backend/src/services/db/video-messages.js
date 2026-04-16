@@ -1,4 +1,4 @@
-const { notifyH3ContentItem, notifyH3ContentItemRemove } = require('../../utils/h3-sync');
+const { notifyH3ContentItem, notifyH3ContentItemRemove, notifyH3UserProfile } = require('../../utils/h3-sync');
 
 module.exports = function(DatabaseService) {
 
@@ -13,18 +13,25 @@ DatabaseService.prototype.createVideoMessage = async function(senderId, { messag
     [messageId, senderId, recipientId || null, lng, lat, accuracyRadiusM || null, locationSource || null, filePath, fileSize, durationMs || null, mimeType, mediaType || 'video', description || null, photoMetadata || null, placeId || null]
   );
 
-  // Ownership sync
-  const type = (mediaType || 'video') === 'photo' ? 'photo' : 'video';
-  if (lat && lng) {
-    const points = type === 'video' ? 5 : 1;
-    notifyH3ContentItem({ itemType: type, itemId: messageId, userId: senderId, lat, lng, points }).catch(() => {});
-  }
-
   // Minimal sender lookup (2 columns vs the old 5-table JOIN)
   const [senderRows] = await this.pool.execute(
     'SELECT display_name, avatar_url FROM users WHERE id = ?', [senderId]
   );
   const sender = senderRows[0] || {};
+
+  // Ownership sync — profile must land in h3-service BEFORE content, otherwise
+  // the INNER JOIN on user_profiles drops the cell from viewport queries
+  // (and the empty result is cached for 30s, masking the message from the map).
+  const type = (mediaType || 'video') === 'photo' ? 'photo' : 'video';
+  if (lat && lng) {
+    const points = type === 'video' ? 5 : 1;
+    (async () => {
+      if (sender.display_name) {
+        await notifyH3UserProfile({ id: senderId, displayName: sender.display_name, avatarUrl: sender.avatar_url });
+      }
+      await notifyH3ContentItem({ itemType: type, itemId: messageId, userId: senderId, lat, lng, points });
+    })().catch(() => {});
+  }
 
   // Place name if linked
   let placeName = null, placeAddress = null;
