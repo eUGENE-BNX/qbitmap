@@ -43,11 +43,31 @@ async function start() {
     });
 
     // Start DB-backed AI analysis queues with WebSocket notification
-    const onAiComplete = (messageId, jobType) => {
-      console.log(`[AI Queue] Completed ${jobType} analysis for ${messageId}, broadcasting WS event`);
+    const onAiComplete = async (messageId, jobType, subId) => {
+      console.log(`[AI Queue] Completed ${jobType}#${subId} for ${messageId}, broadcasting WS event`);
+      let aiDescription = null, aiDescriptionLang = null;
+      try {
+        const msg = await db.getVideoMessageById(messageId);
+        if (jobType === 'photo' && msg) {
+          const photo = (msg.photos || []).find(p => p.idx === subId);
+          aiDescription = photo?.ai_description || null;
+          aiDescriptionLang = photo?.ai_description_lang || null;
+        } else if (msg) {
+          aiDescription = msg.ai_description || null;
+          aiDescriptionLang = msg.ai_description_lang || null;
+        }
+      } catch (e) {
+        // Non-fatal: client can refetch if payload lacks the text
+      }
       wsService.broadcast({
         type: 'ai_description_ready',
-        payload: { messageId, jobType }
+        payload: {
+          messageId,
+          jobType,
+          photoIdx: jobType === 'photo' ? subId : null,
+          aiDescription,
+          aiDescriptionLang
+        }
       });
     };
     photoAiQueue.setOnComplete(onAiComplete);

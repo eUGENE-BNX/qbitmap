@@ -89,6 +89,11 @@ DatabaseService.prototype.getVideoMessageById = async function(messageId, userId
   const msg = rows[0] || null;
   if (msg) {
     msg.tags = await this.getVideoMessageTags(msg.id);
+    if (msg.media_type === 'photo') {
+      msg.photos = await this.getVideoMessagePhotos(msg.id);
+    } else {
+      msg.photos = [];
+    }
     if (userId) {
       const [likeRows] = await this.pool.execute(
         'SELECT 1 FROM likes WHERE entity_type = ? AND entity_id = ? AND user_id = ?',
@@ -100,6 +105,81 @@ DatabaseService.prototype.getVideoMessageById = async function(messageId, userId
     }
   }
   return msg;
+};
+
+DatabaseService.prototype.addVideoMessagePhoto = async function(videoMessageId, { idx, filePath, thumbnailPath, photoMetadata, fileSize, mimeType, isPrimary }) {
+  await this.pool.execute(
+    `INSERT INTO video_message_photos
+       (video_message_id, idx, file_path, thumbnail_path, photo_metadata, file_size, mime_type, is_primary)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [videoMessageId, idx, filePath, thumbnailPath || null, photoMetadata || null, fileSize, mimeType, isPrimary ? 1 : 0]
+  );
+};
+
+DatabaseService.prototype.getVideoMessagePhotos = async function(videoMessageId) {
+  const [rows] = await this.pool.execute(
+    `SELECT idx, file_path, thumbnail_path, photo_metadata, file_size, mime_type, is_primary,
+            ai_description, ai_description_lang
+     FROM video_message_photos
+     WHERE video_message_id = ?
+     ORDER BY idx ASC`,
+    [videoMessageId]
+  );
+  return rows;
+};
+
+DatabaseService.prototype.getVideoMessagePhotosBatch = async function(videoMessageIds) {
+  if (!videoMessageIds || videoMessageIds.length === 0) return new Map();
+  const placeholders = videoMessageIds.map(() => '?').join(',');
+  const [rows] = await this.pool.query(
+    `SELECT video_message_id, idx, file_path, thumbnail_path, photo_metadata, file_size, mime_type, is_primary,
+            ai_description, ai_description_lang
+     FROM video_message_photos
+     WHERE video_message_id IN (${placeholders})
+     ORDER BY video_message_id, idx ASC`,
+    videoMessageIds
+  );
+  const map = new Map();
+  for (const row of rows) {
+    if (!map.has(row.video_message_id)) map.set(row.video_message_id, []);
+    map.get(row.video_message_id).push({
+      idx: row.idx,
+      file_path: row.file_path,
+      thumbnail_path: row.thumbnail_path,
+      photo_metadata: row.photo_metadata,
+      file_size: row.file_size,
+      mime_type: row.mime_type,
+      is_primary: row.is_primary,
+      ai_description: row.ai_description,
+      ai_description_lang: row.ai_description_lang
+    });
+  }
+  return map;
+};
+
+DatabaseService.prototype.updateVideoMessagePhotoThumbnail = async function(videoMessageId, idx, thumbnailPath) {
+  await this.pool.execute(
+    'UPDATE video_message_photos SET thumbnail_path = ? WHERE video_message_id = ? AND idx = ?',
+    [thumbnailPath, videoMessageId, idx]
+  );
+};
+
+DatabaseService.prototype.updateVideoMessagePhotoAiDescription = async function(messageId, photoIdx, text, langCode = null) {
+  // Update the per-photo row by joining on parent message_id
+  await this.pool.execute(
+    `UPDATE video_message_photos vmp
+     JOIN video_messages vm ON vm.id = vmp.video_message_id
+     SET vmp.ai_description = ?, vmp.ai_description_lang = ?
+     WHERE vm.message_id = ? AND vmp.idx = ?`,
+    [text, langCode, messageId, photoIdx]
+  );
+  // Mirror primary (idx=0) to parent for FULLTEXT search compatibility
+  if (photoIdx === 0) {
+    await this.pool.execute(
+      'UPDATE video_messages SET ai_description = ?, ai_description_lang = ? WHERE message_id = ?',
+      [text, langCode, messageId]
+    );
+  }
 };
 
 DatabaseService.prototype.getVideoMessages = async function(userId, { bounds, limit = 50, offset = 0, cursor = null } = {}) {
@@ -173,9 +253,14 @@ DatabaseService.prototype.getVideoMessages = async function(userId, { bounds, li
       likedSet = new Set(likeRows.map(r => r.entity_id));
     }
 
+    // [PERF] Batch fetch photos for photo-type messages
+    const photoIds = rows.filter(r => r.media_type === 'photo').map(r => r.id);
+    const photoMap = await this.getVideoMessagePhotosBatch(photoIds);
+
     for (const row of rows) {
       row.tags = tagMap.get(row.id) || [];
       row.liked = likedSet.has(row.message_id);
+      row.photos = row.media_type === 'photo' ? (photoMap.get(row.id) || []) : [];
     }
   }
   return rows;
@@ -307,8 +392,11 @@ DatabaseService.prototype.searchVideoMessages = async function(query, userId = n
       if (!tagMap.has(tr.video_message_id)) tagMap.set(tr.video_message_id, []);
       tagMap.get(tr.video_message_id).push(tr.name);
     }
+    const photoIds = rows.filter(r => r.media_type === 'photo').map(r => r.id);
+    const photoMap = await this.getVideoMessagePhotosBatch(photoIds);
     for (const row of rows) {
       row.tags = tagMap.get(row.id) || [];
+      row.photos = row.media_type === 'photo' ? (photoMap.get(row.id) || []) : [];
     }
   }
   return rows;
@@ -346,20 +434,20 @@ DatabaseService.prototype.upsertGeoLangCell = async function(cellKey, countryCod
   );
 };
 
-// --- On-demand translation cache ---
-DatabaseService.prototype.getVideoMessageTranslation = async function(messageId, lang) {
+// --- On-demand translation cache (per-photo aware) ---
+DatabaseService.prototype.getVideoMessageTranslation = async function(messageId, photoIdx, lang) {
   const [rows] = await this.pool.execute(
-    'SELECT text FROM video_message_translations WHERE message_id = ? AND lang = ?',
-    [messageId, lang]
+    'SELECT text FROM video_message_translations WHERE message_id = ? AND photo_idx = ? AND lang = ?',
+    [messageId, photoIdx, lang]
   );
   return rows[0]?.text || null;
 };
 
-DatabaseService.prototype.saveVideoMessageTranslation = async function(messageId, lang, text) {
+DatabaseService.prototype.saveVideoMessageTranslation = async function(messageId, photoIdx, lang, text) {
   await this.pool.execute(
-    `INSERT INTO video_message_translations (message_id, lang, text) VALUES (?, ?, ?)
+    `INSERT INTO video_message_translations (message_id, photo_idx, lang, text) VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE text = VALUES(text), created_at = CURRENT_TIMESTAMP`,
-    [messageId, lang, text]
+    [messageId, photoIdx, lang, text]
   );
 };
 
@@ -430,8 +518,11 @@ DatabaseService.prototype.getAdminVideoMessages = async function(page = 1, limit
       if (!tagMap.has(tr.video_message_id)) tagMap.set(tr.video_message_id, []);
       tagMap.get(tr.video_message_id).push(tr.name);
     }
+    const photoIds = items.filter(r => r.media_type === 'photo').map(r => r.id);
+    const photoMap = await this.getVideoMessagePhotosBatch(photoIds);
     for (const row of items) {
       row.tags = tagMap.get(row.id) || [];
+      row.photos = row.media_type === 'photo' ? (photoMap.get(row.id) || []) : [];
     }
   }
 

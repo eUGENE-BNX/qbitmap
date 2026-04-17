@@ -285,6 +285,7 @@ const MapLayerMixin = {
         aiDescriptionLang: m.ai_description_lang || '',
         tags: JSON.stringify(m.tags || []),
         thumbnailPath: m.thumbnail_path || '',
+        photos: JSON.stringify(m.photos || []),
         placeName: m.place_name || ''
       }
     });

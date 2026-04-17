@@ -3,10 +3,10 @@
  */
 
 module.exports = function (DatabaseService) {
-  DatabaseService.prototype.createAiJob = async function (messageId, jobType) {
+  DatabaseService.prototype.createAiJob = async function (messageId, jobType, subId = 0) {
     await this.pool.execute(
-      'INSERT IGNORE INTO ai_jobs (message_id, job_type, status) VALUES (?, ?, ?)',
-      [messageId, jobType, 'pending']
+      'INSERT IGNORE INTO ai_jobs (message_id, sub_id, job_type, status) VALUES (?, ?, ?, ?)',
+      [messageId, subId, jobType, 'pending']
     );
   };
 
@@ -15,7 +15,7 @@ module.exports = function (DatabaseService) {
     const safeLimit = Math.max(1, Math.min(parseInt(limit) || 1, 10));
     // Get pending jobs that are ready for processing
     const [rows] = await this.pool.execute(
-      `SELECT id, message_id, job_type, retries FROM ai_jobs
+      `SELECT id, message_id, sub_id, job_type, retries FROM ai_jobs
        WHERE job_type = ? AND status = 'pending' AND (next_retry_at IS NULL OR next_retry_at <= NOW())
        ORDER BY created_at ASC LIMIT ${safeLimit}`,
       [jobType]
@@ -30,14 +30,14 @@ module.exports = function (DatabaseService) {
     return rows;
   };
 
-  DatabaseService.prototype.completeAiJob = async function (messageId) {
+  DatabaseService.prototype.completeAiJob = async function (messageId, subId = 0) {
     await this.pool.execute(
-      `UPDATE ai_jobs SET status = 'completed', completed_at = NOW(), updated_at = NOW() WHERE message_id = ?`,
-      [messageId]
+      `UPDATE ai_jobs SET status = 'completed', completed_at = NOW(), updated_at = NOW() WHERE message_id = ? AND sub_id = ?`,
+      [messageId, subId]
     );
   };
 
-  DatabaseService.prototype.failAiJob = async function (messageId, errorMessage) {
+  DatabaseService.prototype.failAiJob = async function (messageId, subId, errorMessage) {
     // Increment retries, set next_retry_at with exponential backoff, or mark failed if max retries reached
     await this.pool.execute(
       `UPDATE ai_jobs SET
@@ -46,8 +46,8 @@ module.exports = function (DatabaseService) {
         status = IF(retries + 1 >= max_retries, 'failed', 'pending'),
         next_retry_at = IF(retries + 1 >= max_retries, NULL, DATE_ADD(NOW(), INTERVAL POW(2, retries) * 10 SECOND)),
         updated_at = NOW()
-      WHERE message_id = ?`,
-      [errorMessage, messageId]
+      WHERE message_id = ? AND sub_id = ?`,
+      [errorMessage, messageId, subId]
     );
   };
 

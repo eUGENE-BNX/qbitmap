@@ -34,6 +34,7 @@ export function buildMessagePopupProps(msg) {
     aiDescriptionLang: msg.ai_description_lang || '',
     tags: JSON.stringify(msg.tags || []),
     thumbnailPath: msg.thumbnail_path || '',
+    photos: JSON.stringify(msg.photos || []),
     placeName: msg.place_name || ''
   };
 }

@@ -27,6 +27,7 @@ const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const EXT_MAP = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_DURATION_MS = 30000;
+const MAX_PHOTOS_PER_MESSAGE = 5;
 
 const ORIGINALS_DIR = path.resolve(UPLOADS_DIR, 'originals');
 const OPTIMIZED_MAX_DIM = 2048;
@@ -43,10 +44,10 @@ if (!fs.existsSync(ORIGINALS_DIR)) {
 
 async function videoMessageRoutes(fastify, options) {
 
-  // POST / - Upload a video message
+  // POST / - Upload a video message OR photo message (1-5 photos)
   fastify.post('/', {
     preHandler: authHook,
-    bodyLimit: MAX_FILE_SIZE + 1024 * 10, // file + form fields overhead
+    bodyLimit: MAX_FILE_SIZE * MAX_PHOTOS_PER_MESSAGE + 1024 * 64,
     config: {
       rateLimit: {
         max: 5,
@@ -56,140 +57,231 @@ async function videoMessageRoutes(fastify, options) {
   }, async (request, reply) => {
     const userId = request.user.userId;
 
-    let data;
+    // Collected state from streaming multipart parse
+    const fieldsBag = {};         // form field name -> value (string)
+    const writtenFiles = [];      // tracks every file we wrote (for cleanup on failure)
+    const photoFiles = [];        // [{ filePath, fileName, mimeType, fileSize }]
+    let videoFile = null;         // { filePath, fileName, mimeType, fileSize, mediaType: 'video' }
+    let truncated = false;
+    let parseError = null;
+    let mediaType = null;         // 'photo' | 'video'
+    const tsBase = Date.now().toString(36);
+    // messageId yields known prefix (pmsg_/vmsg_) — frontend popup also branches on this
+    const messageId = `__pending__${userId}_${tsBase}`;
+
+    // Helper: drop a partially-written stream that exceeds limits
+    const cleanupWritten = async () => {
+      for (const f of writtenFiles) {
+        await fsp.unlink(f).catch(() => {});
+      }
+    };
+
     try {
-      data = await request.file({ limits: { fileSize: MAX_FILE_SIZE } });
+      const parts = request.parts({
+        limits: { fileSize: MAX_FILE_SIZE, files: MAX_PHOTOS_PER_MESSAGE + 1 }
+      });
+
+      for await (const part of parts) {
+        if (part.type === 'field') {
+          fieldsBag[part.fieldname] = part.value;
+          continue;
+        }
+
+        // Part is a file
+        const partMime = part.mimetype;
+        if (!ALLOWED_MIME_TYPES.includes(partMime)) {
+          part.file.resume();
+          parseError = { code: 400, msg: `Invalid file type: ${partMime}` };
+          break;
+        }
+        const isImage = IMAGE_MIME_TYPES.includes(partMime);
+
+        if (isImage) {
+          if (mediaType === 'video') {
+            part.file.resume();
+            parseError = { code: 400, msg: 'Cannot mix images and videos' };
+            break;
+          }
+          if (photoFiles.length >= MAX_PHOTOS_PER_MESSAGE) {
+            part.file.resume();
+            parseError = { code: 400, msg: `Too many photos (max ${MAX_PHOTOS_PER_MESSAGE})` };
+            break;
+          }
+          mediaType = 'photo';
+          const idx = photoFiles.length;
+          const ext = EXT_MAP[partMime] || 'bin';
+          const fileName = `pmsg_${userId}_${tsBase}_${idx}.${ext}`;
+          const filePath = path.resolve(UPLOADS_DIR, fileName);
+          if (!filePath.startsWith(UPLOADS_DIR + path.sep)) {
+            part.file.resume();
+            parseError = { code: 400, msg: 'Invalid filename' };
+            break;
+          }
+          const ws = fs.createWriteStream(filePath);
+          writtenFiles.push(filePath);
+          await pipeline(part.file, ws);
+          if (part.file.truncated) {
+            truncated = true;
+            parseError = { code: 413, msg: 'File too large (max 20MB per photo)' };
+            break;
+          }
+          const st = await fsp.stat(filePath);
+          photoFiles.push({ filePath, fileName, mimeType: partMime, fileSize: st.size, idx, ext });
+        } else {
+          // Video file (single)
+          if (mediaType === 'photo') {
+            part.file.resume();
+            parseError = { code: 400, msg: 'Cannot mix images and videos' };
+            break;
+          }
+          if (videoFile) {
+            part.file.resume();
+            parseError = { code: 400, msg: 'Only one video per message' };
+            break;
+          }
+          mediaType = 'video';
+          const ext = EXT_MAP[partMime] || 'bin';
+          const fileName = `vmsg_${userId}_${tsBase}.${ext}`;
+          const filePath = path.resolve(UPLOADS_DIR, fileName);
+          if (!filePath.startsWith(UPLOADS_DIR + path.sep)) {
+            part.file.resume();
+            parseError = { code: 400, msg: 'Invalid filename' };
+            break;
+          }
+          const ws = fs.createWriteStream(filePath);
+          writtenFiles.push(filePath);
+          await pipeline(part.file, ws);
+          if (part.file.truncated) {
+            truncated = true;
+            parseError = { code: 413, msg: 'File too large (max 20MB)' };
+            break;
+          }
+          const st = await fsp.stat(filePath);
+          videoFile = { filePath, fileName, mimeType: partMime, fileSize: st.size, ext };
+        }
+      }
     } catch (err) {
-      logger.warn({ err }, 'Multipart parse error');
+      logger.warn({ err: err.message }, 'Multipart parse error');
+      await cleanupWritten();
       return reply.code(400).send({ error: 'Invalid multipart request' });
     }
 
-    if (!data) {
+    if (parseError) {
+      await cleanupWritten();
+      return reply.code(parseError.code).send({ error: parseError.msg });
+    }
+    if (truncated) {
+      await cleanupWritten();
+      return reply.code(413).send({ error: 'File too large' });
+    }
+    if (!mediaType || (mediaType === 'photo' && photoFiles.length === 0) || (mediaType === 'video' && !videoFile)) {
+      await cleanupWritten();
       return reply.code(400).send({ error: 'No file uploaded' });
     }
 
-    // Validate MIME type
-    const mimeType = data.mimetype;
-    if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
-      // Consume and discard the file stream to prevent hanging
-      data.file.resume();
-      return reply.code(400).send({ error: `Invalid file type: ${mimeType}. Allowed: ${ALLOWED_MIME_TYPES.join(', ')}` });
-    }
+    const isPhoto = mediaType === 'photo';
 
-    // Determine if this is a photo upload
-    const isPhoto = IMAGE_MIME_TYPES.includes(mimeType);
-
-    // Read form fields from multipart
-    const fields = data.fields;
-    const lng = parseFloat(fields.lng?.value);
-    const lat = parseFloat(fields.lat?.value);
-    const accuracyRadiusMRaw = fields.accuracy_radius_m?.value ? parseInt(fields.accuracy_radius_m.value) : null;
+    // Read & validate form fields
+    const lng = parseFloat(fieldsBag.lng);
+    const lat = parseFloat(fieldsBag.lat);
+    const accuracyRadiusMRaw = fieldsBag.accuracy_radius_m ? parseInt(fieldsBag.accuracy_radius_m) : null;
     const accuracyRadiusM = Number.isFinite(accuracyRadiusMRaw) ? accuracyRadiusMRaw : null;
-    const locationSource = (fields.location_source?.value || '').slice(0, 16) || null;
-    const durationMs = isPhoto ? null : parseInt(fields.duration_ms?.value);
-    const recipientEmail = fields.recipient_email?.value || null;
-    const description = (fields.description?.value || '').trim().substring(0, 200) || null;
-    const photoMetadata = isPhoto && fields.photo_metadata?.value ? fields.photo_metadata.value : null;
-    const tagsRaw = (fields.tags?.value || '').trim();
+    const locationSource = (fieldsBag.location_source || '').slice(0, 16) || null;
+    const durationMs = isPhoto ? null : parseInt(fieldsBag.duration_ms);
+    const recipientEmail = fieldsBag.recipient_email || null;
+    const description = (fieldsBag.description || '').trim().substring(0, 200) || null;
+    const tagsRaw = (fieldsBag.tags || '').trim();
     const tagNames = tagsRaw
       ? tagsRaw.split(',').map(t => t.trim()).filter(t => t.length > 0).slice(0, 5)
       : [];
-    const placeIdRaw = fields.place_id?.value ? parseInt(fields.place_id.value) : null;
+    const placeIdRaw = fieldsBag.place_id ? parseInt(fieldsBag.place_id) : null;
 
-    // Validate coordinates
+    // Photo metadata: array (one per photo) or single legacy object
+    let photoMetadataPerIdx = [];
+    if (isPhoto && fieldsBag.photo_metadata) {
+      try {
+        const parsed = JSON.parse(fieldsBag.photo_metadata);
+        photoMetadataPerIdx = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        photoMetadataPerIdx = [];
+      }
+    }
+
     if (!Number.isFinite(lng) || !Number.isFinite(lat) ||
         lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      data.file.resume();
+      await cleanupWritten();
       return reply.code(400).send({ error: 'Valid lng and lat are required' });
     }
 
-    // Validate duration (video only)
     if (!isPhoto) {
       if (!Number.isFinite(durationMs) || durationMs < 1000 || durationMs > MAX_DURATION_MS) {
-        data.file.resume();
+        await cleanupWritten();
         return reply.code(400).send({ error: `Duration must be between 1000 and ${MAX_DURATION_MS} ms` });
       }
     }
 
-    // Resolve recipient if private message
     let recipientId = null;
     if (recipientEmail) {
       recipientId = await db.getActiveUserIdByEmail(recipientEmail);
       if (!recipientId) {
-        data.file.resume();
+        await cleanupWritten();
         return reply.code(404).send({ error: 'Recipient not found' });
       }
       if (recipientId === userId) {
-        data.file.resume();
+        await cleanupWritten();
         return reply.code(400).send({ error: 'Cannot send a message to yourself' });
       }
     }
 
-    // Generate message ID and file path
-    const messageId = `${isPhoto ? 'pmsg' : 'vmsg'}_${userId}_${Date.now().toString(36)}`;
-    const ext = EXT_MAP[mimeType] || 'bin';
-    const fileName = `${messageId}.${ext}`;
-    const filePath = path.resolve(UPLOADS_DIR, fileName);
-    // Defense in depth: fileName is server-generated, but block any future
-    // refactor that might let the resolved path escape UPLOADS_DIR.
-    if (!filePath.startsWith(UPLOADS_DIR + path.sep)) {
-      return reply.code(400).send({ error: 'Invalid filename' });
-    }
+    // Real messageId now that we know media type
+    const realMessageId = `${isPhoto ? 'pmsg' : 'vmsg'}_${userId}_${tsBase}`;
 
     try {
-      // Save file to disk
-      const writeStream = fs.createWriteStream(filePath);
-      await pipeline(data.file, writeStream);
-
-      // Check if file was truncated (exceeded size limit)
-      if (data.file.truncated) {
-        await fs.promises.unlink(filePath);
-        return reply.code(413).send({ error: 'File too large (max 20MB)' });
-      }
-
-      const stats = await fs.promises.stat(filePath);
-      const fileSize = stats.size;
-
-      // Validate actual file content matches declared MIME type
-      const headBuf = Buffer.alloc(12);
-      const fh = await fs.promises.open(filePath, 'r');
-      try { await fh.read(headBuf, 0, 12, 0); } finally { await fh.close(); }
-      if (!validateMagicBytes(headBuf, mimeType)) {
-        await fs.promises.unlink(filePath);
-        return reply.code(400).send({ error: 'File content does not match declared type' });
-      }
-
-      // Photo optimization: archive original, create optimized serving copy
-      // Strips EXIF metadata, resizes to max 2048px, same format
-      if (isPhoto) {
-        const originalPath = path.resolve(ORIGINALS_DIR, `${messageId}.${ext}`);
-        try {
-          await fs.promises.copyFile(filePath, originalPath);
-          await photoOptimizeSem.run(() => new Promise((resolve, reject) => {
-            const args = [
-              '-i', originalPath,
-              '-vf', `scale='min(${OPTIMIZED_MAX_DIM},iw)':'min(${OPTIMIZED_MAX_DIM},ih)':force_original_aspect_ratio=decrease`,
-              '-map_metadata', '-1',
-              ...(mimeType === 'image/jpeg' ? ['-q:v', String(OPTIMIZED_QUALITY_JPEG)] : []),
-              ...(mimeType === 'image/png' ? ['-compression_level', '6'] : []),
-              ...(mimeType === 'image/webp' ? ['-quality', String(OPTIMIZED_QUALITY_WEBP)] : []),
-              '-y', filePath
-            ];
-            execFile('/usr/bin/ffmpeg', args, { timeout: 15000 }, (err) => err ? reject(err) : resolve());
-          }));
-          const optStats = await fs.promises.stat(filePath);
-          logger.info({ messageId, originalSize: fileSize, optimizedSize: optStats.size }, 'Photo optimized, original archived');
-        } catch (optErr) {
-          logger.warn({ err: optErr, messageId }, 'Photo optimization failed, serving original');
+      // ============ Per-file post-processing ============
+      // Validate magic bytes for every uploaded file
+      const filesToValidate = isPhoto ? photoFiles : [videoFile];
+      for (const f of filesToValidate) {
+        const headBuf = Buffer.alloc(12);
+        const fh = await fsp.open(f.filePath, 'r');
+        try { await fh.read(headBuf, 0, 12, 0); } finally { await fh.close(); }
+        if (!validateMagicBytes(headBuf, f.mimeType)) {
+          await cleanupWritten();
+          return reply.code(400).send({ error: 'File content does not match declared type' });
         }
       }
 
-      // Server-side video duration validation via ffprobe
+      // Photo optimization: per-photo archive + ffmpeg optimize
+      if (isPhoto) {
+        for (const p of photoFiles) {
+          const originalPath = path.resolve(ORIGINALS_DIR, p.fileName);
+          try {
+            await fsp.copyFile(p.filePath, originalPath);
+            await photoOptimizeSem.run(() => new Promise((resolve, reject) => {
+              const args = [
+                '-i', originalPath,
+                '-vf', `scale='min(${OPTIMIZED_MAX_DIM},iw)':'min(${OPTIMIZED_MAX_DIM},ih)':force_original_aspect_ratio=decrease`,
+                '-map_metadata', '-1',
+                ...(p.mimeType === 'image/jpeg' ? ['-q:v', String(OPTIMIZED_QUALITY_JPEG)] : []),
+                ...(p.mimeType === 'image/png' ? ['-compression_level', '6'] : []),
+                ...(p.mimeType === 'image/webp' ? ['-quality', String(OPTIMIZED_QUALITY_WEBP)] : []),
+                '-y', p.filePath
+              ];
+              execFile('/usr/bin/ffmpeg', args, { timeout: 15000 }, (err) => err ? reject(err) : resolve());
+            }));
+            const optStats = await fsp.stat(p.filePath);
+            p.fileSize = optStats.size;
+          } catch (optErr) {
+            logger.warn({ err: optErr.message, messageId: realMessageId, idx: p.idx }, 'Photo optimization failed, serving original');
+          }
+        }
+      }
+
+      // Server-side video duration validation
       if (!isPhoto) {
         const actualDurationMs = await new Promise((resolve) => {
           execFile('/usr/bin/ffprobe', [
             '-v', 'error', '-show_entries', 'format=duration',
-            '-of', 'csv=p=0', filePath
+            '-of', 'csv=p=0', videoFile.filePath
           ], { timeout: 10000 }, (err, stdout) => {
             if (err) return resolve(null);
             const secs = parseFloat(stdout.trim());
@@ -197,80 +289,129 @@ async function videoMessageRoutes(fastify, options) {
           });
         });
         if (actualDurationMs !== null && actualDurationMs > MAX_DURATION_MS + 1000) {
-          await fs.promises.unlink(filePath);
+          await cleanupWritten();
           return reply.code(400).send({ error: `Video too long: ${Math.round(actualDurationMs / 1000)}s (max ${MAX_DURATION_MS / 1000}s)` });
         }
       }
 
-      // Generate thumbnails (fire-and-forget, don't block upload response)
+      // Thumbnails (fire-and-forget) — per photo or single video
       const { generateThumbnail, generatePhotoThumbnail, PREVIEW_WIDTH, PREVIEW_QUALITY } = require('../utils/thumbnail');
-      const thumbFileName = `${messageId}_thumb.webp`;
-      const previewFileName = `${messageId}_preview.webp`;
-      const thumbFilePath = path.resolve(UPLOADS_DIR, thumbFileName);
-      const previewFilePath = path.resolve(UPLOADS_DIR, previewFileName);
-      const thumbRelPath = `uploads/video-messages/${thumbFileName}`;
+
       if (isPhoto) {
-        // Map thumb (320px) + popup preview (800px) in parallel
-        Promise.all([
-          generatePhotoThumbnail(filePath, thumbFilePath),
-          generatePhotoThumbnail(filePath, previewFilePath, { width: PREVIEW_WIDTH, quality: PREVIEW_QUALITY })
-        ]).then(async ([thumbOk]) => {
-          if (thumbOk) {
-            try { await db.updateVideoMessageThumbnail(messageId, thumbRelPath); } catch (e) { logger.warn({ err: e.message, messageId }, 'Failed to save thumbnail path to DB'); }
-          }
-        }).catch(() => {});
+        // Defer thumbnail generation until after DB INSERT so we can use the
+        // child row's video_message_id for per-idx persistence.
       } else {
-        // Video: use duration for smart frame selection + generate preview
+        const thumbFileName = `${realMessageId}_thumb.webp`;
+        const previewFileName = `${realMessageId}_preview.webp`;
+        const thumbFilePath = path.resolve(UPLOADS_DIR, thumbFileName);
+        const previewFilePath = path.resolve(UPLOADS_DIR, previewFileName);
+        const thumbRelPath = `uploads/video-messages/${thumbFileName}`;
         const vidDurationMs = durationMs || null;
         Promise.all([
-          generateThumbnail(filePath, thumbFilePath, { durationMs: vidDurationMs }),
-          generateThumbnail(filePath, previewFilePath, { width: PREVIEW_WIDTH, quality: PREVIEW_QUALITY, durationMs: vidDurationMs })
+          generateThumbnail(videoFile.filePath, thumbFilePath, { durationMs: vidDurationMs }),
+          generateThumbnail(videoFile.filePath, previewFilePath, { width: PREVIEW_WIDTH, quality: PREVIEW_QUALITY, durationMs: vidDurationMs })
         ]).then(async ([thumbOk]) => {
           if (thumbOk) {
-            try { await db.updateVideoMessageThumbnail(messageId, thumbRelPath); } catch (e) { logger.warn({ err: e.message, messageId }, 'Failed to save thumbnail path to DB'); }
+            try { await db.updateVideoMessageThumbnail(realMessageId, thumbRelPath); } catch (e) { logger.warn({ err: e.message, messageId: realMessageId }, 'Failed to save thumbnail path to DB'); }
           }
         }).catch(() => {});
       }
 
-      // Validate place_id if provided
+      // Validate place_id
       let validatedPlaceId = null;
       if (placeIdRaw && Number.isFinite(placeIdRaw)) {
         const place = await db.getPlaceById(placeIdRaw);
         if (place) validatedPlaceId = place.id;
       }
 
-      // Save to database
+      // Save parent video_messages row — kapak (idx=0) field'ları parent'a yansır
+      const primaryFile = isPhoto ? photoFiles[0] : videoFile;
+      const primaryMeta = isPhoto && photoMetadataPerIdx[0] ? JSON.stringify(photoMetadataPerIdx[0]) : null;
       const message = await db.createVideoMessage(userId, {
-        messageId,
+        messageId: realMessageId,
         recipientId,
         lng,
         lat,
         accuracyRadiusM,
         locationSource,
-        filePath: `uploads/video-messages/${fileName}`,
-        fileSize,
+        filePath: `uploads/video-messages/${primaryFile.fileName}`,
+        fileSize: primaryFile.fileSize,
         durationMs,
-        mimeType,
+        mimeType: primaryFile.mimeType,
         description,
         mediaType: isPhoto ? 'photo' : 'video',
-        photoMetadata,
+        photoMetadata: primaryMeta,
         placeId: validatedPlaceId
       });
 
-      // Enqueue for AI content analysis (fire-and-forget)
+      // Persist child photo rows + per-photo thumbnails
       if (isPhoto) {
-        photoAiQueue.enqueue(messageId, fileName);
-      } else {
-        videoAiQueue.enqueue(messageId, fileName);
+        const childThumbsRel = []; // for response/WS payload
+        for (const p of photoFiles) {
+          const meta = photoMetadataPerIdx[p.idx] ? JSON.stringify(photoMetadataPerIdx[p.idx]) : null;
+          await db.addVideoMessagePhoto(message.id, {
+            idx: p.idx,
+            filePath: `uploads/video-messages/${p.fileName}`,
+            thumbnailPath: null,
+            photoMetadata: meta,
+            fileSize: p.fileSize,
+            mimeType: p.mimeType,
+            isPrimary: p.idx === 0
+          });
+
+          // Generate thumb+preview per photo (fire-and-forget)
+          const baseName = p.fileName.replace(/\.[^.]+$/, '');
+          const thumbFileName = `${baseName}_thumb.webp`;
+          const previewFileName = `${baseName}_preview.webp`;
+          const thumbFilePath = path.resolve(UPLOADS_DIR, thumbFileName);
+          const previewFilePath = path.resolve(UPLOADS_DIR, previewFileName);
+          const thumbRelPath = `uploads/video-messages/${thumbFileName}`;
+          childThumbsRel.push({ idx: p.idx, thumbRel: thumbRelPath });
+
+          Promise.all([
+            generatePhotoThumbnail(p.filePath, thumbFilePath),
+            generatePhotoThumbnail(p.filePath, previewFilePath, { width: PREVIEW_WIDTH, quality: PREVIEW_QUALITY })
+          ]).then(async ([thumbOk]) => {
+            if (thumbOk) {
+              try {
+                await db.updateVideoMessagePhotoThumbnail(message.id, p.idx, thumbRelPath);
+                if (p.idx === 0) {
+                  // Mirror primary to parent for BC with old single-photo paths
+                  await db.updateVideoMessageThumbnail(realMessageId, thumbRelPath);
+                }
+              } catch (e) {
+                logger.warn({ err: e.message, messageId: realMessageId, idx: p.idx }, 'Failed to save photo thumbnail path');
+              }
+            }
+          }).catch(() => {});
+        }
+        // Attach (still-pending) thumb URLs for client optimism
+        message.photos = photoFiles.map((p) => ({
+          idx: p.idx,
+          file_path: `uploads/video-messages/${p.fileName}`,
+          thumbnail_path: childThumbsRel.find(c => c.idx === p.idx)?.thumbRel || null,
+          photo_metadata: photoMetadataPerIdx[p.idx] || null,
+          file_size: p.fileSize,
+          mime_type: p.mimeType,
+          is_primary: p.idx === 0 ? 1 : 0
+        }));
       }
 
-      // Save tags
+      // AI queue — every photo gets its own analysis job
+      if (isPhoto) {
+        for (const p of photoFiles) {
+          photoAiQueue.enqueue(realMessageId, p.fileName, p.idx);
+        }
+      } else {
+        videoAiQueue.enqueue(realMessageId, videoFile.fileName);
+      }
+
+      // Tags
       if (tagNames.length > 0) {
         await db.setVideoMessageTags(message.id, tagNames);
         message.tags = tagNames;
       }
 
-      // Send WebSocket notifications
       const wsPayload = {
         type: 'video_message_new',
         payload: {
@@ -288,32 +429,33 @@ async function videoMessageRoutes(fastify, options) {
           aiDescription: message.ai_description || null,
           tags: message.tags || [],
           thumbnailPath: message.thumbnail_path || null,
+          photos: message.photos || [],
           createdAt: message.created_at,
           placeName: message.place_name || null
         }
       };
 
       if (recipientId) {
-        // Private message: notify recipient only
         wsService.sendToUser(recipientId, wsPayload);
-        // Also send updated unread count
         const unreadCount = await db.getUnreadVideoMessageCount(recipientId);
         wsService.sendToUser(recipientId, {
           type: 'video_message_unread_count',
           payload: { count: unreadCount }
         });
       } else {
-        // Public message: broadcast to all
         wsService.broadcast(wsPayload);
       }
 
-      logger.info({ messageId, userId, recipientId, fileSize, durationMs, mediaType: isPhoto ? 'photo' : 'video' }, 'Message uploaded');
+      logger.info({
+        messageId: realMessageId, userId, recipientId,
+        photoCount: isPhoto ? photoFiles.length : 0,
+        durationMs, mediaType
+      }, 'Message uploaded');
       return reply.code(201).send({ status: 'ok', message });
 
     } catch (error) {
-      // Cleanup file on error
-      fsp.unlink(filePath).catch(() => {});
-      logger.error({ err: error, messageId }, 'Video message upload failed');
+      await cleanupWritten();
+      logger.error({ err: error, messageId: realMessageId }, 'Video message upload failed');
       return reply.code(500).send({ error: 'Upload failed' });
     }
   });
@@ -508,13 +650,13 @@ async function videoMessageRoutes(fastify, options) {
         return { lang, text: msg.ai_description, cached: true };
       }
 
-      const cached = await db.getVideoMessageTranslation(messageId, lang);
+      const cached = await db.getVideoMessageTranslation(messageId, 0, lang);
       if (cached) return { lang, text: cached, cached: true };
 
       const { translateText } = require('../services/ai-translate');
       try {
         const translated = await translateText(msg.ai_description, sourceLang, lang);
-        await db.saveVideoMessageTranslation(messageId, lang, translated);
+        await db.saveVideoMessageTranslation(messageId, 0, lang, translated);
         return { lang, text: translated, cached: false };
       } catch (err) {
         logger.warn({ err: err.message, messageId, lang }, 'Translation failed');
@@ -522,6 +664,57 @@ async function videoMessageRoutes(fastify, options) {
       }
     } catch (error) {
       logger.error({ err: error }, 'Description endpoint failed');
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // GET /:messageId/photos/:idx/description?lang=XX - Per-photo translated AI description
+  fastify.get('/:messageId/photos/:idx/description', {
+    preHandler: optionalAuthHook,
+    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
+    const ALLOWED_LANGS = ['en', 'de', 'fr', 'tr', 'es', 'zh', 'ru', 'ar'];
+    try {
+      const { messageId } = request.params;
+      const idx = parseInt(request.params.idx, 10);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= MAX_PHOTOS_PER_MESSAGE) {
+        return reply.code(400).send({ error: 'Invalid photo index' });
+      }
+      const lang = String(request.query.lang || '').toLowerCase();
+      if (!ALLOWED_LANGS.includes(lang)) {
+        return reply.code(400).send({ error: 'Unsupported lang' });
+      }
+
+      const msg = await db.getVideoMessageById(messageId);
+      if (!msg || msg.media_type !== 'photo') return reply.code(404).send({ error: 'Message not found' });
+
+      const denied = assertCanViewMessage(msg, request.user);
+      if (denied) return reply.code(denied.code).send(denied.body);
+
+      const photo = (msg.photos || []).find(p => p.idx === idx);
+      if (!photo || !photo.ai_description) {
+        return reply.code(404).send({ error: 'No AI description yet' });
+      }
+
+      const sourceLang = photo.ai_description_lang || 'tr';
+      if (sourceLang === lang) {
+        return { lang, text: photo.ai_description, cached: true };
+      }
+
+      const cached = await db.getVideoMessageTranslation(messageId, idx, lang);
+      if (cached) return { lang, text: cached, cached: true };
+
+      const { translateText } = require('../services/ai-translate');
+      try {
+        const translated = await translateText(photo.ai_description, sourceLang, lang);
+        await db.saveVideoMessageTranslation(messageId, idx, lang, translated);
+        return { lang, text: translated, cached: false };
+      } catch (err) {
+        logger.warn({ err: err.message, messageId, idx, lang }, 'Translation failed');
+        return reply.code(503).send({ error: 'Translation unavailable' });
+      }
+    } catch (error) {
+      logger.error({ err: error }, 'Photo description endpoint failed');
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
@@ -581,6 +774,79 @@ async function videoMessageRoutes(fastify, options) {
 
     } catch (error) {
       logger.error({ err: error }, 'Video serve failed');
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // GET /:messageId/photos/:idx - Serve a specific photo from a multi-photo message
+  fastify.get('/:messageId/photos/:idx', { preHandler: optionalAuthHook }, async (request, reply) => {
+    try {
+      const { messageId } = request.params;
+      const idx = parseInt(request.params.idx, 10);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= MAX_PHOTOS_PER_MESSAGE) {
+        return reply.code(400).send({ error: 'Invalid photo index' });
+      }
+      const msg = await db.getVideoMessageById(messageId);
+      if (!msg || msg.media_type !== 'photo') return reply.code(404).send({ error: 'Photo not found' });
+
+      const denied = assertCanViewMessage(msg, request.user);
+      if (denied) return reply.code(denied.code).send(denied.body);
+
+      const photo = (msg.photos || []).find(p => p.idx === idx);
+      if (!photo) return reply.code(404).send({ error: 'Photo not found' });
+
+      const filePath = safePath(photo.file_path, 'uploads');
+      if (!filePath) return reply.code(404).send({ error: 'Photo file not found' });
+      try { await fsp.access(filePath); } catch {
+        return reply.code(404).send({ error: 'Photo file not found' });
+      }
+
+      const stat = await fsp.stat(filePath);
+      reply.header('Content-Length', stat.size);
+      reply.header('Content-Type', photo.mime_type);
+      reply.header('Cache-Control', 'public, max-age=86400');
+      return reply.send(fs.createReadStream(filePath));
+    } catch (error) {
+      logger.error({ err: error }, 'Photo serve failed');
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // GET /:messageId/photos/:idx/original - Serve uncompressed original of a specific photo
+  fastify.get('/:messageId/photos/:idx/original', { preHandler: optionalAuthHook }, async (request, reply) => {
+    try {
+      const { messageId } = request.params;
+      const idx = parseInt(request.params.idx, 10);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= MAX_PHOTOS_PER_MESSAGE) {
+        return reply.code(400).send({ error: 'Invalid photo index' });
+      }
+      const msg = await db.getVideoMessageById(messageId);
+      if (!msg || msg.media_type !== 'photo') return reply.code(404).send({ error: 'Photo not found' });
+
+      const denied = assertCanViewMessage(msg, request.user);
+      if (denied) return reply.code(denied.code).send(denied.body);
+
+      const photo = (msg.photos || []).find(p => p.idx === idx);
+      if (!photo) return reply.code(404).send({ error: 'Photo not found' });
+
+      const baseName = path.basename(photo.file_path);
+      const originalPath = path.resolve(ORIGINALS_DIR, baseName);
+      let filePath;
+      try {
+        await fsp.stat(originalPath);
+        filePath = originalPath;
+      } catch {
+        filePath = safePath(photo.file_path, 'uploads');
+      }
+      if (!filePath) return reply.code(404).send({ error: 'File not found' });
+
+      const stat = await fsp.stat(filePath);
+      reply.header('Content-Length', stat.size);
+      reply.header('Content-Type', photo.mime_type);
+      reply.header('Cache-Control', 'public, max-age=86400');
+      return reply.send(fs.createReadStream(filePath));
+    } catch (error) {
+      logger.error({ err: error }, 'Photo original serve failed');
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
@@ -699,18 +965,38 @@ async function videoMessageRoutes(fastify, options) {
       }
 
       // Delete files from disk (fire-and-forget, path traversal safe)
-      const filePath = safePath(deleted.file_path, 'uploads');
-      if (filePath) {
-        fsp.unlink(filePath).catch(() => {});
-        fsp.unlink(path.resolve(ORIGINALS_DIR, path.basename(filePath))).catch(() => {});
-      }
-      if (deleted.thumbnail_path) {
-        const thumbPath = safePath(deleted.thumbnail_path, 'uploads');
-        if (thumbPath) {
-          fsp.unlink(thumbPath).catch(() => {});
-          fsp.unlink(thumbPath.replace('_thumb.webp', '_preview.webp')).catch(() => {});
+      // For multi-photo messages: iterate child rows; for video/legacy single-photo: parent paths
+      const filesToUnlink = [];
+      if (deleted.media_type === 'photo' && Array.isArray(deleted.photos) && deleted.photos.length > 0) {
+        for (const p of deleted.photos) {
+          const fp = safePath(p.file_path, 'uploads');
+          if (fp) {
+            filesToUnlink.push(fp);
+            filesToUnlink.push(path.resolve(ORIGINALS_DIR, path.basename(fp)));
+          }
+          if (p.thumbnail_path) {
+            const tp = safePath(p.thumbnail_path, 'uploads');
+            if (tp) {
+              filesToUnlink.push(tp);
+              filesToUnlink.push(tp.replace('_thumb.webp', '_preview.webp'));
+            }
+          }
+        }
+      } else {
+        const filePath = safePath(deleted.file_path, 'uploads');
+        if (filePath) {
+          filesToUnlink.push(filePath);
+          filesToUnlink.push(path.resolve(ORIGINALS_DIR, path.basename(filePath)));
+        }
+        if (deleted.thumbnail_path) {
+          const thumbPath = safePath(deleted.thumbnail_path, 'uploads');
+          if (thumbPath) {
+            filesToUnlink.push(thumbPath);
+            filesToUnlink.push(thumbPath.replace('_thumb.webp', '_preview.webp'));
+          }
         }
       }
+      for (const f of filesToUnlink) fsp.unlink(f).catch(() => {});
 
       // Notify via WebSocket
       const wsPayload = {

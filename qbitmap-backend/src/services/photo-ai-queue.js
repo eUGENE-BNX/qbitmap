@@ -52,9 +52,9 @@ let onComplete = null; // callback for WebSocket notification
 
 function setOnComplete(cb) { onComplete = cb; }
 
-async function enqueue(messageId, fileName) {
-  await db.createAiJob(messageId, 'photo');
-  logger.info({ messageId }, 'Photo enqueued for AI analysis (DB)');
+async function enqueue(messageId, fileName, photoIdx = 0) {
+  await db.createAiJob(messageId, 'photo', photoIdx);
+  logger.info({ messageId, photoIdx }, 'Photo enqueued for AI analysis (DB)');
   // Trigger immediate poll
   pollOnce();
 }
@@ -77,32 +77,37 @@ async function pollOnce() {
 }
 
 async function processJob(job) {
+  const subId = job.sub_id || 0;
   try {
-    await analyzePhoto(job.message_id);
-    await db.completeAiJob(job.message_id);
+    await analyzePhoto(job.message_id, subId);
+    await db.completeAiJob(job.message_id, subId);
     circuitBreaker.onSuccess();
-    if (onComplete) onComplete(job.message_id, 'photo');
+    if (onComplete) onComplete(job.message_id, 'photo', subId);
   } catch (err) {
-    logger.error({ messageId: job.message_id, err: err.message, retries: job.retries }, 'Photo AI analysis failed');
+    logger.error({ messageId: job.message_id, photoIdx: subId, err: err.message, retries: job.retries }, 'Photo AI analysis failed');
     circuitBreaker.onFailure(err.message);
-    await db.failAiJob(job.message_id, err.message);
+    await db.failAiJob(job.message_id, subId, err.message);
   }
   activeCount--;
   // Check for more work
   pollOnce();
 }
 
-async function analyzePhoto(messageId) {
+async function analyzePhoto(messageId, photoIdx = 0) {
   const vllmUrl = await getVllmUrl();
   const model = await getModelName();
   const apiKey = await getVllmApiKey();
 
-  // Resolve original file from DB and downscale to a vLLM-friendly bounding box.
+  // Resolve message + per-photo file path
   const msg = await db.getVideoMessageById(messageId);
-  if (!msg || !msg.file_path) throw new Error('Message or file_path not found');
+  if (!msg) throw new Error('Message not found');
+  const photo = (msg.photos || []).find(p => p.idx === photoIdx);
+  const filePath = photo?.file_path || (photoIdx === 0 ? msg.file_path : null);
+  if (!filePath) throw new Error(`Photo idx ${photoIdx} not found for message ${messageId}`);
+
   const lang = await resolveLanguageForCoords(Number(msg.lat), Number(msg.lng));
   const PROMPT = buildPrompt(lang.name);
-  const srcPath = path.resolve(__dirname, '../../', msg.file_path);
+  const srcPath = path.resolve(__dirname, '../../', filePath);
   if (!srcPath.startsWith(UPLOADS_DIR + path.sep)) throw new Error('Invalid file path');
   if (!fs.existsSync(srcPath)) throw new Error(`Source image missing: ${srcPath}`);
 
@@ -112,7 +117,7 @@ async function analyzePhoto(messageId) {
     resizedPath = await downscaleForAi(srcPath);
     const buf = await fs.promises.readFile(resizedPath);
     imageDataUrl = `data:image/jpeg;base64,${buf.toString('base64')}`;
-    logger.info({ messageId, model, srcSize: (await fs.promises.stat(srcPath)).size, resizedSize: buf.length }, 'Starting photo AI analysis');
+    logger.info({ messageId, photoIdx, model, srcSize: (await fs.promises.stat(srcPath)).size, resizedSize: buf.length }, 'Starting photo AI analysis');
   } finally {
     if (resizedPath) fs.promises.unlink(resizedPath).catch(() => {});
   }
@@ -144,13 +149,13 @@ async function analyzePhoto(messageId) {
   }
 
   const data = await resp.json();
-  logger.info({ messageId, response: JSON.stringify(data).substring(0, 500) }, 'vLLM raw response');
+  logger.info({ messageId, photoIdx, response: JSON.stringify(data).substring(0, 500) }, 'vLLM raw response');
 
   let text = (data.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   if (!text) throw new Error('Empty AI description');
 
-  await db.updateVideoMessageAiDescription(messageId, text.substring(0, 1000), lang.code);
-  logger.info({ messageId, len: text.length, lang: lang.code }, 'Photo AI description saved');
+  await db.updateVideoMessagePhotoAiDescription(messageId, photoIdx, text.substring(0, 1000), lang.code);
+  logger.info({ messageId, photoIdx, len: text.length, lang: lang.code }, 'Photo AI description saved');
 }
 
 function start() {

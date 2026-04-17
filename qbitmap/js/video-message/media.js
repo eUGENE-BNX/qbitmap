@@ -11,14 +11,54 @@ function saveCameraId(deviceId) {
 }
 
 function applyAutofocus(stream) {
-  // No-op: we no longer force continuous autofocus.
-  // Tap-to-focus is handled via bindTapToFocus on the video element.
+  // Try to keep continuous autofocus active so panning to a new scene refocuses
+  // automatically. Tap-to-focus does a single-shot AF at the tap point and then
+  // reverts to continuous (rather than locking to manual) for the same reason.
+  if (!stream) return;
+  const track = stream.getVideoTracks()[0];
+  if (!track) return;
+  const caps = track.getCapabilities?.();
+  if (caps?.focusMode?.includes('continuous')) {
+    track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+  }
+}
+
+/**
+ * Trigger a single-shot autofocus at the center of the frame.
+ * Returns a promise that resolves after a brief settle delay so the caller
+ * can capture immediately afterwards. Safe to call on devices without AF
+ * controls (resolves immediately).
+ */
+async function refocusCenter(stream) {
+  if (!stream) return;
+  const track = stream.getVideoTracks()[0];
+  if (!track) return;
+  const caps = track.getCapabilities?.();
+  if (!caps?.focusMode) return;
+
+  const adv = {};
+  if (caps.focusMode.includes('single-shot')) {
+    adv.focusMode = 'single-shot';
+  } else if (caps.focusMode.includes('continuous')) {
+    adv.focusMode = 'continuous';
+  } else {
+    return;
+  }
+  if (caps.pointsOfInterest) adv.pointsOfInterest = [{ x: 0.5, y: 0.5 }];
+
+  try {
+    await track.applyConstraints({ advanced: [adv] });
+    // Give the lens time to settle before capture
+    await new Promise(r => setTimeout(r, 250));
+  } catch {
+    /* device rejected — proceed without forced AF */
+  }
 }
 
 /**
  * Bind tap-to-focus on a video element.
- * Taps trigger single-shot AF at the tapped point, then reverts to manual
- * so the camera doesn't hunt. Works on devices that support focusMode + pointsOfInterest.
+ * Taps trigger single-shot AF at the tapped point, then reverts to continuous
+ * AF so the camera refocuses automatically when panned to a new scene.
  */
 function bindTapToFocus(videoEl, stream) {
   if (!videoEl || !stream) return;
@@ -29,13 +69,6 @@ function bindTapToFocus(videoEl, stream) {
 
   let revertTimer = null;
 
-  // After initial focus completes, switch to manual to stop hunting
-  if (caps.focusMode.includes('manual')) {
-    setTimeout(() => {
-      track.applyConstraints({ advanced: [{ focusMode: 'manual' }] }).catch(() => {});
-    }, 2000);
-  }
-
   videoEl.addEventListener('click', (e) => {
     const rect = videoEl.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
@@ -44,6 +77,8 @@ function bindTapToFocus(videoEl, stream) {
     const constraints = { advanced: [{}] };
     if (caps.focusMode.includes('single-shot')) {
       constraints.advanced[0].focusMode = 'single-shot';
+    } else if (caps.focusMode.includes('continuous')) {
+      constraints.advanced[0].focusMode = 'continuous';
     }
     if (caps.pointsOfInterest) {
       constraints.advanced[0].pointsOfInterest = [{ x, y }];
@@ -64,12 +99,14 @@ function bindTapToFocus(videoEl, stream) {
     void dot.offsetWidth;
     dot.classList.add('vmsg-focus-animate');
 
+    // After a single-shot focus settles, return to continuous so panning to
+    // a new scene re-acquires focus instead of locking to the tap distance.
     clearTimeout(revertTimer);
-    revertTimer = setTimeout(() => {
-      if (caps.focusMode.includes('manual')) {
-        track.applyConstraints({ advanced: [{ focusMode: 'manual' }] }).catch(() => {});
-      }
-    }, 3000);
+    if (caps.focusMode.includes('continuous')) {
+      revertTimer = setTimeout(() => {
+        track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+      }, 1500);
+    }
   });
 }
 
@@ -410,4 +447,4 @@ const MediaMixin = {
   },
 };
 
-export { MediaMixin, applyAutofocus, bindTapToFocus, getSavedCameraId, saveCameraId };
+export { MediaMixin, applyAutofocus, bindTapToFocus, refocusCenter, getSavedCameraId, saveCameraId };

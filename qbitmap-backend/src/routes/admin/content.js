@@ -65,7 +65,14 @@ module.exports = async function(fastify) {
       return reply.code(400).send({ error: 'Invalid text (max 2000 chars)' });
     }
 
-    await db.updateVideoMessageAiDescription(messageId, text.trim(), lang || null);
+    // Write to photos[idx=0] (per-photo store) — mirrors to parent for FULLTEXT search.
+    // Falls back to parent-only update for legacy messages without photo rows.
+    const msg = await db.getVideoMessageById(messageId);
+    if (msg && msg.media_type === 'photo' && Array.isArray(msg.photos) && msg.photos.length > 0) {
+      await db.updateVideoMessagePhotoAiDescription(messageId, 0, text.trim(), lang || null);
+    } else {
+      await db.updateVideoMessageAiDescription(messageId, text.trim(), lang || null);
+    }
     await db.clearVideoMessageTranslations(messageId);
 
     logger.info({ messageId, admin: request.user.email }, 'Admin edited AI description');

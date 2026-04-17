@@ -1,6 +1,6 @@
 import { Logger } from "../utils.js";
 import { AuthSystem } from "../auth.js";
-import { applyAutofocus, bindTapToFocus, getSavedCameraId, saveCameraId } from "./media.js";
+import { applyAutofocus, bindTapToFocus, refocusCenter, getSavedCameraId, saveCameraId } from "./media.js";
 
 function _haptic(style) {
   if (!navigator.vibrate) return;
@@ -17,6 +17,8 @@ const PhotoCaptureMixin = {
 
     if (this.isRecording || this._modalEl) return;
     this.isPhotoMode = true;
+    this._capturedPhotos = [];
+    this._previewActiveIdx = 0;
 
     try {
       const res = this.PHOTO_RESOLUTIONS[this._photoResolution];
@@ -83,6 +85,11 @@ const PhotoCaptureMixin = {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
           </button>
         </div>
+        <div class="photo-capture-strip" id="vmsg-photo-strip">
+          <span class="photo-strip-counter"><span id="vmsg-photo-count">0</span>/${this.MAX_PHOTOS_PER_MESSAGE}</span>
+          <div class="photo-strip-thumbs" id="vmsg-photo-thumbs"></div>
+          <button class="photo-strip-finish" id="vmsg-photo-finish" disabled>Bitir</button>
+        </div>
         <div class="video-msg-controls photo-controls" id="vmsg-controls">
           <button class="video-msg-btn video-msg-btn-cancel" id="vmsg-cancel" title="İptal" aria-label="İptal">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -122,6 +129,8 @@ const PhotoCaptureMixin = {
         this.switchCamera();
       }
     };
+    modal.querySelector('#vmsg-photo-finish').onclick = () => this._finishCapture();
+    this._renderPhotoStrip();
 
     // Photo-specific controls
     this._bindPhotoZoom(modal);
@@ -134,12 +143,25 @@ const PhotoCaptureMixin = {
 
   async capturePhoto() {
     if (!this.mediaStream) return;
+    if (this._capturedPhotos.length >= this.MAX_PHOTOS_PER_MESSAGE) return;
+    if (this._capturing) return;
+    this._capturing = true;
+
+    const captureBtn = this._modalEl?.querySelector('#vmsg-capture');
+    if (captureBtn) captureBtn.classList.add('is-focusing');
 
     const video = this._modalEl?.querySelector('#vmsg-preview-video');
-    if (!video) return;
+    if (!video) { this._capturing = false; if (captureBtn) captureBtn.classList.remove('is-focusing'); return; }
 
     const track = this.mediaStream.getVideoTracks()[0];
     const res = this.PHOTO_RESOLUTIONS[this._photoResolution];
+
+    // Trigger fresh autofocus before each shot — fixes the case where the
+    // user has panned/tilted the camera between captures and the lens is
+    // still focused on the previous scene.
+    await refocusCenter(this.mediaStream);
+
+    if (captureBtn) captureBtn.classList.remove('is-focusing');
 
     // Detect portrait: check if the container has portrait class (set by _applyVideoOrientation)
     // We can't rely on video.videoWidth/Height — mobile browsers report sensor dimensions
@@ -151,35 +173,92 @@ const PhotoCaptureMixin = {
 
     // Always use canvas capture — ImageCapture.takePhoto() produces black frames
     // on many mobile devices due to GPU-only video decode paths
-    this.capturedPhotoBlob = await this._canvasCapture(video, targetW, targetH);
+    let blob = await this._canvasCapture(video, targetW, targetH);
 
     // If canvas capture failed, try ImageCapture.grabFrame() as fallback
-    if (!this.capturedPhotoBlob && typeof ImageCapture !== 'undefined') {
+    if (!blob && typeof ImageCapture !== 'undefined') {
       try {
         Logger.log('[VideoMessage] Canvas capture failed, trying grabFrame()');
         const imageCapture = new ImageCapture(track);
         const bitmap = await imageCapture.grabFrame();
-        this.capturedPhotoBlob = await this._cropToAspect(bitmap, targetW, targetH);
+        blob = await this._cropToAspect(bitmap, targetW, targetH);
         bitmap.close();
       } catch (e) {
         Logger.warn('[VideoMessage] grabFrame also failed:', e);
       }
     }
 
-    if (!this.capturedPhotoBlob) {
+    if (!blob) {
       AuthSystem.showNotification('Fotoğraf çekilemedi, tekrar deneyin', 'error');
+      this._capturing = false;
       return;
     }
 
-    this._capturedWidth = targetW;
-    this._capturedHeight = targetH;
-
     _haptic('medium');
 
-    // Stop camera
-    this.mediaStream.getTracks().forEach(t => t.stop());
-    this.mediaStream = null;
+    const objectUrl = URL.createObjectURL(blob);
+    this._capturedPhotos.push({ blob, width: targetW, height: targetH, objectUrl });
+    // BC mirrors so existing single-photo code paths keep working
+    this.capturedPhotoBlob = this._capturedPhotos[0].blob;
+    this._capturedWidth = this._capturedPhotos[0].width;
+    this._capturedHeight = this._capturedPhotos[0].height;
 
+    this._renderPhotoStrip();
+    this._capturing = false;
+  },
+
+  _renderPhotoStrip() {
+    if (!this._modalEl) return;
+    const strip = this._modalEl.querySelector('#vmsg-photo-thumbs');
+    const counter = this._modalEl.querySelector('#vmsg-photo-count');
+    const finishBtn = this._modalEl.querySelector('#vmsg-photo-finish');
+    const captureBtn = this._modalEl.querySelector('#vmsg-capture');
+    if (!strip || !counter) return;
+
+    const count = this._capturedPhotos.length;
+    counter.textContent = count;
+    strip.innerHTML = this._capturedPhotos.map((p, i) => `
+      <div class="photo-strip-thumb${i === 0 ? ' is-primary' : ''}" data-idx="${i}">
+        <img src="${p.objectUrl}" alt="Foto ${i + 1}">
+        <button class="photo-strip-thumb-remove" data-idx="${i}" aria-label="Sil">&times;</button>
+      </div>
+    `).join('');
+
+    strip.querySelectorAll('.photo-strip-thumb-remove').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        this._removePhotoAt(parseInt(btn.dataset.idx, 10));
+      };
+    });
+
+    if (finishBtn) finishBtn.disabled = count === 0;
+    if (captureBtn) {
+      const atMax = count >= this.MAX_PHOTOS_PER_MESSAGE;
+      captureBtn.disabled = atMax;
+      captureBtn.classList.toggle('is-disabled', atMax);
+    }
+  },
+
+  _removePhotoAt(idx) {
+    if (idx < 0 || idx >= this._capturedPhotos.length) return;
+    const removed = this._capturedPhotos.splice(idx, 1)[0];
+    if (removed?.objectUrl) URL.revokeObjectURL(removed.objectUrl);
+    if (this._capturedPhotos.length > 0) {
+      this.capturedPhotoBlob = this._capturedPhotos[0].blob;
+      this._capturedWidth = this._capturedPhotos[0].width;
+      this._capturedHeight = this._capturedPhotos[0].height;
+    } else {
+      this.capturedPhotoBlob = null;
+    }
+    this._renderPhotoStrip();
+  },
+
+  _finishCapture() {
+    if (this._capturedPhotos.length === 0) return;
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach(t => t.stop());
+      this.mediaStream = null;
+    }
     this.showPhotoPreview();
   },
 
@@ -337,14 +416,43 @@ const PhotoCaptureMixin = {
   },
 
   showPhotoPreview() {
-    if (!this._modalEl || !this.capturedPhotoBlob) return;
+    if (!this._modalEl) return;
 
-    const objectUrl = URL.createObjectURL(this.capturedPhotoBlob);
+    // Ensure _capturedPhotos has at least the legacy single blob
+    if ((!this._capturedPhotos || this._capturedPhotos.length === 0) && this.capturedPhotoBlob) {
+      this._capturedPhotos = [{
+        blob: this.capturedPhotoBlob,
+        width: this._capturedWidth || 0,
+        height: this._capturedHeight || 0,
+        objectUrl: URL.createObjectURL(this.capturedPhotoBlob)
+      }];
+    }
+    if (!this._capturedPhotos || this._capturedPhotos.length === 0) return;
+
+    this._previewActiveIdx = 0;
+    const total = this._capturedPhotos.length;
+    const firstUrl = this._capturedPhotos[0].objectUrl;
 
     this._modalEl.innerHTML = `
       <div class="video-msg-modal-content">
         <div class="video-msg-video-container photo-preview-container">
-          <img id="vmsg-photo-preview" src="${objectUrl}" alt="Captured photo">
+          <img id="vmsg-photo-preview" src="${firstUrl}" alt="Captured photo">
+          <div class="vmsg-preview-carousel-overlay" data-total="${total}">
+            <div class="vmsg-preview-counter"><span data-curr>1</span>/${total}</div>
+            <button class="vmsg-preview-arrow vmsg-preview-prev" aria-label="Önceki" ${total <= 1 ? 'disabled' : ''}>‹</button>
+            <button class="vmsg-preview-arrow vmsg-preview-next" aria-label="Sonraki" ${total <= 1 ? 'disabled' : ''}>›</button>
+            <div class="vmsg-preview-dots">
+              ${this._capturedPhotos.map((_, i) => `<span class="vmsg-preview-dot${i === 0 ? ' active' : ''}" data-idx="${i}"></span>`).join('')}
+            </div>
+          </div>
+          <div class="vmsg-preview-thumbs">
+            ${this._capturedPhotos.map((p, i) => `
+              <div class="vmsg-preview-thumb${i === 0 ? ' active' : ''}" data-idx="${i}">
+                <img src="${p.objectUrl}" alt="Foto ${i + 1}">
+                <button class="vmsg-preview-thumb-remove" data-idx="${i}" aria-label="Sil">&times;</button>
+              </div>
+            `).join('')}
+          </div>
         </div>
         <div class="video-msg-send-panel">
           <input type="text" class="video-msg-description-input" id="vmsg-description"
@@ -386,7 +494,7 @@ const PhotoCaptureMixin = {
       </div>
     `;
 
-    // Detect photo orientation
+    // Detect photo orientation (re-runs on each carousel switch)
     const previewContainer = this._modalEl.querySelector('.photo-preview-container');
     const img = this._modalEl.querySelector('#vmsg-photo-preview');
     if (previewContainer && img) {
@@ -399,8 +507,81 @@ const PhotoCaptureMixin = {
       };
     }
 
-    this._objectUrl = objectUrl;
+    this._objectUrl = firstUrl;
+    this._bindPreviewCarousel();
     this._bindSendPanel();
+  },
+
+  _bindPreviewCarousel() {
+    if (!this._modalEl) return;
+    const overlay = this._modalEl.querySelector('.vmsg-preview-carousel-overlay');
+    if (!overlay) return;
+
+    const setIdx = (idx) => {
+      const total = this._capturedPhotos.length;
+      if (total === 0) return;
+      this._previewActiveIdx = ((idx % total) + total) % total;
+      const photo = this._capturedPhotos[this._previewActiveIdx];
+      const img = this._modalEl.querySelector('#vmsg-photo-preview');
+      if (img && photo) img.src = photo.objectUrl;
+      const curr = overlay.querySelector('[data-curr]');
+      if (curr) curr.textContent = this._previewActiveIdx + 1;
+      overlay.querySelectorAll('.vmsg-preview-dot').forEach((d, i) => {
+        d.classList.toggle('active', i === this._previewActiveIdx);
+      });
+      this._modalEl.querySelectorAll('.vmsg-preview-thumb').forEach((t, i) => {
+        t.classList.toggle('active', i === this._previewActiveIdx);
+      });
+    };
+
+    overlay.querySelector('.vmsg-preview-prev').onclick = () => setIdx(this._previewActiveIdx - 1);
+    overlay.querySelector('.vmsg-preview-next').onclick = () => setIdx(this._previewActiveIdx + 1);
+    overlay.querySelectorAll('.vmsg-preview-dot').forEach(d => {
+      d.onclick = () => setIdx(parseInt(d.dataset.idx, 10));
+    });
+
+    this._modalEl.querySelectorAll('.vmsg-preview-thumb').forEach(thumb => {
+      thumb.onclick = (e) => {
+        if (e.target.classList.contains('vmsg-preview-thumb-remove')) return;
+        setIdx(parseInt(thumb.dataset.idx, 10));
+      };
+    });
+    this._modalEl.querySelectorAll('.vmsg-preview-thumb-remove').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const removeIdx = parseInt(btn.dataset.idx, 10);
+        if (this._capturedPhotos.length <= 1) return; // Keep at least 1
+        const removed = this._capturedPhotos.splice(removeIdx, 1)[0];
+        if (removed?.objectUrl) URL.revokeObjectURL(removed.objectUrl);
+        this.capturedPhotoBlob = this._capturedPhotos[0].blob;
+        this._capturedWidth = this._capturedPhotos[0].width;
+        this._capturedHeight = this._capturedPhotos[0].height;
+        // Re-render preview entirely (counter, dots, thumbs change)
+        this.showPhotoPreview();
+      };
+    });
+
+    // Touch swipe (mobile)
+    const container = this._modalEl.querySelector('.photo-preview-container');
+    if (container && this._capturedPhotos.length > 1) {
+      let startX = 0, startY = 0, swiping = false;
+      container.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        swiping = true;
+      }, { passive: true });
+      container.addEventListener('touchend', (e) => {
+        if (!swiping) return;
+        swiping = false;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          setIdx(this._previewActiveIdx + (dx < 0 ? 1 : -1));
+        }
+      }, { passive: true });
+    }
   },
 
   // ==================== PHOTO CONTROLS ====================

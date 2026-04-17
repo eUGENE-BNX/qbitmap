@@ -50,13 +50,13 @@ async function pollOnce() {
 async function processJob(job) {
   try {
     await analyzeVideo(job.message_id);
-    await db.completeAiJob(job.message_id);
+    await db.completeAiJob(job.message_id, 0);
     circuitBreaker.onSuccess();
-    if (onComplete) onComplete(job.message_id, 'video');
+    if (onComplete) onComplete(job.message_id, 'video', 0);
   } catch (err) {
     logger.error({ messageId: job.message_id, err: err.message, retries: job.retries }, 'Video AI analysis failed');
     circuitBreaker.onFailure(err.message);
-    await db.failAiJob(job.message_id, err.message);
+    await db.failAiJob(job.message_id, 0, err.message);
   }
   activeCount--;
   pollOnce();

@@ -140,6 +140,11 @@ const FormUploadMixin = {
     // Re-record / re-capture
     this._modalEl.querySelector('#vmsg-rerecord').onclick = () => {
       if (this._objectUrl) URL.revokeObjectURL(this._objectUrl);
+      if (Array.isArray(this._capturedPhotos)) {
+        this._capturedPhotos.forEach(p => p?.objectUrl && URL.revokeObjectURL(p.objectUrl));
+      }
+      this._capturedPhotos = [];
+      this._previewActiveIdx = 0;
       this.recordedBlob = null;
       this.capturedPhotoBlob = null;
       this.selectedRecipient = null;
@@ -458,12 +463,24 @@ const FormUploadMixin = {
   // ==================== UPLOAD ====================
 
   async uploadMessage() {
-    const blob = this.isPhotoMode ? this.capturedPhotoBlob : this.recordedBlob;
+    const photos = this.isPhotoMode
+      ? (this._capturedPhotos && this._capturedPhotos.length > 0
+          ? this._capturedPhotos
+          : (this.capturedPhotoBlob ? [{ blob: this.capturedPhotoBlob, width: this._capturedWidth, height: this._capturedHeight }] : []))
+      : null;
+    const blob = this.isPhotoMode ? (photos[0]?.blob || null) : this.recordedBlob;
     if (!blob || !this.selectedLocation) return;
 
-    // Client-side file size check (max 20MB)
+    // Client-side file size check (max 20MB per file)
     const MAX_SIZE = 20 * 1024 * 1024;
-    if (blob.size > MAX_SIZE) {
+    if (this.isPhotoMode) {
+      for (const p of photos) {
+        if (p.blob.size > MAX_SIZE) {
+          AuthSystem.showNotification(`Bir fotoğraf çok büyük (${(p.blob.size / 1024 / 1024).toFixed(1)}MB). Maksimum 20MB.`, 'error');
+          return;
+        }
+      }
+    } else if (blob.size > MAX_SIZE) {
       AuthSystem.showNotification(`Dosya çok büyük (${(blob.size / 1024 / 1024).toFixed(1)}MB). Maksimum 20MB.`, 'error');
       return;
     }
@@ -509,17 +526,23 @@ const FormUploadMixin = {
       formData.append('place_id', this._selectedPlace.id);
     }
     if (this.isPhotoMode) {
-      // Send photo metadata
-      const photoMeta = {
-        width: this._capturedWidth,
-        height: this._capturedHeight,
-        zoom: this._photoZoomLevel,
-        flash: this._flashEnabled,
-        resolution: this._photoResolution
-      };
-      formData.append('photo_metadata', JSON.stringify(photoMeta));
-      const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
-      formData.append('video', blob, `photo.${ext}`);
+      // Per-photo metadata array (kapak = idx=0, taşıdığı capture-time settings cover-only fields'a uygulanır)
+      const photoMetas = photos.map((p, i) => ({
+        width: p.width,
+        height: p.height,
+        zoom: i === 0 ? this._photoZoomLevel : null,
+        flash: i === 0 ? this._flashEnabled : null,
+        resolution: this._photoResolution,
+        is_primary: i === 0
+      }));
+      formData.append('photo_metadata', JSON.stringify(photoMetas));
+      formData.append('photo_count', String(photos.length));
+      formData.append('primary_idx', '0');
+      photos.forEach((p, i) => {
+        const ext = p.blob.type === 'image/png' ? 'png' : p.blob.type === 'image/webp' ? 'webp' : 'jpg';
+        // Backend reads files via request.files() iterator; field name is consistent
+        formData.append('photos', p.blob, `photo_${i}.${ext}`);
+      });
     } else {
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
       formData.append('video', blob, `message.${ext}`);
@@ -565,8 +588,23 @@ const FormUploadMixin = {
             try { resolve(JSON.parse(xhr.responseText)); }
             catch { resolve({ status: 'ok' }); }
           } else {
-            try { reject(new Error(JSON.parse(xhr.responseText).error || `HTTP ${xhr.status}`)); }
-            catch { reject(new Error(`HTTP ${xhr.status}`)); }
+            // Stringify error robustly: error field may be string, object, or absent
+            let msg = `HTTP ${xhr.status}`;
+            try {
+              const parsed = JSON.parse(xhr.responseText);
+              const candidate = parsed.error ?? parsed.message;
+              if (typeof candidate === 'string' && candidate) {
+                msg = candidate;
+              } else if (candidate) {
+                msg = JSON.stringify(candidate);
+              } else if (xhr.responseText) {
+                msg = `HTTP ${xhr.status}: ${xhr.responseText.slice(0, 200)}`;
+              }
+            } catch {
+              if (xhr.responseText) msg = `HTTP ${xhr.status}: ${xhr.responseText.slice(0, 200)}`;
+            }
+            Logger.error('[VideoMessage] Upload failed', { status: xhr.status, body: xhr.responseText?.slice(0, 500) });
+            reject(new Error(msg));
           }
         };
 
@@ -597,7 +635,9 @@ const FormUploadMixin = {
 
     } catch (error) {
       Logger.error('[VideoMessage] Upload error:', error);
-      AuthSystem.showNotification(error.message || 'Yükleme başarısız', 'error');
+      const rawMsg = error?.message ?? error;
+      const msg = typeof rawMsg === 'string' ? rawMsg : (() => { try { return JSON.stringify(rawMsg); } catch { return 'Yükleme başarısız'; } })();
+      AuthSystem.showNotification(msg || 'Yükleme başarısız', 'error');
 
       // Restore actions
       if (progressEl) progressEl.style.display = 'none';

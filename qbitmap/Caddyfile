@@ -128,8 +128,9 @@ stream.qbitmap.com {
 
 	encode gzip zstd
 
+	# 5 photo upload (max 5 × 20MB) + form overhead
 	request_body {
-		max_size 25MB
+		max_size 110MB
 	}
 }
 

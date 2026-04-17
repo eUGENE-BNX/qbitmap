@@ -379,6 +379,28 @@ CREATE TABLE IF NOT EXISTS video_messages (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================
+-- 20a. video_message_photos (multi-photo per message, idx=0 = kapak)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS video_message_photos (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  video_message_id BIGINT UNSIGNED NOT NULL,
+  idx TINYINT UNSIGNED NOT NULL,
+  file_path VARCHAR(500) NOT NULL,
+  thumbnail_path VARCHAR(500) DEFAULT NULL,
+  photo_metadata JSON DEFAULT NULL,
+  ai_description TEXT DEFAULT NULL,
+  ai_description_lang VARCHAR(8) DEFAULT NULL,
+  file_size INT UNSIGNED NOT NULL,
+  mime_type VARCHAR(50) NOT NULL,
+  is_primary TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_vmp_msg_idx (video_message_id, idx),
+  INDEX idx_vmp_msg (video_message_id),
+  CONSTRAINT fk_vmp_vmsg FOREIGN KEY (video_message_id)
+    REFERENCES video_messages(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================
 -- 21. tags (for video message tagging)
 -- =================================================================
 CREATE TABLE IF NOT EXISTS tags (
@@ -523,6 +545,7 @@ CREATE TABLE IF NOT EXISTS like_counts (
 CREATE TABLE IF NOT EXISTS ai_jobs (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   message_id VARCHAR(64) NOT NULL,
+  sub_id INT UNSIGNED NOT NULL DEFAULT 0,
   job_type ENUM('photo', 'video') NOT NULL,
   status ENUM('pending', 'processing', 'completed', 'failed') NOT NULL DEFAULT 'pending',
   retries TINYINT UNSIGNED DEFAULT 0,
@@ -534,7 +557,7 @@ CREATE TABLE IF NOT EXISTS ai_jobs (
   completed_at DATETIME DEFAULT NULL,
   INDEX idx_aijobs_status (status, next_retry_at),
   INDEX idx_aijobs_message (message_id),
-  UNIQUE KEY uk_aijobs_message (message_id)
+  UNIQUE KEY uk_aijobs_msg_sub (message_id, sub_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================
@@ -553,10 +576,11 @@ CREATE TABLE IF NOT EXISTS geo_lang_cells (
 -- =================================================================
 CREATE TABLE IF NOT EXISTS video_message_translations (
   message_id VARCHAR(64) NOT NULL,
+  photo_idx TINYINT UNSIGNED NOT NULL DEFAULT 0,
   lang VARCHAR(8) NOT NULL,
   text VARCHAR(1200) NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (message_id, lang),
+  PRIMARY KEY (message_id, photo_idx, lang),
   FULLTEXT INDEX ft_vmsg_trans (text),
   CONSTRAINT fk_vmsg_trans_message FOREIGN KEY (message_id)
     REFERENCES video_messages(message_id) ON DELETE CASCADE ON UPDATE CASCADE

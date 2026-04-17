@@ -31,13 +31,43 @@ const PopupMixin = {
 
     const videoUrl = `${this.apiBase}/${encodeURIComponent(messageId)}/video`;
 
+    // Build photo list for carousel (BC: empty/legacy → fallback to single video URL)
+    let photoList = [];
+    try {
+      const raw = props.photos;
+      if (raw) {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (Array.isArray(parsed)) photoList = parsed;
+      }
+    } catch { photoList = []; }
+    if (photoList.length === 0) {
+      photoList = [{ idx: 0, is_primary: 1 }];
+    }
+    const photoUrls = photoList.map((p) => {
+      const i = Number(p.idx) || 0;
+      return {
+        idx: i,
+        // idx=0 uses legacy /video endpoint (parent file_path mirror) for BC;
+        // higher indices use the new per-photo endpoint
+        url: i === 0
+          ? videoUrl
+          : `${this.apiBase}/${encodeURIComponent(messageId)}/photos/${i}`,
+        originalUrl: i === 0
+          ? `${this.apiBase}/${encodeURIComponent(messageId)}/original`
+          : `${this.apiBase}/${encodeURIComponent(messageId)}/photos/${i}/original`
+      };
+    });
+    const photoCount = photoUrls.length;
+
     const viewCount = parseInt(props.viewCount) || 0;
     const likeCount = parseInt(props.likeCount) || 0;
     const liked = props.liked === 'true' || props.liked === true;
     const isLoggedIn = AuthSystem.isLoggedIn();
     const description = props.description || '';
-    const aiDescription = props.aiDescription || '';
-    const aiDescriptionLang = (props.aiDescriptionLang || 'tr').toLowerCase();
+    // For multi-photo messages, AI description comes from the active photo
+    // (initial = idx=0). Falls back to legacy parent ai_description for BC.
+    const aiDescription = (photoList[0]?.ai_description) || props.aiDescription || '';
+    const aiDescriptionLang = ((photoList[0]?.ai_description_lang) || props.aiDescriptionLang || 'tr').toLowerCase();
     const SUPPORTED_LANGS = [
       { code: 'en', label: 'English' },
       { code: 'de', label: 'Deutsch' },
@@ -56,13 +86,26 @@ const PopupMixin = {
     const shimmerHtml = `<div class="vmsg-media-shimmer"><div class="vmsg-shimmer-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div>`;
 
     const mediaBodyHtml = isPhoto
-      ? `${shimmerHtml}<img class="vmsg-popup-photo" alt="Foto mesaj" data-photo-src="${videoUrl}">
-         <button class="vmsg-photo-expand-btn" data-action="expand-photo" title="Büyük görüntüle">
-           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-             <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
-             <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
-           </svg>
-         </button>`
+      ? `<div class="vmsg-popup-carousel" data-active-idx="0" data-total="${photoCount}">
+           ${shimmerHtml}
+           <img class="vmsg-popup-photo" alt="Foto mesaj" data-photo-idx="0">
+           <div class="vmsg-popup-counter"><span data-curr>1</span>/${photoCount}</div>
+           <button class="vmsg-popup-arrow vmsg-popup-prev" aria-label="Önceki" ${photoCount <= 1 ? 'disabled' : ''}>
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+           </button>
+           <button class="vmsg-popup-arrow vmsg-popup-next" aria-label="Sonraki" ${photoCount <= 1 ? 'disabled' : ''}>
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+           </button>
+           <div class="vmsg-popup-dots">
+             ${photoUrls.map((_, i) => `<span class="vmsg-popup-dot${i === 0 ? ' active' : ''}" data-idx="${i}"></span>`).join('')}
+           </div>
+           <button class="vmsg-photo-expand-btn" data-action="expand-photo" title="Büyük görüntüle">
+             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+               <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+               <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+             </svg>
+           </button>
+         </div>`
       : `${shimmerHtml}<video controls playsinline preload="metadata" crossorigin="use-credentials">
             <source src="${videoUrl}" type="${esc(props.mimeType || 'video/mp4')}">
           </video>`;
@@ -101,10 +144,10 @@ const PopupMixin = {
         <div class="video-msg-popup-body">
           ${mediaBodyHtml}
         </div>
-        ${description || aiDescription || placeName || tags.length > 0 || isOwn ? `
+        ${description || aiDescription || placeName || tags.length > 0 || isOwn || isPhoto ? `
         <div class="video-msg-popup-meta">
-          ${(description || aiDescription) ? `<div class="video-msg-popup-title-row">${description ? `<div class="video-msg-popup-title">${esc(description)}</div>` : '<div class="video-msg-popup-title-spacer"></div>'}${aiDescription ? `<div class="video-msg-ai-lang-wrap"><button type="button" class="video-msg-ai-lang-btn" data-ai-lang-btn title="Dil seç" aria-label="Dil seç"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></button><div class="video-msg-ai-lang-menu" data-ai-lang-menu hidden>${SUPPORTED_LANGS.map(l => `<button type="button" class="video-msg-ai-lang-item${l.code === aiDescriptionLang ? ' active' : ''}" data-lang="${l.code}">${l.label}</button>`).join('')}</div></div>` : ''}</div>` : ''}
-          ${aiDescription ? `<div class="video-msg-ai-wrap"><div class="video-msg-popup-ai-description" data-ai-desc>${escFmt(aiDescription)}</div><div class="video-msg-ai-fade" data-ai-fade><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>${isAdmin ? `<button class="video-msg-ai-edit-btn" data-action="edit-ai-desc" title="AI açıklamayı düzenle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>` : ''}</div>` : ''}
+          ${(description || aiDescription || isPhoto) ? `<div class="video-msg-popup-title-row">${description ? `<div class="video-msg-popup-title">${esc(description)}</div>` : '<div class="video-msg-popup-title-spacer"></div>'}${(aiDescription || isPhoto) ? `<div class="video-msg-ai-lang-wrap"><button type="button" class="video-msg-ai-lang-btn" data-ai-lang-btn title="Dil seç" aria-label="Dil seç"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></button><div class="video-msg-ai-lang-menu" data-ai-lang-menu hidden>${SUPPORTED_LANGS.map(l => `<button type="button" class="video-msg-ai-lang-item${l.code === aiDescriptionLang ? ' active' : ''}" data-lang="${l.code}">${l.label}</button>`).join('')}</div></div>` : ''}</div>` : ''}
+          ${(aiDescription || isPhoto) ? `<div class="video-msg-ai-wrap"><div class="video-msg-popup-ai-description" data-ai-desc>${aiDescription ? escFmt(aiDescription) : '<em class="vmsg-ai-pending">Açıklama hazırlanıyor…</em>'}</div><div class="video-msg-ai-fade" data-ai-fade><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>${isAdmin ? `<button class="video-msg-ai-edit-btn" data-action="edit-ai-desc" title="AI açıklamayı düzenle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>` : ''}</div>` : ''}
           ${placeName ? `<div class="video-msg-popup-place"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg> ${esc(placeName)}</div>` : ''}
           <div class="video-msg-popup-tags" data-tags-container>
             ${tags.map(t => `<span class="video-msg-popup-tag">${esc(t)}${isOwn ? '<button class="video-msg-tag-remove" data-tag="' + esc(t) + '">&times;</button>' : ''}</span>`).join('')}
@@ -167,11 +210,83 @@ const PopupMixin = {
         this.markAsRead(messageId);
       }
 
+      // Per-photo AI state (popup-scoped). Shared by carousel switch + lang dropdown.
+      // photoAiState: idx → { text, lang }   currently displayed text+lang per photo
+      // langCache: `${idx}:${lang}` → text   client-side translation cache
+      // currentActiveIdx: index of the photo whose AI text is currently in the DOM
+      const photoAiState = new Map();
+      const langCache = new Map();
+      let currentActiveIdx = 0;
+      photoList.forEach((p, i) => {
+        if (p.ai_description) {
+          const lng = (p.ai_description_lang || 'tr').toLowerCase();
+          photoAiState.set(i, { text: p.ai_description, lang: lng });
+          langCache.set(`${i}:${lng}`, p.ai_description);
+        }
+      });
+
+      // AI description DOM refs (used by carousel switch + lang dropdown + admin edit)
+      const aiDesc = popupEl.querySelector('[data-ai-desc]');
+      const aiFade = popupEl.querySelector('[data-ai-fade]');
+      const langMenu = popupEl.querySelector('[data-ai-lang-menu]');
+      const langItems = langMenu ? langMenu.querySelectorAll('[data-lang]') : [];
+      const checkScroll = () => {
+        if (!aiDesc || !aiFade) return;
+        const atBottom = aiDesc.scrollHeight - aiDesc.scrollTop - aiDesc.clientHeight < 4;
+        aiFade.classList.toggle('hidden', atBottom || aiDesc.scrollHeight <= aiDesc.clientHeight);
+      };
+      const renderAiForActive = () => {
+        if (!aiDesc) return;
+        // Prefer popup-local Map (holds in-flight translations) over global cache.
+        // Lazy seed from in-memory videoMessages cache so background AI completions
+        // (that arrived after popup open) are picked up on next photo switch.
+        let state = photoAiState.get(currentActiveIdx);
+        if (!state) {
+          const cachedMsg = this.videoMessages.get(messageId);
+          const photo = cachedMsg?.photos?.find(p => p.idx === currentActiveIdx);
+          if (photo?.ai_description) {
+            state = { text: photo.ai_description, lang: (photo.ai_description_lang || 'tr').toLowerCase() };
+            photoAiState.set(currentActiveIdx, state);
+          }
+        }
+        if (state && state.text) {
+          aiDesc.innerHTML = escFmt(state.text);
+          if (langItems && langItems.length) {
+            langItems.forEach(b => b.classList.toggle('active', b.dataset.lang === state.lang));
+          }
+        } else {
+          aiDesc.innerHTML = '<em class="vmsg-ai-pending">Açıklama hazırlanıyor…</em>';
+        }
+        aiDesc.scrollTop = 0;
+        checkScroll();
+      };
+
+      // Listen for AI-ready custom events dispatched by cleanup.handleAiDescriptionReady
+      // so the active photo's text refreshes live without waiting for a switch.
+      const aiReadyHandler = (e) => {
+        const idx = e.detail?.photoIdx;
+        if (idx == null || idx === currentActiveIdx) {
+          // Reset cached state for that idx so renderAiForActive re-reads from videoMessages
+          if (idx != null) photoAiState.delete(idx);
+          renderAiForActive();
+        } else {
+          // Background photo: just drop stale popup-local state so the next switch re-reads
+          photoAiState.delete(idx);
+        }
+      };
+      popupEl.addEventListener('vmsg:ai-update', aiReadyHandler);
+      popup.on('close', () => popupEl.removeEventListener('vmsg:ai-update', aiReadyHandler));
+
       // Set media credentials
       if (isPhoto) {
         const imgEl = popupEl.querySelector('.vmsg-popup-photo');
-        if (imgEl) {
-          imgEl.onload = () => {
+        const carousel = popupEl.querySelector('.vmsg-popup-carousel');
+        if (imgEl && carousel) {
+          // Per-popup blob URL cache: index → object URL (released on popup close)
+          const photoCache = new Map();
+          let activeIdx = 0;
+
+          const orientImg = () => {
             if (imgEl.naturalHeight > imgEl.naturalWidth) {
               const body = imgEl.closest('.video-msg-popup-body');
               if (body && !body.classList.contains('vmsg-portrait-photo-wrap')) {
@@ -179,13 +294,103 @@ const PopupMixin = {
               }
             }
           };
-          this.loadPhotoWithCredentials(imgEl, videoUrl);
+          imgEl.onload = orientImg;
 
-          // Click on photo or expand button → open fullscreen overlay with original quality
+          const loadIdx = (idx) => {
+            const entry = photoUrls[idx];
+            if (!entry) return Promise.resolve(null);
+            if (photoCache.has(idx)) return Promise.resolve(photoCache.get(idx));
+            return fetch(entry.url, { credentials: 'include' })
+              .then(r => r.ok ? r.blob() : null)
+              .then(blob => {
+                if (!blob || blob.size === 0) return null;
+                const url = URL.createObjectURL(blob);
+                photoCache.set(idx, url);
+                return url;
+              })
+              .catch(() => null);
+          };
+
+          const setActive = async (newIdx) => {
+            if (photoCount === 0) return;
+            activeIdx = ((newIdx % photoCount) + photoCount) % photoCount;
+            currentActiveIdx = activeIdx;
+            carousel.dataset.activeIdx = String(activeIdx);
+            const counter = carousel.querySelector('[data-curr]');
+            if (counter) counter.textContent = activeIdx + 1;
+            carousel.querySelectorAll('.vmsg-popup-dot').forEach((d, i) => d.classList.toggle('active', i === activeIdx));
+            // Render AI description for the new active photo (or placeholder)
+            renderAiForActive();
+            // Switch image (use cache or fetch)
+            const url = await loadIdx(activeIdx);
+            if (url) {
+              imgEl.src = url;
+              carousel.querySelector('.vmsg-media-shimmer')?.remove();
+            }
+            // Prefetch neighbors
+            if (photoCount > 1) {
+              loadIdx((activeIdx + 1) % photoCount);
+              loadIdx((activeIdx - 1 + photoCount) % photoCount);
+            }
+          };
+
+          // Initial load
+          setActive(0);
+
+          // Prev/next buttons (no-op when single)
+          const prevBtn = carousel.querySelector('.vmsg-popup-prev');
+          const nextBtn = carousel.querySelector('.vmsg-popup-next');
+          if (prevBtn && photoCount > 1) prevBtn.onclick = () => setActive(activeIdx - 1);
+          if (nextBtn && photoCount > 1) nextBtn.onclick = () => setActive(activeIdx + 1);
+
+          // Dot clicks
+          carousel.querySelectorAll('.vmsg-popup-dot').forEach(d => {
+            d.onclick = () => setActive(parseInt(d.dataset.idx, 10));
+          });
+
+          // Touch swipe
+          if (photoCount > 1) {
+            let startX = 0, startY = 0, swiping = false;
+            carousel.addEventListener('touchstart', (e) => {
+              if (e.touches.length !== 1) return;
+              startX = e.touches[0].clientX;
+              startY = e.touches[0].clientY;
+              swiping = true;
+            }, { passive: true });
+            carousel.addEventListener('touchend', (e) => {
+              if (!swiping) return;
+              swiping = false;
+              const t = e.changedTouches[0];
+              const dx = t.clientX - startX;
+              const dy = t.clientY - startY;
+              if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                setActive(activeIdx + (dx < 0 ? 1 : -1));
+              }
+            }, { passive: true });
+          }
+
+          // Keyboard (popup-scoped)
+          const keyHandler = (e) => {
+            if (photoCount <= 1) return;
+            if (e.key === 'ArrowLeft') { e.preventDefault(); setActive(activeIdx - 1); }
+            else if (e.key === 'ArrowRight') { e.preventDefault(); setActive(activeIdx + 1); }
+          };
+          document.addEventListener('keydown', keyHandler);
+
+          // Cleanup on popup close
+          popup.on('close', () => {
+            document.removeEventListener('keydown', keyHandler);
+            for (const u of photoCache.values()) URL.revokeObjectURL(u);
+            photoCache.clear();
+          });
+
+          // Expand → carousel-aware fullscreen overlay
           const expandBtn = popupEl.querySelector('[data-action="expand-photo"]');
-          const originalUrl = `${this.apiBase}/${encodeURIComponent(messageId)}/original`;
           const openOverlay = () => {
-            this.openPhotoOverlay(imgEl.src, originalUrl);
+            this.openPhotoOverlay(imgEl.src, photoUrls[activeIdx]?.originalUrl || null, {
+              photos: photoUrls,
+              startIdx: activeIdx
+            });
           };
           imgEl.style.cursor = 'pointer';
           imgEl.onclick = openOverlay;
@@ -249,33 +454,21 @@ const PopupMixin = {
         };
       });
 
-      // AI description scroll fade indicator
-      const aiDesc = popupEl.querySelector('[data-ai-desc]');
-      const aiFade = popupEl.querySelector('[data-ai-fade]');
-      const checkScroll = () => {
-        if (!aiDesc || !aiFade) return;
-        const atBottom = aiDesc.scrollHeight - aiDesc.scrollTop - aiDesc.clientHeight < 4;
-        aiFade.classList.toggle('hidden', atBottom || aiDesc.scrollHeight <= aiDesc.clientHeight);
-      };
+      // AI description scroll fade listener (uses checkScroll defined above)
       if (aiDesc && aiFade) {
         aiDesc.addEventListener('scroll', checkScroll);
         checkScroll();
       }
 
-      // Raw (unrendered) text cache shared by admin-edit and language dropdown.
-      // Tracks current displayed raw text so <b>/<i>/<u> tags survive
-      // edit/lang-switch round-trips (innerHTML render loses source tag info).
-      let currentRawText = aiDescription;
-      const langCache = new Map();
-      langCache.set(aiDescriptionLang, aiDescription);
-
-      // Admin: AI description edit
+      // Admin: AI description edit (operates on the currently active photo's text)
       const editAiBtn = popupEl.querySelector('[data-action="edit-ai-desc"]');
       if (editAiBtn && aiDesc) {
         editAiBtn.onclick = () => {
           const wrap = aiDesc.closest('.video-msg-ai-wrap');
           if (wrap.querySelector('.video-msg-ai-edit-area')) return;
-          const currentText = currentRawText;
+          const currentState = photoAiState.get(currentActiveIdx);
+          const currentText = currentState?.text || '';
+          const currentLang = currentState?.lang || aiDescriptionLang;
           aiDesc.style.display = 'none';
           if (aiFade) aiFade.style.display = 'none';
           editAiBtn.style.display = 'none';
@@ -312,12 +505,12 @@ const PopupMixin = {
                 method: 'PUT',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: newText, lang: aiDescriptionLang })
+                body: JSON.stringify({ text: newText, lang: currentLang })
               });
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
               aiDesc.innerHTML = escFmt(newText);
-              currentRawText = newText;
-              langCache.set(aiDescriptionLang, newText);
+              photoAiState.set(currentActiveIdx, { text: newText, lang: currentLang });
+              langCache.set(`${currentActiveIdx}:${currentLang}`, newText);
               cancel();
               checkScroll();
             } catch (err) {
@@ -334,10 +527,8 @@ const PopupMixin = {
         };
       }
 
-      // AI description language dropdown
+      // AI description language dropdown — operates on currently active photo
       const langBtn = popupEl.querySelector('[data-ai-lang-btn]');
-      const langMenu = popupEl.querySelector('[data-ai-lang-menu]');
-      const langItems = langMenu ? langMenu.querySelectorAll('[data-lang]') : [];
       if (langBtn && langMenu && aiDesc) {
         // Monotonic request id: lets us ignore stale responses when the user
         // clicks A→B→A rapidly and an earlier in-flight fetch resolves last.
@@ -364,42 +555,53 @@ const PopupMixin = {
             e.stopPropagation();
             const target = item.dataset.lang;
             closeMenu();
-            if (item.classList.contains('active')) return;
+            // No-op if already on this lang for this photo
+            const stateNow = photoAiState.get(currentActiveIdx);
+            if (stateNow && stateNow.lang === target) return;
+            // Capture which photo this request was for — guards against the
+            // user switching photos while a translation fetch is in-flight.
+            const idxForReq = currentActiveIdx;
             langItems.forEach(b => b.classList.remove('active'));
             item.classList.add('active');
 
-            if (langCache.has(target)) {
-              const cached = langCache.get(target);
-              aiDesc.innerHTML = escFmt(cached);
-              currentRawText = cached;
-              aiDesc.scrollTop = 0;
-              checkScroll();
+            const cacheKey = `${idxForReq}:${target}`;
+            if (langCache.has(cacheKey)) {
+              const cached = langCache.get(cacheKey);
+              photoAiState.set(idxForReq, { text: cached, lang: target });
+              if (idxForReq === currentActiveIdx) {
+                aiDesc.innerHTML = escFmt(cached);
+                aiDesc.scrollTop = 0;
+                checkScroll();
+              }
               return;
             }
 
             const mySeq = ++langReqSeq;
-            const prevRaw = currentRawText;
+            const prevState = stateNow;
             aiDesc.style.opacity = '0.5';
             try {
-              const res = await fetch(`${this.apiBase}/${encodeURIComponent(messageId)}/description?lang=${target}`, {
+              const res = await fetch(`${this.apiBase}/${encodeURIComponent(messageId)}/photos/${idxForReq}/description?lang=${target}`, {
                 credentials: 'include'
               });
               if (mySeq !== langReqSeq) return;
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
               const data = await res.json();
               if (mySeq !== langReqSeq) return;
-              langCache.set(target, data.text);
-              aiDesc.innerHTML = escFmt(data.text);
-              currentRawText = data.text;
-              aiDesc.scrollTop = 0;
-              checkScroll();
+              langCache.set(cacheKey, data.text);
+              photoAiState.set(idxForReq, { text: data.text, lang: target });
+              if (idxForReq === currentActiveIdx) {
+                aiDesc.innerHTML = escFmt(data.text);
+                aiDesc.scrollTop = 0;
+                checkScroll();
+              }
             } catch (err) {
               if (mySeq !== langReqSeq) return;
               Logger.warn('[VideoMessage] Translation fetch failed:', err);
               AuthSystem.showNotification('Çeviri alınamadı', 'error');
-              aiDesc.innerHTML = escFmt(prevRaw);
-              currentRawText = prevRaw;
-              langItems.forEach(b => b.classList.toggle('active', b.dataset.lang === aiDescriptionLang));
+              if (idxForReq === currentActiveIdx) {
+                aiDesc.innerHTML = prevState ? escFmt(prevState.text) : '<em class="vmsg-ai-pending">Açıklama hazırlanıyor…</em>';
+                langItems.forEach(b => b.classList.toggle('active', prevState && b.dataset.lang === prevState.lang));
+              }
             } finally {
               if (mySeq === langReqSeq) aiDesc.style.opacity = '';
             }
@@ -456,14 +658,19 @@ const PopupMixin = {
     imgEl.src = url;
   },
 
-  openPhotoOverlay(previewUrl, originalUrl) {
+  openPhotoOverlay(previewUrl, originalUrl, opts = {}) {
     // Remove existing overlay if any
     document.querySelector('.vmsg-photo-overlay')?.remove();
+
+    const photos = Array.isArray(opts.photos) ? opts.photos : null;
+    const photoCount = photos ? photos.length : 1;
+    let activeIdx = Number.isFinite(opts.startIdx) ? opts.startIdx : 0;
 
     const overlay = document.createElement('div');
     overlay.className = 'vmsg-photo-overlay';
     overlay.innerHTML = `
       <div class="vmsg-photo-overlay-toolbar">
+        ${photoCount > 1 ? `<span class="vmsg-photo-overlay-counter"><span data-curr>${activeIdx + 1}</span>/${photoCount}</span>` : ''}
         <button class="vmsg-photo-overlay-btn" data-action="zoom-in" title="Yakınlaştır">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
         </button>
@@ -473,6 +680,10 @@ const PopupMixin = {
         <button class="vmsg-photo-overlay-btn" data-action="zoom-reset" title="Sıfırla">1:1</button>
         <button class="vmsg-photo-overlay-btn close" data-action="close-overlay" title="Kapat">&times;</button>
       </div>
+      ${photoCount > 1 ? `
+        <button class="vmsg-photo-overlay-arrow vmsg-photo-overlay-prev" aria-label="Önceki">‹</button>
+        <button class="vmsg-photo-overlay-arrow vmsg-photo-overlay-next" aria-label="Sonraki">›</button>
+      ` : ''}
       <div class="vmsg-photo-overlay-container">
         <img src="${previewUrl}" alt="Foto mesaj" draggable="false">
       </div>
@@ -480,26 +691,66 @@ const PopupMixin = {
     document.body.appendChild(overlay);
 
     const img = overlay.querySelector('img');
+    const objectUrls = []; // track for cleanup
 
-    // Load original quality in background, swap when ready
-    if (originalUrl) {
-      fetch(originalUrl, { credentials: 'include' })
+    // Load original quality for the current photo in background
+    const loadOriginal = (url) => {
+      if (!url) return;
+      fetch(url, { credentials: 'include' })
         .then(r => r.ok ? r.blob() : null)
         .then(blob => {
           if (blob && blob.size > 0) {
-            img.src = URL.createObjectURL(blob);
+            const u = URL.createObjectURL(blob);
+            objectUrls.push(u);
+            img.src = u;
           }
         })
         .catch(() => {});
-    }
+    };
+    loadOriginal(originalUrl);
+
     const container = overlay.querySelector('.vmsg-photo-overlay-container');
     let scale = 1;
     let panX = 0, panY = 0;
     let isPanning = false, startX = 0, startY = 0;
-
     const applyTransform = () => {
       img.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
     };
+
+    // Switch active photo (carousel mode only)
+    const switchTo = (newIdx) => {
+      if (!photos) return;
+      activeIdx = ((newIdx % photoCount) + photoCount) % photoCount;
+      const p = photos[activeIdx];
+      // Reset zoom/pan for clean view of new photo
+      scale = 1; panX = 0; panY = 0;
+      applyTransform();
+      // Show preview-quality first, then upgrade to original
+      fetch(p.url, { credentials: 'include' })
+        .then(r => r.ok ? r.blob() : null)
+        .then(blob => {
+          if (blob && blob.size > 0) {
+            const u = URL.createObjectURL(blob);
+            objectUrls.push(u);
+            img.src = u;
+          }
+        })
+        .catch(() => {});
+      loadOriginal(p.originalUrl);
+      const counter = overlay.querySelector('[data-curr]');
+      if (counter) counter.textContent = activeIdx + 1;
+    };
+
+    if (photos && photoCount > 1) {
+      overlay.querySelector('.vmsg-photo-overlay-prev').onclick = (e) => {
+        e.stopPropagation();
+        switchTo(activeIdx - 1);
+      };
+      overlay.querySelector('.vmsg-photo-overlay-next').onclick = (e) => {
+        e.stopPropagation();
+        switchTo(activeIdx + 1);
+      };
+    }
 
     // Zoom buttons
     overlay.querySelector('[data-action="zoom-in"]').onclick = () => {
@@ -517,9 +768,21 @@ const PopupMixin = {
     };
 
     // Close
-    const closeOverlay = () => overlay.remove();
+    const closeOverlay = () => {
+      overlay.remove();
+      for (const u of objectUrls) URL.revokeObjectURL(u);
+      objectUrls.length = 0;
+      document.removeEventListener('keydown', overlayKeyHandler);
+    };
+    const overlayKeyHandler = (e) => {
+      if (e.key === 'Escape') { closeOverlay(); return; }
+      if (photos && photoCount > 1) {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); switchTo(activeIdx - 1); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); switchTo(activeIdx + 1); }
+      }
+    };
     overlay.querySelector('[data-action="close-overlay"]').onclick = closeOverlay;
-    overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeOverlay(); });
+    document.addEventListener('keydown', overlayKeyHandler);
 
     // Click on backdrop to close (but not on image)
     overlay.onclick = (e) => { if (e.target === overlay || e.target === container) closeOverlay(); };
@@ -558,16 +821,23 @@ const PopupMixin = {
       if (img.parentNode) img.style.cursor = scale > 1 ? 'grab' : 'pointer';
     });
 
-    // Touch pinch zoom & pan
+    // Touch pinch zoom & pan + carousel swipe (carousel-only, when scale==1)
     let lastTouchDist = 0;
     let lastTouchX = 0, lastTouchY = 0;
+    let swipeStartX = 0, swipeStartY = 0, swipeTracking = false;
     container.addEventListener('touchstart', (e) => {
       if (e.touches.length === 2) {
         lastTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        swipeTracking = false;
       } else if (e.touches.length === 1 && scale > 1) {
         isPanning = true;
         lastTouchX = e.touches[0].clientX - panX;
         lastTouchY = e.touches[0].clientY - panY;
+        swipeTracking = false;
+      } else if (e.touches.length === 1 && photos && photoCount > 1 && scale === 1) {
+        swipeStartX = e.touches[0].clientX;
+        swipeStartY = e.touches[0].clientY;
+        swipeTracking = true;
       }
     }, { passive: true });
     container.addEventListener('touchmove', (e) => {
@@ -591,6 +861,17 @@ const PopupMixin = {
     container.addEventListener('touchend', (e) => {
       isPanning = false;
       lastTouchDist = 0;
+      // Carousel swipe (only when no zoom)
+      if (swipeTracking && photos && photoCount > 1) {
+        swipeTracking = false;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - swipeStartX;
+        const dy = t.clientY - swipeStartY;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          switchTo(activeIdx + (dx < 0 ? 1 : -1));
+          return;
+        }
+      }
       // Double-tap to zoom
       if (e.touches.length === 0) {
         const now = Date.now();

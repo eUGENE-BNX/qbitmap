@@ -60,6 +60,8 @@ const VideoMessage = {
   _flashEnabled: false,
   _capturedWidth: 0,
   _capturedHeight: 0,
+  _capturedPhotos: [],
+  _previewActiveIdx: 0,
 
   // Place tagging
   _nearbyPlaces: [],
@@ -67,6 +69,7 @@ const VideoMessage = {
 
   // Constants
   MAX_DURATION_MS: 30000,
+  MAX_PHOTOS_PER_MESSAGE: 5,
   RESOLUTION: { width: 1280, height: 720 },
   PHOTO_RESOLUTIONS: {
     standard: { width: 1920, height: 1080 },
@@ -222,19 +225,38 @@ const VideoMessage = {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) return;
+    input.multiple = true;
+    input.onchange = async () => {
+      const files = Array.from(input.files || []).slice(0, this.MAX_PHOTOS_PER_MESSAGE);
+      if (files.length === 0) return;
 
       const MAX_SIZE = 20 * 1024 * 1024;
-      if (file.size > MAX_SIZE) {
-        AuthSystem.showNotification('Fotoğraf 20MB\'dan küçük olmalı', 'error');
-        return;
+      for (const f of files) {
+        if (f.size > MAX_SIZE) {
+          AuthSystem.showNotification(`Fotoğraf 20MB'dan küçük olmalı (${f.name})`, 'error');
+          return;
+        }
       }
 
       this.isPhotoMode = true;
       this._isGalleryMode = true;
-      this.capturedPhotoBlob = file;
+
+      // Build _capturedPhotos with width/height from each file
+      this._capturedPhotos = await Promise.all(files.map(async (file) => {
+        const objectUrl = URL.createObjectURL(file);
+        const dims = await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          img.onerror = () => resolve({ width: 0, height: 0 });
+          img.src = objectUrl;
+        });
+        return { blob: file, width: dims.width, height: dims.height, objectUrl };
+      }));
+
+      // BC mirrors for upload code paths
+      this.capturedPhotoBlob = this._capturedPhotos[0].blob;
+      this._capturedWidth = this._capturedPhotos[0].width;
+      this._capturedHeight = this._capturedPhotos[0].height;
 
       const modal = document.createElement('div');
       modal.className = 'video-msg-modal';

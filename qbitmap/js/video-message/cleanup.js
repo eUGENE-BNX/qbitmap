@@ -25,6 +25,7 @@ const CleanupMixin = {
       ai_description: payload.aiDescription || '',
       tags: payload.tags || [],
       thumbnail_path: payload.thumbnailPath || '',
+      photos: payload.photos || [],
       place_name: payload.placeName || ''
     };
     this.videoMessages.set(msg.message_id, msg);
@@ -49,50 +50,40 @@ const CleanupMixin = {
   },
 
   handleAiDescriptionReady(payload) {
-    const msg = this.videoMessages.get(payload.messageId);
+    const { messageId, jobType, photoIdx, aiDescription, aiDescriptionLang } = payload || {};
+    if (!messageId) return;
 
-    // Fetch updated ai_description from API
-    fetch(`${this.apiBase}/${encodeURIComponent(payload.messageId)}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        const aiText = data?.message?.ai_description || data?.ai_description;
-        if (!aiText) return;
+    const msg = this.videoMessages.get(messageId);
 
-        // Update in-memory cache
-        if (msg) {
-          msg.ai_description = aiText;
-          this.updateMapLayer();
+    // 1) In-memory cache update — per-photo for photos, parent for videos
+    if (msg) {
+      if (jobType === 'photo' && photoIdx != null && Array.isArray(msg.photos)) {
+        const photo = msg.photos.find(p => p.idx === photoIdx);
+        if (photo) {
+          photo.ai_description = aiDescription;
+          photo.ai_description_lang = aiDescriptionLang;
         }
-
-        // Update open popup if showing this message
-        const popupRoot = document.querySelector(`[data-message-id="${payload.messageId}"]`);
-        if (!popupRoot) return;
-
-        const existing = popupRoot.querySelector('.video-msg-popup-ai-description');
-        if (existing) {
-          existing.innerHTML = escapeHtmlAllowFormat(aiText);
-          existing.style.display = '';
-        } else {
-          // No ai-description element yet — inject into meta section
-          let meta = popupRoot.querySelector('.video-msg-popup-meta');
-          if (!meta) {
-            // Meta section doesn't exist — create it after body
-            const body = popupRoot.querySelector('.video-msg-popup-body');
-            if (body) {
-              meta = document.createElement('div');
-              meta.className = 'video-msg-popup-meta';
-              body.after(meta);
-            }
-          }
-          if (meta) {
-            const div = document.createElement('div');
-            div.className = 'video-msg-popup-ai-description';
-            div.innerHTML = escapeHtmlAllowFormat(aiText);
-            meta.appendChild(div);
-          }
+        // Mirror primary to parent for FULLTEXT/legacy display paths
+        if (photoIdx === 0) {
+          msg.ai_description = aiDescription;
+          msg.ai_description_lang = aiDescriptionLang;
         }
-      })
-      .catch(() => {});
+      } else {
+        msg.ai_description = aiDescription;
+        msg.ai_description_lang = aiDescriptionLang;
+      }
+      this.updateMapLayer();
+    }
+
+    // 2) Live popup update if it's open. Dispatch a custom event the popup
+    //    listens for — popup decides whether the active photo matches and
+    //    refreshes its own state Map accordingly.
+    const popupRoot = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!popupRoot || !aiDescription) return;
+
+    popupRoot.dispatchEvent(new CustomEvent('vmsg:ai-update', {
+      detail: { photoIdx, jobType, aiDescription, aiDescriptionLang }
+    }));
   },
 
   // ==================== HELPERS ====================
@@ -318,6 +309,11 @@ const CleanupMixin = {
       this._objectUrl = null;
     }
 
+    // Revoke all captured photo object URLs
+    if (Array.isArray(this._capturedPhotos)) {
+      this._capturedPhotos.forEach(p => p?.objectUrl && URL.revokeObjectURL(p.objectUrl));
+    }
+
     // Exit location selection
     if (this.isSelectingLocation) {
       this.exitLocationSelection();
@@ -349,6 +345,8 @@ const CleanupMixin = {
     this._flashEnabled = false;
     this._capturedWidth = 0;
     this._capturedHeight = 0;
+    this._capturedPhotos = [];
+    this._previewActiveIdx = 0;
   },
 
   closeModal() {
