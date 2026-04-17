@@ -12,6 +12,8 @@ const teslacamSync = require('./src/services/teslacam-sync');
 const voiceCallService = require('./src/services/voice-call');
 const settingsCache = require('./src/services/settings-cache');
 const db = require('./src/services/database');
+const metrics = require('./src/services/metrics');
+const { runStartupChecks } = require('./src/utils/startup-checks');
 const logger = require('./src/utils/logger').child({ module: 'main' });
 
 let fastify;
@@ -48,6 +50,15 @@ async function start() {
     photoAiQueue.start();
     videoAiQueue.start();
 
+    // Sample AI queue depth into prom-client gauges. Runs on a timer so each
+    // Prometheus scrape reads cached values instead of round-tripping to DB.
+    metrics.startAiQueueSampler();
+
+    // Non-blocking upstream reachability probes. Logs warn if H3/MediaMTX
+    // are unreachable so the on-call sees it in the boot log instead of
+    // learning from the first user request.
+    runStartupChecks();
+
     console.log(`
 ╔═══════════════════════════════════════════════╗
 ║  QBitmap Backend Server                       ║
@@ -69,6 +80,10 @@ async function shutdown(signal) {
   photoAiQueue.stop();
   videoAiQueue.stop();
 
+  // Stop metrics sampler so its interval doesn't keep sampling against a
+  // closing DB pool.
+  metrics.stopAiQueueSampler();
+
   // Stop periodic services
   cleanupService.stop();
   teslacamSync.stop();
@@ -85,8 +100,12 @@ async function shutdown(signal) {
     db.accessCacheCleanupInterval = null;
   }
 
-  // Close WebSocket connections
-  wsService.shutdown();
+  // Drain WebSocket connections BEFORE the HTTP server goes away.
+  // shutdown() flips shuttingDown → notifies clients → waits up to 10s for
+  // them to close → force-closes the rest with 1001. If we let fastify.close
+  // tear down the server first, sockets would see reset-connection noise
+  // instead of a clean "closing" frame.
+  await wsService.shutdown();
 
   // Close Fastify server (also triggers onClose hook for mediamtx interval)
   if (fastify) {

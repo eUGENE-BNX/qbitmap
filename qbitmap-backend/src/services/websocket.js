@@ -85,6 +85,7 @@ class WebSocketService {
     this.clients = new Map(); // userId -> Set of WebSocket connections
     this.heartbeatInterval = null; // Store for cleanup
     this.cleanupInterval = null;   // Store for cleanup
+    this.shuttingDown = false;     // Flips true in shutdown(); blocks new upgrades
   }
 
   /**
@@ -102,6 +103,12 @@ class WebSocketService {
       // behind. Missing Origin header → reject: every supported browser
       // sends it on WS upgrade.
       verifyClient: (info, cb) => {
+        // During graceful shutdown reject new upgrades fast so systemd /
+        // load-balancer stops sending traffic here; existing sockets are
+        // drained separately in shutdown().
+        if (this.shuttingDown) {
+          return cb(false, 503, 'Server shutting down');
+        }
         const origin = info.req.headers.origin;
         if (!origin || !ALLOWED_WS_ORIGINS.has(origin)) {
           logger.warn({ origin, ip: info.req.socket.remoteAddress }, 'WS upgrade rejected: origin not allowed');
@@ -752,9 +759,22 @@ class WebSocketService {
   }
 
   /**
-   * Shutdown - clear intervals to prevent memory leaks on hot reload
+   * Graceful shutdown.
+   *
+   * Order matters: flip shuttingDown → stop heartbeats → notify clients with
+   * {type:'closing'} (so the FE can show a "reconnecting…" UI and pause
+   * writes) → wait up to drainTimeoutMs for sockets to leave on their own →
+   * force-close stragglers with 1001 (Going Away) → wss.close().
+   *
+   * Without this the old shutdown() tore down the HTTP server mid-frame,
+   * so clients saw reset-connection noise and any in-flight broadcast was
+   * silently dropped. Now they get a clean "closing" signal before we pull
+   * the plug, and shutdown() awaits actual drain before the caller moves
+   * on to fastify.close() + dbPool.end().
    */
-  shutdown() {
+  async shutdown({ drainTimeoutMs = 10000 } = {}) {
+    this.shuttingDown = true;
+
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
@@ -763,15 +783,39 @@ class WebSocketService {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
     }
+
     if (this.wss) {
-      this.wss.close();
+      const closingMsg = JSON.stringify({ type: 'closing' });
+      for (const ws of this.wss.clients) {
+        try {
+          if (ws.readyState === WebSocket.OPEN) ws.send(closingMsg);
+        } catch (_) { /* client already gone */ }
+      }
+
+      const deadline = Date.now() + drainTimeoutMs;
+      while (this.wss.clients.size > 0 && Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+
+      // Force-close anything still hanging around. 1001 = Going Away —
+      // the spec-blessed code for a server restart/shutdown, so FE reconnect
+      // logic knows this wasn't an error.
+      for (const ws of this.wss.clients) {
+        try { ws.close(1001, 'server shutdown'); } catch (_) {}
+      }
+
+      // Short grace so close frames get flushed to sockets before .close().
+      await new Promise(r => setTimeout(r, 200));
+
+      await new Promise(resolve => this.wss.close(() => resolve()));
       this.wss = null;
     }
+
     this.clients.clear();
     // [PERF-14] Drop auth cache on shutdown so a hot-reload doesn't
     // carry stale authorization data into the new instance.
     if (this._authCache) { this._authCache.clear(); this._authCache = null; }
-    logger.info('WebSocket service shutdown complete');
+    logger.info({ drainTimeoutMs }, 'WebSocket service shutdown complete');
   }
 }
 

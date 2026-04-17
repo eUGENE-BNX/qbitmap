@@ -6,8 +6,17 @@ const rateLimit = require('@fastify/rate-limit');
 const compress = require('@fastify/compress');
 const formbody = require('@fastify/formbody');
 const multipart = require('@fastify/multipart');
+const crypto = require('node:crypto');
+const { randomUUID } = crypto;
 const config = require('./config');
 const logger = require('./utils/logger');
+const metrics = require('./services/metrics');
+
+// Accept upstream X-Request-Id only if it looks sane — keeps attacker-
+// controlled log-injection bytes (newlines, ANSI) out of our log pipeline
+// while still letting Caddy / other hops propagate their own ID for cross-
+// service correlation.
+const REQ_ID_RE = /^[a-zA-Z0-9._:-]{1,64}$/;
 const db = require('./services/database');
 const cleanupService = require('./services/cleanup');
 const teslaTokenService = require('./services/tesla-token');
@@ -34,8 +43,30 @@ async function buildServer() {
         },
     bodyLimit: 20 * 1024 * 1024,
     trustProxy: '127.0.0.1',
-    disableRequestLogging: isProduction
+    disableRequestLogging: isProduction,
+    // UUID-based reqId (Fastify's default is a per-process counter that
+    // collides across workers / restarts). Honor a well-formed incoming
+    // X-Request-Id so IDs minted by Caddy / upstream propagate through.
+    genReqId: (req) => {
+      const incoming = req.headers['x-request-id'];
+      if (typeof incoming === 'string' && REQ_ID_RE.test(incoming)) return incoming;
+      return randomUUID();
+    }
   });
+
+  // Bind reqId to AsyncLocalStorage so every module-scoped child logger
+  // (`require('./utils/logger').child({module})`) and the X-Request-Id
+  // injected by fetch-timeout pick it up without touching callsites. Must
+  // run before any other onRequest hook that logs.
+  fastify.addHook('onRequest', async (request, reply) => {
+    logger.enterRequestId(request.id);
+    reply.header('X-Request-Id', request.id);
+  });
+
+  // HTTP histogram + counter. Registered here (after reqId hook, before any
+  // route plugin) so every request is measured regardless of which plugin
+  // owns the route. Labels use the route template — see metrics.js.
+  metrics.registerHttpHooks(fastify);
 
   await fastify.register(cookie);
 
@@ -194,9 +225,64 @@ async function buildServer() {
   // Wait for MySQL connection pool and seed data
   await db.ensureReady();
 
-  fastify.get('/health', async () => {
-    return { status: 'ok', timestamp: new Date().toISOString() };
+  // Liveness + readiness probe. Previously this always returned 200 even
+  // when MySQL was down or the WS server never initialized — probes were
+  // useless for detecting real outages. Now:
+  //   - DB: SELECT 1 with a 2s timeout so a hung pool can't wedge the probe
+  //   - WS: wsService.wss is non-null once initialize() runs in fastify.ready
+  //   - failure in either → 503 so load balancers / uptime monitors page
+  // Upstream pings (H3, Tesla) intentionally omitted: a slow third party
+  // shouldn't flip this node to unhealthy and get yanked out of rotation.
+  fastify.get('/health', async (request, reply) => {
+    const checks = {};
+    let ok = true;
+
+    try {
+      await Promise.race([
+        db.pool.execute('SELECT 1'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('db probe timeout')), 2000))
+      ]);
+      checks.db = 'ok';
+    } catch (err) {
+      fastify.log.error({ err }, '/health: db probe failed');
+      checks.db = 'fail';
+      ok = false;
+    }
+
+    checks.ws = wsService.wss ? 'ok' : 'fail';
+    if (checks.ws === 'fail') ok = false;
+
+    reply.code(ok ? 200 : 503);
+    return {
+      status: ok ? 'ok' : 'degraded',
+      checks,
+      timestamp: new Date().toISOString()
+    };
   });
+
+  // Prometheus scrape endpoint. Disabled (404) unless METRICS_TOKEN is set
+  // in the env — metrics leak route paths and error rates, so we default to
+  // closed. With the token set, scraper sends `Authorization: Bearer <tok>`;
+  // timingSafeEqual + length guard prevents byte-by-byte token recovery via
+  // response-time side channel.
+  const metricsToken = process.env.METRICS_TOKEN;
+  if (metricsToken) {
+    const expectedAuth = Buffer.from(`Bearer ${metricsToken}`, 'utf8');
+    fastify.get('/metrics', async (request, reply) => {
+      const provided = Buffer.from(String(request.headers['authorization'] || ''), 'utf8');
+      if (
+        provided.length !== expectedAuth.length ||
+        !crypto.timingSafeEqual(provided, expectedAuth)
+      ) {
+        return reply.code(401).send('Unauthorized');
+      }
+      reply.header('Content-Type', metrics.registry.contentType);
+      return metrics.registry.metrics();
+    });
+    logger.info('Prometheus /metrics endpoint enabled (Bearer auth)');
+  } else {
+    logger.info('METRICS_TOKEN not set — /metrics endpoint disabled');
+  }
 
   // Register auth routes (Google OAuth)
   await fastify.register(require('./routes/auth'));
