@@ -5,7 +5,20 @@ const eventStore = require('./event-store');
 const config = require('./config');
 const { encrypt, decrypt, isEncrypted } = require('./crypto');
 
-const CAMERAS_FILE = path.join(__dirname, '..', 'cameras.json');
+// Credential file path is overridable via env so the production file can live
+// outside the deploy tree (e.g. /etc/qbitmap/cameras.json). Keeping it inside
+// the repo root makes it a casualty of any future rsync --delete that forgets
+// to exclude it (same class of incident as the tesla *.pem wipe) and a one-
+// .gitignore-line-away-from-being-committed risk. Default preserves current
+// behavior so existing deploys keep working until the operator moves the file
+// and sets CAMERAS_CONFIG_PATH.
+const DEFAULT_CAMERAS_FILE = path.join(__dirname, '..', 'cameras.json');
+const CAMERAS_FILE = process.env.CAMERAS_CONFIG_PATH || DEFAULT_CAMERAS_FILE;
+if (!process.env.CAMERAS_CONFIG_PATH) {
+  console.warn(`[ONVIF] CAMERAS_CONFIG_PATH not set; using ${DEFAULT_CAMERAS_FILE}. In production, move this file outside the deploy tree and set CAMERAS_CONFIG_PATH.`);
+} else {
+  console.log(`[ONVIF] Using credentials file: ${CAMERAS_FILE}`);
+}
 const EVENT_DEBOUNCE_MS = 3000; // 3 seconds debounce per event type per camera
 
 class CameraManager {

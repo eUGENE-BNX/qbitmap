@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const db = require('../services/database');
 const frameCache = require('../services/frame-cache');
 const streamCache = require('../services/stream-cache');
@@ -888,9 +889,24 @@ async function publicRoutes(fastify, options) {
   });
 
   // H3 Grid Service - camera coordinates for full sync
-  fastify.get('/all-camera-coordinates', async (request, reply) => {
-    const serviceKey = request.headers['x-service-key'];
-    if (!serviceKey || serviceKey !== process.env.H3_SERVICE_KEY) {
+  // Rate-limit caps brute-force attempts on X-Service-Key. Real consumer
+  // (h3-service full-sync) runs on the order of once per day; 10/min is far
+  // above normal usage. timingSafeEqual + length guard prevents
+  // character-by-character secret recovery via response-time side channel;
+  // same pattern as utils/auth.js:42. Long-term: move to HMAC(body, key) +
+  // timestamp to defeat replay if the key leaks via logs/proxy caches.
+  fastify.get('/all-camera-coordinates', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
+    const expectedKey = process.env.H3_SERVICE_KEY;
+    if (!expectedKey) return reply.code(503).send({ error: 'Service key not configured' });
+
+    const provided = Buffer.from(String(request.headers['x-service-key'] || ''), 'utf8');
+    const expected = Buffer.from(expectedKey, 'utf8');
+    if (
+      provided.length !== expected.length ||
+      !crypto.timingSafeEqual(provided, expected)
+    ) {
       return reply.code(403).send({ error: 'Forbidden' });
     }
 

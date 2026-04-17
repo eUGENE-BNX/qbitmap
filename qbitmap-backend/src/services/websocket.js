@@ -1,8 +1,14 @@
 const WebSocket = require('ws');
 const db = require('./database');
 const { verifyTokenWithVersion } = require('../utils/jwt');
+const config = require('../config');
 const logger = require('../utils/logger').child({ module: 'websocket' });
 const cookie = require('cookie');
+
+// Allow-list of origins permitted to open /ws/cameras. Browser WS handshakes
+// always send Origin; non-browser callers (there are none — WS is frontend-
+// only) would be rejected. Reused from CORS config so HTTP + WS stay in sync.
+const ALLOWED_WS_ORIGINS = new Set(config.cors.origin);
 
 /**
  * Extract token from request cookies (secure - no JS exposure)
@@ -87,7 +93,22 @@ class WebSocketService {
   initialize(server) {
     this.wss = new WebSocket.Server({
       server,
-      path: '/ws/cameras'
+      path: '/ws/cameras',
+      // Cookie-auth on WS is *not* same-origin-policied by browsers, so a
+      // malicious page could trigger a credentialed WS upgrade on behalf of
+      // the victim. SameSite on the session cookie is our primary defense;
+      // this Origin allow-list is defense-in-depth for the case where SameSite
+      // is relaxed (e.g., Lax + top-level nav) or the user's browser lags
+      // behind. Missing Origin header → reject: every supported browser
+      // sends it on WS upgrade.
+      verifyClient: (info, cb) => {
+        const origin = info.req.headers.origin;
+        if (!origin || !ALLOWED_WS_ORIGINS.has(origin)) {
+          logger.warn({ origin, ip: info.req.socket.remoteAddress }, 'WS upgrade rejected: origin not allowed');
+          return cb(false, 403, 'Origin not allowed');
+        }
+        cb(true);
+      }
     });
 
     this.wss.on('connection', async (ws, request) => {

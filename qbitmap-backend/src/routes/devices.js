@@ -69,7 +69,23 @@ async function deviceRoutes(fastify, options) {
   });
 
   // Device registration
-  fastify.post("/", async (request, reply) => {
+  // Rate-limited per source IP to cap mass-registration abuse if
+  // DEVICE_SHARED_SECRET ever leaks. Real firmware reboots only register
+  // a handful of times per hour at worst; 10/hr/IP gives wide headroom
+  // while bounding the blast radius of a leaked shared secret (which
+  // would otherwise let an attacker fabricate HMAC tokens for any
+  // guessable device_id and spam unclaimed rows into the cameras table).
+  // The full remediation (per-device random secret + user-initiated
+  // pairing) requires firmware changes and is tracked separately.
+  fastify.post("/", {
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: '1 hour',
+        keyGenerator: (req) => req.ip
+      }
+    }
+  }, async (request, reply) => {
     const { deviceId } = request;
 
     try {
