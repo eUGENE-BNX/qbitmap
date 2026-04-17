@@ -2,6 +2,17 @@ const { notifyH3CameraChange, notifyH3CameraRemove, notifyH3ContentItem, notifyH
 const settingsCache = require('../settings-cache');
 const logger = require('../../utils/logger').child({ module: 'db-cameras' });
 
+// Columns returned by getCameraById / getCameraByDeviceId — the two hot-path
+// lookups used on every frame upload, WS subscribe, and route auth check.
+// Intentionally excludes face_detection_enabled, face_detection_interval,
+// and alarm_trigger_names: those live behind the dedicated
+// getFaceDetectionSettings() query and are never read off the generic
+// camera object (verified across all routes/* and services/*). Trimming
+// them keeps the row payload small — alarm_trigger_names in particular is
+// a TEXT column that can grow arbitrarily. Admin-side flows that need
+// every column should build a bespoke query.
+const CAMERA_COLS = 'id, device_id, user_id, name, lng, lat, is_public, stream_mode, last_seen, camera_type, whep_url, voice_call_enabled, mediamtx_path, onvif_camera_id, rtsp_source_url, audio_muted, created_at';
+
 module.exports = function(DatabaseService) {
 
 DatabaseService.prototype._safePagination = function(page, limit, maxLimit = 100) {
@@ -30,7 +41,7 @@ DatabaseService.prototype.registerCamera = async function(deviceId) {
 };
 
 DatabaseService.prototype.getCameraByDeviceId = async function(deviceId) {
-  const [rows] = await this.pool.execute('SELECT * FROM cameras WHERE device_id = ?', [deviceId]);
+  const [rows] = await this.pool.execute(`SELECT ${CAMERA_COLS} FROM cameras WHERE device_id = ?`, [deviceId]);
   return rows[0];
 };
 
@@ -98,7 +109,7 @@ DatabaseService.prototype.claimCamera = async function(userId, deviceId) {
 };
 
 DatabaseService.prototype.getCameraById = async function(cameraId) {
-  const [rows] = await this.pool.execute('SELECT * FROM cameras WHERE id = ?', [cameraId]);
+  const [rows] = await this.pool.execute(`SELECT ${CAMERA_COLS} FROM cameras WHERE id = ?`, [cameraId]);
   return rows[0];
 };
 

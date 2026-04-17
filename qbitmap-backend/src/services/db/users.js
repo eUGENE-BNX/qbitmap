@@ -98,11 +98,22 @@ DatabaseService.prototype.getUserLocation = async function(userId) {
 };
 
 DatabaseService.prototype.getUsersWithVisibleLocation = async function() {
+  // Previous version used a DEPENDENT SUBQUERY for camera_count; EXPLAIN
+  // reported it running once per user row (classic N+1 in SQL). Replacing
+  // with a single LEFT JOIN + GROUP BY collapses it into one pass, using
+  // idx_cameras_user for the join. LIMIT caps payload size if the user
+  // base grows — 10k GeoJSON features is already a heavy FE render.
   const [rows] = await this.pool.execute(`
-    SELECT u.id, u.display_name, u.avatar_url, u.last_lat, u.last_lng, u.last_location_accuracy, u.last_location_updated,
-           (SELECT COUNT(*) FROM cameras WHERE user_id = u.id) as camera_count
+    SELECT u.id, u.display_name, u.avatar_url, u.last_lat, u.last_lng,
+           u.last_location_accuracy, u.last_location_updated,
+           COUNT(c.id) AS camera_count
     FROM users u
-    WHERE u.show_location_on_map = 1 AND u.last_lat IS NOT NULL AND u.last_lng IS NOT NULL
+    LEFT JOIN cameras c ON c.user_id = u.id
+    WHERE u.show_location_on_map = 1
+      AND u.last_lat IS NOT NULL
+      AND u.last_lng IS NOT NULL
+    GROUP BY u.id
+    LIMIT 10000
   `);
   return rows;
 };

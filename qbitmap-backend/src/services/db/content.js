@@ -26,7 +26,15 @@ DatabaseService.prototype.getCameraZones = async function(cameraId) {
 };
 
 DatabaseService.prototype.getZoneById = async function(zoneId) {
-  const [rows] = await this.pool.execute('SELECT * FROM clickable_zones WHERE id = ?', [zoneId]);
+  // `points` is a TEXT column holding the polygon geometry JSON — never
+  // read off this object in the current codebase (grep: only list/safe
+  // variants parse it). Internal callers are owner/auth checks and relay
+  // actions, which need user_id / camera_id / relay_*_url / last_state.
+  // Skipping points trims the row to what's actually consumed.
+  const [rows] = await this.pool.execute(
+    'SELECT id, camera_id, user_id, name, last_state, created_at, relay_on_url, relay_off_url, relay_status_url FROM clickable_zones WHERE id = ?',
+    [zoneId]
+  );
   return rows[0];
 };
 

@@ -35,6 +35,14 @@ const RATE_LIMIT_WINDOW = 10000; // 10 second window
 const ipConnectionCounts = new Map(); // ip -> count
 const MAX_CONNECTIONS_PER_IP = 10;
 
+// Backpressure threshold for broadcast fanout. If a socket's write buffer
+// exceeds this, its client is slow or stuck and queueing more bytes only
+// makes it worse — skip that iteration and keep the broadcast snappy for
+// every healthy subscriber. 1 MiB matches the audit guidance and is several
+// hundred typical broadcast messages worth of backlog, so a healthy client
+// on a normal link never trips it.
+const BACKPRESSURE_LIMIT_BYTES = 1 * 1024 * 1024;
+
 function checkRateLimit(ws) {
   const now = Date.now();
   let record = connectionRateLimits.get(ws);
@@ -86,6 +94,26 @@ class WebSocketService {
     this.heartbeatInterval = null; // Store for cleanup
     this.cleanupInterval = null;   // Store for cleanup
     this.shuttingDown = false;     // Flips true in shutdown(); blocks new upgrades
+  }
+
+  /**
+   * Send payload to one socket with state + backpressure guards. Returns a
+   * small status so callers can aggregate stats without duplicating checks:
+   *   'sent'     — payload handed off to ws
+   *   'closed'   — socket not OPEN (benign, routine races with close)
+   *   'backpressure' — bufferedAmount > threshold, skipped (caller logs warn)
+   *   'threw'    — ws.send threw (e.g. closed mid-call); treat as closed
+   * Never throws to the caller.
+   */
+  _trySend(client, payload) {
+    if (!client || client.readyState !== WebSocket.OPEN) return 'closed';
+    if (client.bufferedAmount > BACKPRESSURE_LIMIT_BYTES) return 'backpressure';
+    try {
+      client.send(payload);
+      return 'sent';
+    } catch {
+      return 'threw';
+    }
   }
 
   /**
@@ -218,7 +246,9 @@ class WebSocketService {
       }
     });
 
-    // Heartbeat to detect dead connections (store interval for cleanup)
+    // Heartbeat to detect dead connections (store interval for cleanup).
+    // .unref() so SIGTERM doesn't wait on the 30s heartbeat tick — shutdown()
+    // still explicitly clearInterval's it, this is belt-and-suspenders.
     this.heartbeatInterval = setInterval(() => {
       this.wss.clients.forEach((ws) => {
         if (!ws.isAlive) {
@@ -234,11 +264,13 @@ class WebSocketService {
         ws.ping();
       });
     }, 30000);
+    this.heartbeatInterval.unref();
 
     // Periodic cleanup of stale entries in clients Map (every 5 minutes)
     this.cleanupInterval = setInterval(() => {
       this.cleanupStaleClients();
     }, 300000);
+    this.cleanupInterval.unref();
 
     logger.info('WebSocket server initialized on /ws/cameras');
   }
@@ -433,11 +465,14 @@ class WebSocketService {
     if (!userClients) return 0;
     const payload = JSON.stringify(message);
     let sent = 0;
+    let backpressure = 0;
     for (const ws of userClients) {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(payload);
-        sent++;
-      }
+      const r = this._trySend(ws, payload);
+      if (r === 'sent') sent++;
+      else if (r === 'backpressure') backpressure++;
+    }
+    if (backpressure > 0) {
+      logger.warn({ userId, type: message.type, backpressure }, 'sendToUser dropped frames due to bufferedAmount');
     }
     return sent;
   }
@@ -448,15 +483,19 @@ class WebSocketService {
   broadcast(message) {
     const payload = JSON.stringify(message);
     let sentCount = 0;
+    let backpressure = 0;
 
     this.wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(payload);
-        sentCount++;
-      }
+      const r = this._trySend(client, payload);
+      if (r === 'sent') sentCount++;
+      else if (r === 'backpressure') backpressure++;
     });
 
-    logger.debug({ type: message.type, count: sentCount }, 'Broadcasted message');
+    if (backpressure > 0) {
+      logger.warn({ type: message.type, sent: sentCount, backpressure }, 'broadcast dropped frames due to bufferedAmount');
+    } else {
+      logger.debug({ type: message.type, count: sentCount }, 'Broadcasted message');
+    }
   }
 
   /**
@@ -487,6 +526,7 @@ class WebSocketService {
       this._authCache.set(deviceId, { camera, users: authorizedSet, isPublic: isPublicCamera, time: now });
     }
 
+    let backpressureCount = 0;
     this.wss.clients.forEach((client) => {
       if (client.readyState !== WebSocket.OPEN) return;
 
@@ -501,15 +541,21 @@ class WebSocketService {
         authorized = true;
       }
 
-      if (authorized) {
-        client.send(payload);
-        sentCount++;
-      } else {
+      if (!authorized) {
         skippedCount++;
+        return;
       }
+
+      const r = this._trySend(client, payload);
+      if (r === 'sent') sentCount++;
+      else if (r === 'backpressure') backpressureCount++;
     });
 
-    logger.debug({ type: message.type, deviceId, sent: sentCount, skipped: skippedCount }, 'Broadcasted to authorized clients');
+    if (backpressureCount > 0) {
+      logger.warn({ type: message.type, deviceId, sent: sentCount, skipped: skippedCount, backpressure: backpressureCount }, 'Authorized broadcast dropped frames due to bufferedAmount');
+    } else {
+      logger.debug({ type: message.type, deviceId, sent: sentCount, skipped: skippedCount }, 'Broadcasted to authorized clients');
+    }
   }
 
   /**
@@ -518,18 +564,23 @@ class WebSocketService {
   broadcastToCamera(deviceId, message) {
     const payload = JSON.stringify(message);
     let sentCount = 0;
+    let backpressureCount = 0;
 
     this.wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        // Send to all clients if no subscription, or if client subscribed to this camera
-        if (client.subscribedCameras.length === 0 || client.subscribedCameras.includes(deviceId)) {
-          client.send(payload);
-          sentCount++;
-        }
+      if (client.readyState !== WebSocket.OPEN) return;
+      // Send to all clients if no subscription, or if client subscribed to this camera
+      if (client.subscribedCameras.length === 0 || client.subscribedCameras.includes(deviceId)) {
+        const r = this._trySend(client, payload);
+        if (r === 'sent') sentCount++;
+        else if (r === 'backpressure') backpressureCount++;
       }
     });
 
-    logger.debug({ type: message.type, deviceId, count: sentCount }, 'Broadcasted to camera');
+    if (backpressureCount > 0) {
+      logger.warn({ type: message.type, deviceId, sent: sentCount, backpressure: backpressureCount }, 'broadcastToCamera dropped frames due to bufferedAmount');
+    } else {
+      logger.debug({ type: message.type, deviceId, count: sentCount }, 'Broadcasted to camera');
+    }
   }
 
   /**
@@ -656,6 +707,7 @@ class WebSocketService {
    */
   async broadcastTeslaMesh() {
     try {
+      let backpressure = 0;
       for (const [userId, userClients] of this.clients.entries()) {
         const needsSnapshot = [...userClients].some(
           ws => ws.readyState === WebSocket.OPEN && ws.subscribedTesla
@@ -665,10 +717,13 @@ class WebSocketService {
         const payload = await this._buildTeslaMeshPayloadForUser(userId);
         const msg = JSON.stringify({ type: 'tesla_vehicles', payload });
         for (const ws of userClients) {
-          if (ws.readyState === WebSocket.OPEN && ws.subscribedTesla) {
-            ws.send(msg);
-          }
+          if (!ws.subscribedTesla) continue;
+          const r = this._trySend(ws, msg);
+          if (r === 'backpressure') backpressure++;
         }
+      }
+      if (backpressure > 0) {
+        logger.warn({ backpressure }, 'broadcastTeslaMesh dropped frames due to bufferedAmount');
       }
     } catch (err) {
       logger.error({ err }, 'broadcastTeslaMesh failed');
@@ -692,13 +747,17 @@ class WebSocketService {
       logger.warn({ err }, 'mesh_visible lookup failed');
     }
 
+    let backpressure = 0;
     if (vehicle && vehicle.mesh_visible) {
       for (const userClients of this.clients.values()) {
         for (const ws of userClients) {
-          if (ws.readyState === WebSocket.OPEN && ws.subscribedTesla) {
-            ws.send(payload);
-          }
+          if (!ws.subscribedTesla) continue;
+          const r = this._trySend(ws, payload);
+          if (r === 'backpressure') backpressure++;
         }
+      }
+      if (backpressure > 0) {
+        logger.warn({ vin: vehicleData.vin, backpressure }, 'broadcastTeslaUpdate (mesh) dropped frames');
       }
       return;
     }
@@ -716,10 +775,13 @@ class WebSocketService {
       const userClients = this.clients.get(uid);
       if (!userClients) continue;
       for (const ws of userClients) {
-        if (ws.readyState === WebSocket.OPEN && ws.subscribedTesla) {
-          ws.send(payload);
-        }
+        if (!ws.subscribedTesla) continue;
+        const r = this._trySend(ws, payload);
+        if (r === 'backpressure') backpressure++;
       }
+    }
+    if (backpressure > 0) {
+      logger.warn({ vin: vehicleData.vin, backpressure }, 'broadcastTeslaUpdate (private) dropped frames');
     }
   }
 
@@ -732,11 +794,14 @@ class WebSocketService {
     if (!userClients) return false;
     const data = JSON.stringify(message);
     let delivered = false;
+    let backpressure = 0;
     for (const ws of userClients) {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-        delivered = true;
-      }
+      const r = this._trySend(ws, data);
+      if (r === 'sent') delivered = true;
+      else if (r === 'backpressure') backpressure++;
+    }
+    if (backpressure > 0) {
+      logger.warn({ userId, type: message.type, backpressure }, 'sendToUser (push) dropped frames due to bufferedAmount');
     }
     return delivered;
   }
