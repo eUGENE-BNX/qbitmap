@@ -8,7 +8,8 @@
 ## Deployment (MANDATORY: use deploy.sh)
 
 **ALWAYS use `./deploy.sh` - NEVER run raw rsync commands.**
-The script has hardcoded excludes for uploads/, *.pem, *.db files and runs a dry-run first.
+The script has hardcoded excludes for `uploads/` and `*.pem` keys, runs a
+dry-run first, and prompts before pushing.
 
 ```bash
 cd /home/eugene/Documents/CODES/Qbitmap/qbitmap-backend
@@ -16,9 +17,12 @@ cd /home/eugene/Documents/CODES/Qbitmap/qbitmap-backend
 ```
 
 ## Database
-- SQLite file: `/opt/qbitmap-backend/cameras.db`
-- **NEVER delete or overwrite *.db files**
-- Permissions: `chmod 664` and `chown qbitmap:qbitmap`
+- **MySQL 8** via `mysql2/promise` pool (see `src/services/db-pool.js`)
+- Connection config from env (`DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`,
+  `DB_PORT=3306`) loaded via `/etc/qbitmap/secrets.env` (systemd EnvironmentFile)
+- SQLite was retired; any `*.db` / `*.db-wal` / `*.db-shm` file on disk is a
+  stale fragment from the old stack and can be removed safely.
+- Schema changes go through `migrations/` (startup-applied by `db.ensureReady`).
 
 ## Service
 - Systemd: `qbitmap-backend.service`

@@ -5,8 +5,8 @@ ESP32-CAM streaming backend for QBitmap map application.
 ## Architecture
 
 - **Framework**: Fastify (high-performance Node.js web framework)
-- **Database**: SQLite with better-sqlite3 (synchronous, fast)
-- **Authentication**: HMAC-SHA256 device tokens
+- **Database**: MySQL 8 via `mysql2/promise` connection pool
+- **Authentication**: Google OAuth + JWT (HttpOnly cookies) for users; HMAC-SHA256 for ESP32 devices
 - **Deployment**: systemd service + Caddy reverse proxy with auto-HTTPS
 
 ## API Endpoints
@@ -136,17 +136,18 @@ systemctl status qbitmap-backend
 /opt/qbitmap-backend/
 ├── index.js                    # Entry point
 ├── package.json
-├── qbitmap.db                  # SQLite database
+├── migrations/                 # Startup-applied MySQL schema migrations
 ├── src/
 │   ├── config.js              # Configuration
 │   ├── server.js              # Fastify server setup
-│   ├── routes/
-│   │   └── devices.js         # Device API endpoints
+│   ├── routes/                # HTTP + WS route handlers
 │   ├── services/
-│   │   ├── database.js        # SQLite operations
-│   │   └── cleanup.js         # Frame cleanup cron
+│   │   ├── db-pool.js         # mysql2 pool (single source of truth)
+│   │   ├── db/                # Per-domain SQL modules (users, cameras, …)
+│   │   └── cleanup.js         # Retention + MediaMTX reconciliation
 │   └── utils/
-│       └── auth.js            # HMAC validation
+│       ├── auth.js            # HMAC validation for device tokens
+│       └── jwt.js             # JWT + authHook for user sessions
 ```
 
 ## Development
@@ -210,7 +211,9 @@ curl -X POST https://stream.qbitmap.com/api/devices/0c9ad0f1ec44/frame \
 
 ## Notes
 
-- Shared secret for HMAC: `chihuahua7` (must match firmware)
+- HMAC shared secret: loaded from env `DEVICE_SHARED_SECRET` (set via
+  `/etc/qbitmap/secrets.env`, must match firmware build). Do NOT commit or
+  document literal values.
 - Default port: 3000 (proxied via Caddy)
-- Database location: `/opt/qbitmap-backend/qbitmap.db`
+- Database: MySQL 8 on `localhost:3306`, DB name `qbitmap` (per `/etc/qbitmap/secrets.env`)
 - Service name: `qbitmap-backend.service`
