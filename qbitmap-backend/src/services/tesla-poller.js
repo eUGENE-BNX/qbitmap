@@ -92,11 +92,13 @@ async function pollVehicle(vehicle, accessToken, userId) {
 
     // Broadcast full state
     const wsService = require('./websocket');
+    const effectiveLat = update.lat ?? vehicle.last_lat;
+    const effectiveLng = update.lng ?? vehicle.last_lng;
     wsService.broadcastTeslaUpdate(userId, {
       vin,
       vehicleId: vehicle.vehicle_id,
-      lat: update.lat ?? vehicle.last_lat,
-      lng: update.lng ?? vehicle.last_lng,
+      lat: effectiveLat,
+      lng: effectiveLng,
       soc: update.soc ?? vehicle.last_soc,
       gear: update.gear,
       bearing: update.bearing ?? vehicle.last_bearing,
@@ -107,6 +109,20 @@ async function pollVehicle(vehicle, accessToken, userId) {
       locked: update.locked ?? vehicle.last_locked,
       sentry: update.sentry ?? vehicle.last_sentry,
     });
+
+    if (update.lat != null && update.lng != null) {
+      try {
+        const proximity = require('./tesla-proximity');
+        proximity.checkProximity(userId, {
+          vin,
+          lat: effectiveLat,
+          lng: effectiveLng,
+          displayName: vehicle.display_name,
+        });
+      } catch (err) {
+        logger.warn({ err }, 'proximity check failed');
+      }
+    }
 
     logger.info({ vin, update }, 'Debug poll complete');
     return { vin, status: 'ok', update };

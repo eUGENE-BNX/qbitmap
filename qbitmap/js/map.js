@@ -545,6 +545,11 @@ map.on("load", async () => {
     // Lazy-load non-critical modules after map is ready
     import('/js/tesla-dashcam.js');
 
+    // Tesla proximity popup is independent of the Tesla layer so shared
+    // contacts still get notified when their cars come close — attach at
+    // boot as long as the shared camera WebSocket exists.
+    import('/js/tesla/proximity-popup.js').then(m => m.TeslaProximityPopup.init());
+
     const styleObj = map.getStyle();
     const vectorSourceId = Object.entries(styleObj.sources).find(([, src]) => src.type === "vector")?.[0];
     if (!vectorSourceId) return;

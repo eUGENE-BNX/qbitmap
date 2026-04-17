@@ -574,10 +574,13 @@ class WebSocketService {
   }
 
   /**
-   * Build the mesh payload (all vehicles whose owners opted in)
+   * Build the mesh payload FOR A SPECIFIC USER. Includes:
+   *  - every mesh_visible vehicle (public),
+   *  - the user's own vehicles (always visible to owner, even when hidden),
+   *  - vehicles individually shared with this user via tesla_vehicle_shares.
    */
-  async _buildTeslaMeshPayload() {
-    const vehicles = await db.getMeshVisibleTeslaVehicles();
+  async _buildTeslaMeshPayloadForUser(userId) {
+    const vehicles = await db.getTeslaVehiclesVisibleToUser(userId);
     return vehicles.map(v => ({
       vin: v.vin,
       vehicleId: v.vehicle_id,
@@ -607,12 +610,12 @@ class WebSocketService {
   }
 
   /**
-   * Send current Tesla mesh to a client (all mesh-visible vehicles)
+   * Send current Tesla mesh to a client (user-specific: public + owned + shared).
    */
   async sendTeslaVehicles(ws) {
     try {
       if (!ws.userId) return;
-      const payload = await this._buildTeslaMeshPayload();
+      const payload = await this._buildTeslaMeshPayloadForUser(ws.userId);
       ws.send(JSON.stringify({ type: 'tesla_vehicles', payload }));
     } catch (err) {
       logger.error({ err }, 'Error sending Tesla vehicles');
@@ -620,14 +623,19 @@ class WebSocketService {
   }
 
   /**
-   * Broadcast the full mesh snapshot to every subscribed client
-   * (used after a user toggles mesh_visible so others add/remove the vehicle live)
+   * Broadcast the full mesh snapshot. Each connected user gets a personalised
+   * snapshot so hidden vehicles stay visible to their owner and share list.
    */
   async broadcastTeslaMesh() {
     try {
-      const payload = await this._buildTeslaMeshPayload();
-      const msg = JSON.stringify({ type: 'tesla_vehicles', payload });
-      for (const userClients of this.clients.values()) {
+      for (const [userId, userClients] of this.clients.entries()) {
+        const needsSnapshot = [...userClients].some(
+          ws => ws.readyState === WebSocket.OPEN && ws.subscribedTesla
+        );
+        if (!needsSnapshot) continue;
+
+        const payload = await this._buildTeslaMeshPayloadForUser(userId);
+        const msg = JSON.stringify({ type: 'tesla_vehicles', payload });
         for (const ws of userClients) {
           if (ws.readyState === WebSocket.OPEN && ws.subscribedTesla) {
             ws.send(msg);
@@ -641,23 +649,22 @@ class WebSocketService {
 
   /**
    * Broadcast Tesla vehicle telemetry update.
-   * If the vehicle is mesh_visible, fan out to ALL subscribed clients;
-   * otherwise only to the owning user's connections.
+   * If mesh_visible, fan out to all subscribed clients; otherwise only to
+   * the owner and users the vehicle has been explicitly shared with.
    */
   async broadcastTeslaUpdate(userId, vehicleData) {
     const payload = JSON.stringify({ type: 'tesla_vehicle_update', payload: vehicleData });
 
-    let isMesh = false;
+    let vehicle = null;
     try {
       if (vehicleData.vin) {
-        const v = await db.getTeslaVehicleByVin(vehicleData.vin);
-        isMesh = !!(v && v.mesh_visible);
+        vehicle = await db.getTeslaVehicleByVin(vehicleData.vin);
       }
     } catch (err) {
       logger.warn({ err }, 'mesh_visible lookup failed');
     }
 
-    if (isMesh) {
+    if (vehicle && vehicle.mesh_visible) {
       for (const userClients of this.clients.values()) {
         for (const ws of userClients) {
           if (ws.readyState === WebSocket.OPEN && ws.subscribedTesla) {
@@ -668,13 +675,42 @@ class WebSocketService {
       return;
     }
 
-    const userClients = this.clients.get(userId);
-    if (!userClients) return;
-    for (const ws of userClients) {
-      if (ws.readyState === WebSocket.OPEN && ws.subscribedTesla) {
-        ws.send(payload);
+    // Hidden vehicle — send to owner + explicit share recipients.
+    let recipientIds = [userId];
+    if (vehicle) {
+      try {
+        recipientIds = await db.getTeslaVehiclePrivateAudience(vehicle.id);
+      } catch (err) {
+        logger.warn({ err }, 'private audience lookup failed, falling back to owner only');
       }
     }
+    for (const uid of recipientIds) {
+      const userClients = this.clients.get(uid);
+      if (!userClients) continue;
+      for (const ws of userClients) {
+        if (ws.readyState === WebSocket.OPEN && ws.subscribedTesla) {
+          ws.send(payload);
+        }
+      }
+    }
+  }
+
+  /**
+   * Send an arbitrary JSON message to every live connection of a user.
+   * Used for targeted push (e.g. Tesla proximity alerts).
+   */
+  sendToUser(userId, message) {
+    const userClients = this.clients.get(userId);
+    if (!userClients) return false;
+    const data = JSON.stringify(message);
+    let delivered = false;
+    for (const ws of userClients) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(data);
+        delivered = true;
+      }
+    }
+    return delivered;
   }
 
   /**

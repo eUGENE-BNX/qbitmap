@@ -280,6 +280,58 @@ async function teslaApiRoutes(fastify) {
     return { status: 'ok', meshVisible: !!visible };
   });
 
+  // ---- Per-user vehicle sharing ----
+
+  fastify.get('/vehicles/:vehicleId/shares', async (request, reply) => {
+    const { vehicleId } = request.params;
+    const shares = await db.getTeslaVehicleShares(vehicleId, request.user.userId);
+    if (shares === null) return reply.code(404).send({ error: 'Vehicle not found' });
+    return { shares };
+  });
+
+  fastify.post('/vehicles/:vehicleId/shares', async (request, reply) => {
+    const { vehicleId } = request.params;
+    const email = (request.body?.email || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      return reply.code(400).send({ error: 'Geçerli bir e-posta girin' });
+    }
+    const result = await db.shareTeslaVehicle(vehicleId, request.user.userId, email);
+    if (!result.success) {
+      const code = result.error === 'You do not own this vehicle' ? 403 : 400;
+      return reply.code(code).send({ error: result.error });
+    }
+    try {
+      const wsService = require('../services/websocket');
+      wsService.broadcastTeslaMesh();
+    } catch (err) {
+      logger.warn({ err }, 'broadcastTeslaMesh failed after share add');
+    }
+    return { status: 'ok', share: result.share };
+  });
+
+  fastify.delete('/vehicles/:vehicleId/shares/:userId', async (request, reply) => {
+    const { vehicleId, userId } = request.params;
+    const result = await db.unshareTeslaVehicle(vehicleId, request.user.userId, Number(userId));
+    if (!result.success) return reply.code(403).send({ error: result.error });
+    try {
+      const wsService = require('../services/websocket');
+      wsService.broadcastTeslaMesh();
+    } catch (err) {
+      logger.warn({ err }, 'broadcastTeslaMesh failed after share remove');
+    }
+    return { status: 'ok' };
+  });
+
+  fastify.patch('/vehicles/:vehicleId/shares/:userId', async (request, reply) => {
+    const { vehicleId, userId } = request.params;
+    const { proximityAlertEnabled } = request.body || {};
+    const result = await db.setTeslaShareProximityAlert(
+      vehicleId, request.user.userId, Number(userId), !!proximityAlertEnabled
+    );
+    if (!result.success) return reply.code(404).send({ error: result.error || 'Share not found' });
+    return { status: 'ok', proximityAlertEnabled: !!proximityAlertEnabled };
+  });
+
   // Update vehicle license plate
   fastify.patch('/vehicles/:vehicleId/license-plate', async (request, reply) => {
     const { vehicleId } = request.params;
@@ -463,11 +515,13 @@ async function teslaTelemetryRoutes(fastify) {
     const vehicle = await db.getTeslaVehicleByVin(vin);
     if (vehicle) {
       const wsService = require('../services/websocket');
+      const effectiveLat = lat ?? vehicle.last_lat;
+      const effectiveLng = lng ?? vehicle.last_lng;
       wsService.broadcastTeslaUpdate(vehicle.user_id, {
         vin,
         vehicleId: vehicle.vehicle_id,
-        lat: lat ?? vehicle.last_lat,
-        lng: lng ?? vehicle.last_lng,
+        lat: effectiveLat,
+        lng: effectiveLng,
         soc: soc ?? vehicle.last_soc,
         gear: gear ?? vehicle.last_gear,
         bearing: bearing ?? vehicle.last_bearing,
@@ -478,6 +532,20 @@ async function teslaTelemetryRoutes(fastify) {
         locked: locked ?? vehicle.last_locked,
         sentry: sentry ?? vehicle.last_sentry,
       });
+
+      if (lat != null && lng != null) {
+        try {
+          const proximity = require('../services/tesla-proximity');
+          proximity.checkProximity(vehicle.user_id, {
+            vin,
+            lat: effectiveLat,
+            lng: effectiveLng,
+            displayName: vehicle.display_name,
+          });
+        } catch (err) {
+          logger.warn({ err }, 'proximity check failed');
+        }
+      }
     }
 
     return { status: 'ok' };

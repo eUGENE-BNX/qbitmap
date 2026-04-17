@@ -194,4 +194,160 @@ DatabaseService.prototype.getTeslaVehicleByVehicleId = async function(vehicleId)
   return rows[0] || null;
 };
 
+// Tesla-share ownership guard. Vehicle endpoints accept the external
+// tesla_vehicle_id (string) but FKs need the internal PK (int) — this
+// resolves one to the other while also verifying the caller owns it.
+DatabaseService.prototype.getOwnedTeslaVehiclePk = async function(vehicleId, ownerUserId) {
+  const [rows] = await this.pool.execute(
+    `SELECT v.id FROM tesla_vehicles v
+     JOIN tesla_accounts a ON a.id = v.tesla_account_id
+     WHERE v.vehicle_id = ? AND a.user_id = ?`,
+    [vehicleId, ownerUserId]
+  );
+  return rows[0]?.id || null;
+};
+
+DatabaseService.prototype.shareTeslaVehicle = async function(vehicleId, ownerUserId, shareWithEmail) {
+  const pk = await this.getOwnedTeslaVehiclePk(vehicleId, ownerUserId);
+  if (!pk) return { success: false, error: 'You do not own this vehicle' };
+
+  const targetUser = await this.getUserByEmail(shareWithEmail);
+  if (!targetUser) return { success: false, error: 'User not found' };
+  if (targetUser.id === ownerUserId) return { success: false, error: 'Cannot share with yourself' };
+
+  try {
+    await this.pool.execute(
+      `INSERT INTO tesla_vehicle_shares (tesla_vehicle_id, shared_with_user_id)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE shared_with_user_id = VALUES(shared_with_user_id)`,
+      [pk, targetUser.id]
+    );
+    return {
+      success: true,
+      share: {
+        userId: targetUser.id,
+        email: targetUser.email,
+        displayName: targetUser.display_name,
+        avatarUrl: targetUser.avatar_url,
+        proximityAlertEnabled: true,
+      },
+    };
+  } catch {
+    return { success: false, error: 'Failed to create share' };
+  }
+};
+
+DatabaseService.prototype.unshareTeslaVehicle = async function(vehicleId, ownerUserId, sharedUserId) {
+  const pk = await this.getOwnedTeslaVehiclePk(vehicleId, ownerUserId);
+  if (!pk) return { success: false, error: 'You do not own this vehicle' };
+  await this.pool.execute(
+    'DELETE FROM tesla_vehicle_shares WHERE tesla_vehicle_id = ? AND shared_with_user_id = ?',
+    [pk, sharedUserId]
+  );
+  return { success: true };
+};
+
+DatabaseService.prototype.setTeslaShareProximityAlert = async function(vehicleId, ownerUserId, sharedUserId, enabled) {
+  const pk = await this.getOwnedTeslaVehiclePk(vehicleId, ownerUserId);
+  if (!pk) return { success: false, error: 'You do not own this vehicle' };
+  const [res] = await this.pool.execute(
+    'UPDATE tesla_vehicle_shares SET proximity_alert_enabled = ? WHERE tesla_vehicle_id = ? AND shared_with_user_id = ?',
+    [enabled ? 1 : 0, pk, sharedUserId]
+  );
+  return { success: res.affectedRows > 0 };
+};
+
+DatabaseService.prototype.getTeslaVehicleShares = async function(vehicleId, ownerUserId) {
+  const pk = await this.getOwnedTeslaVehiclePk(vehicleId, ownerUserId);
+  if (!pk) return null;
+  const [rows] = await this.pool.execute(
+    `SELECT s.shared_with_user_id, s.proximity_alert_enabled, s.created_at,
+            u.email, u.display_name, u.avatar_url
+     FROM tesla_vehicle_shares s
+     JOIN users u ON u.id = s.shared_with_user_id
+     WHERE s.tesla_vehicle_id = ?
+     ORDER BY s.created_at DESC`,
+    [pk]
+  );
+  return rows.map(r => ({
+    userId: r.shared_with_user_id,
+    email: r.email,
+    displayName: r.display_name,
+    avatarUrl: r.avatar_url,
+    proximityAlertEnabled: !!r.proximity_alert_enabled,
+    createdAt: r.created_at,
+  }));
+};
+
+// Returns vehicles the given user has either mesh-visible access to, owns,
+// or has been individually shared. Used to build a per-user mesh snapshot
+// (so a hidden vehicle still shows to its owner and to anyone on its share list).
+DatabaseService.prototype.getTeslaVehiclesVisibleToUser = async function(userId) {
+  const [rows] = await this.pool.execute(
+    `SELECT v.*, a.user_id, a.full_name AS owner_full_name, a.profile_image_url AS owner_profile_image,
+            u.display_name, u.avatar_url
+     FROM tesla_vehicles v
+     JOIN tesla_accounts a ON a.id = v.tesla_account_id
+     JOIN users u ON u.id = a.user_id
+     WHERE v.mesh_visible = 1
+        OR a.user_id = ?
+        OR EXISTS (
+             SELECT 1 FROM tesla_vehicle_shares s
+             WHERE s.tesla_vehicle_id = v.id AND s.shared_with_user_id = ?
+           )`,
+    [userId, userId]
+  );
+  return rows;
+};
+
+// Returns the set of user IDs who should receive a given vehicle's telemetry:
+// the owner + every user it's shared with. Everyone-else visibility
+// (mesh_visible=1) is handled separately by the broadcast function.
+DatabaseService.prototype.getTeslaVehiclePrivateAudience = async function(vehicleInternalId) {
+  const [rows] = await this.pool.execute(
+    `SELECT a.user_id FROM tesla_vehicles v
+     JOIN tesla_accounts a ON a.id = v.tesla_account_id
+     WHERE v.id = ?
+     UNION
+     SELECT s.shared_with_user_id AS user_id
+     FROM tesla_vehicle_shares s
+     WHERE s.tesla_vehicle_id = ?`,
+    [vehicleInternalId, vehicleInternalId]
+  );
+  return rows.map(r => r.user_id);
+};
+
+// For proximity checks: returns every peer Tesla vehicle (with location)
+// belonging to a user with whom movingUserId has an active, proximity-enabled
+// share — in either direction. The caller computes distance and decides
+// whether to alert.
+DatabaseService.prototype.getTeslaProximityPeers = async function(movingUserId) {
+  const [rows] = await this.pool.execute(
+    `SELECT v.id AS vehicle_pk, v.vin, v.display_name, v.last_lat, v.last_lng,
+            v.last_telemetry_at, a.user_id AS peer_user_id,
+            u.display_name AS peer_name, u.avatar_url AS peer_avatar
+     FROM tesla_vehicles v
+     JOIN tesla_accounts a ON a.id = v.tesla_account_id
+     JOIN users u ON u.id = a.user_id
+     WHERE a.user_id != ?
+       AND v.last_lat IS NOT NULL
+       AND v.last_lng IS NOT NULL
+       AND a.user_id IN (
+         SELECT s1.shared_with_user_id
+         FROM tesla_vehicle_shares s1
+         JOIN tesla_vehicles v1 ON v1.id = s1.tesla_vehicle_id
+         JOIN tesla_accounts a1 ON a1.id = v1.tesla_account_id
+         WHERE a1.user_id = ? AND s1.proximity_alert_enabled = 1
+         UNION
+         SELECT a2.user_id
+         FROM tesla_vehicle_shares s2
+         JOIN tesla_vehicles v2 ON v2.id = s2.tesla_vehicle_id
+         JOIN tesla_accounts a2 ON a2.id = v2.tesla_account_id
+         WHERE s2.shared_with_user_id = ? AND s2.proximity_alert_enabled = 1
+       )`,
+    [movingUserId, movingUserId, movingUserId]
+  );
+  return rows;
+};
+
 };

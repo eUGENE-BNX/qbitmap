@@ -1,4 +1,5 @@
 import { CameraSystem } from '../camera-system/index.js';
+import { TeslaProximityPopup } from './proximity-popup.js';
 
 export const TeslaWebSocket = {
   onVehiclesList: null,
@@ -27,6 +28,8 @@ export const TeslaWebSocket = {
           this.onVehiclesList(msg.payload);
         } else if (msg.type === 'tesla_vehicle_update' && this.onVehicleUpdate) {
           this.onVehicleUpdate(msg.payload);
+        } else if (msg.type === 'tesla_proximity_alert') {
+          TeslaProximityPopup.show(msg.payload);
         }
       } catch { /* ignore non-json */ }
     };

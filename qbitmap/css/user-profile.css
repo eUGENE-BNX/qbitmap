@@ -210,9 +210,9 @@
   position: absolute;
   top: 8px;
   left: 12px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #9aa0a6;
+  font-size: 12px;
+  font-weight: 800;
+  color: #3c4043;
   letter-spacing: 0.5px;
 }
 
@@ -302,7 +302,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 2px;
 }
 
 .profile-tesla-logo {
@@ -324,6 +324,8 @@
   height: 75px;
   object-fit: contain;
   flex-shrink: 0;
+  margin-top: -12px;
+  margin-bottom: -8px;
 }
 
 .profile-tesla-title {
@@ -827,6 +829,10 @@
   margin-bottom: 0;
 }
 
+.profile-recent-section + .profile-recent-section {
+  margin-top: 8px;
+}
+
 .profile-recent-section h4,
 .profile-section-title {
   margin: 0 0 3px 0;
@@ -1095,19 +1101,22 @@
 }
 
 .broadcast-rec-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
   display: flex;
-  gap: 4px;
-  margin-top: 4px;
+  gap: 3px;
+  z-index: 1;
 }
 
 .broadcast-rec-visibility-btn,
 .broadcast-rec-delete-btn {
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.55);
+  border: none;
   border-radius: 4px;
-  color: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 3px 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1116,19 +1125,18 @@
 
 .broadcast-rec-visibility-btn:hover,
 .broadcast-rec-delete-btn:hover {
-  background: rgba(0, 0, 0, 0.1);
-  color: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
 }
 
 .broadcast-rec-visibility-btn.active {
-  background: rgba(124, 58, 237, 0.15);
-  border-color: rgba(124, 58, 237, 0.4);
-  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.85);
+  color: #fff;
 }
 
 .broadcast-rec-delete-btn:hover {
-  background: rgba(217, 48, 37, 0.1);
-  color: #d93025;
+  background: rgba(217, 48, 37, 0.85);
+  color: #fff;
 }
 
 .broadcast-duration-badge {
@@ -1188,3 +1196,130 @@
   max-height: 70vh;
   background: #000;
 }
+
+/* Tesla per-user sharing */
+.profile-tesla-shares {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+}
+.profile-tesla-shares-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: #24292f;
+  margin-bottom: 4px;
+}
+.profile-tesla-shares-hint {
+  font-size: 11px;
+  color: #57606a;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+.profile-tesla-shares-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.profile-tesla-shares-empty {
+  font-size: 12px;
+  color: #8b949e;
+  font-style: italic;
+}
+.profile-tesla-share-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+}
+.profile-tesla-share-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #d0d7de;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #57606a;
+  flex-shrink: 0;
+}
+.profile-tesla-share-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.profile-tesla-share-meta {
+  flex: 1;
+  min-width: 0;
+}
+.profile-tesla-share-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #24292f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-tesla-share-email-text {
+  font-size: 11px;
+  color: #57606a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-tesla-share-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #57606a;
+  cursor: pointer;
+  user-select: none;
+}
+.profile-tesla-share-remove {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: #8b949e;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.profile-tesla-share-remove:hover {
+  background: #ffebe9;
+  color: #cf222e;
+}
+.profile-tesla-shares-add {
+  display: flex;
+  gap: 6px;
+}
+.profile-tesla-share-email {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  font-size: 12px;
+  min-width: 0;
+}
+.profile-tesla-share-add-btn {
+  padding: 6px 12px;
+  background: #1f6feb;
+  border: 1px solid #1f6feb;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.profile-tesla-share-add-btn:hover { background: #1158c7; }
+.profile-tesla-share-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }

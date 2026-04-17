@@ -336,8 +336,94 @@ const UserProfileSystem = {
             <span class="profile-tesla-mesh-label">${vehicle.meshVisible === false ? 'Offline' : 'Online'}</span>
           </button>
         </div>
+
+        <div class="profile-tesla-shares" data-vehicle-id="${escapeHtml(vehicleId)}">
+          <div class="profile-tesla-shares-header">Paylaşılan Kişiler</div>
+          <div class="profile-tesla-shares-hint">Araç gizliyken yalnızca siz ve aşağıdaki kişiler aracı haritada görür. Yakınlık uyarısı işaretli kişilerle 250m çapına girdiğinizde popup gösterilir.</div>
+          <div class="profile-tesla-shares-list" data-vehicle-id="${escapeHtml(vehicleId)}">Yükleniyor…</div>
+          <div class="profile-tesla-shares-add">
+            <input type="email" class="profile-tesla-share-email" placeholder="E-posta adresi" data-vehicle-id="${escapeHtml(vehicleId)}">
+            <button class="profile-tesla-share-add-btn" data-vehicle-id="${escapeHtml(vehicleId)}">Ekle</button>
+          </div>
+        </div>
       </div>
     `;
+  },
+
+  async loadTeslaShares(vehicleId, listEl) {
+    if (!listEl) return;
+    try {
+      const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${vehicleId}/shares`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      this.renderTeslaShares(listEl, data.shares || []);
+    } catch {
+      listEl.textContent = 'Paylaşımlar yüklenemedi';
+    }
+  },
+
+  renderTeslaShares(listEl, shares) {
+    listEl.textContent = '';
+    if (shares.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'profile-tesla-shares-empty';
+      empty.textContent = 'Henüz paylaşım yok';
+      listEl.appendChild(empty);
+      return;
+    }
+    for (const s of shares) {
+      const row = document.createElement('div');
+      row.className = 'profile-tesla-share-row';
+      row.dataset.userId = s.userId;
+
+      const avatar = document.createElement('div');
+      avatar.className = 'profile-tesla-share-avatar';
+      if (s.avatarUrl) {
+        const img = document.createElement('img');
+        img.src = s.avatarUrl;
+        img.alt = '';
+        avatar.appendChild(img);
+      } else {
+        avatar.textContent = (s.displayName || s.email || '?').charAt(0).toUpperCase();
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'profile-tesla-share-meta';
+      const name = document.createElement('div');
+      name.className = 'profile-tesla-share-name';
+      name.textContent = s.displayName || s.email;
+      const email = document.createElement('div');
+      email.className = 'profile-tesla-share-email-text';
+      email.textContent = s.email;
+      meta.appendChild(name);
+      meta.appendChild(email);
+
+      const alertLabel = document.createElement('label');
+      alertLabel.className = 'profile-tesla-share-alert';
+      alertLabel.title = 'Bu kişiyle 250m yakınlığa girdiğinizde popup göster';
+      const alertInput = document.createElement('input');
+      alertInput.type = 'checkbox';
+      alertInput.className = 'profile-tesla-share-alert-input';
+      alertInput.checked = !!s.proximityAlertEnabled;
+      const alertText = document.createElement('span');
+      alertText.textContent = 'Yakınlık uyarısı';
+      alertLabel.appendChild(alertInput);
+      alertLabel.appendChild(alertText);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'profile-tesla-share-remove';
+      removeBtn.type = 'button';
+      removeBtn.title = 'Paylaşımı kaldır';
+      removeBtn.textContent = '×';
+
+      row.appendChild(avatar);
+      row.appendChild(meta);
+      row.appendChild(alertLabel);
+      row.appendChild(removeBtn);
+      listEl.appendChild(row);
+    }
   },
 
   setupTeslaListeners(content) {
@@ -460,6 +546,79 @@ const UserProfileSystem = {
         });
       }
     });
+
+    // Per-user vehicle shares
+    content.querySelectorAll('.profile-tesla-shares').forEach(section => {
+      const vehicleId = section.dataset.vehicleId;
+      const listEl = section.querySelector('.profile-tesla-shares-list');
+      const emailInput = section.querySelector('.profile-tesla-share-email');
+      const addBtn = section.querySelector('.profile-tesla-share-add-btn');
+
+      this.loadTeslaShares(vehicleId, listEl);
+
+      const addShare = async () => {
+        const email = emailInput.value.trim();
+        if (!email) return;
+        addBtn.disabled = true;
+        try {
+          const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${vehicleId}/shares`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || 'Eklenemedi');
+          emailInput.value = '';
+          await this.loadTeslaShares(vehicleId, listEl);
+          AuthSystem.showNotification('Paylaşım eklendi', 'success');
+        } catch (err) {
+          AuthSystem.showNotification(err.message || 'Paylaşım eklenemedi', 'error');
+        } finally {
+          addBtn.disabled = false;
+        }
+      };
+      addBtn.addEventListener('click', addShare);
+      emailInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addShare(); });
+
+      // Event delegation for remove + proximity toggle
+      listEl.addEventListener('click', async (e) => {
+        const row = e.target.closest('.profile-tesla-share-row');
+        if (!row) return;
+        const userId = row.dataset.userId;
+        if (e.target.classList.contains('profile-tesla-share-remove')) {
+          if (!confirm('Bu paylaşımı kaldırmak istediğinize emin misiniz?')) return;
+          try {
+            const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${vehicleId}/shares/${userId}`, {
+              method: 'DELETE', credentials: 'include',
+            });
+            if (!res.ok) throw new Error('http ' + res.status);
+            await this.loadTeslaShares(vehicleId, listEl);
+            AuthSystem.showNotification('Paylaşım kaldırıldı', 'info');
+          } catch {
+            AuthSystem.showNotification('Paylaşım kaldırılamadı', 'error');
+          }
+        }
+      });
+
+      listEl.addEventListener('change', async (e) => {
+        if (!e.target.classList.contains('profile-tesla-share-alert-input')) return;
+        const row = e.target.closest('.profile-tesla-share-row');
+        if (!row) return;
+        const userId = row.dataset.userId;
+        const enabled = e.target.checked;
+        try {
+          const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${vehicleId}/shares/${userId}`, {
+            method: 'PATCH', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ proximityAlertEnabled: enabled }),
+          });
+          if (!res.ok) throw new Error('http ' + res.status);
+        } catch {
+          e.target.checked = !enabled;
+          AuthSystem.showNotification('Uyarı ayarı kaydedilemedi', 'error');
+        }
+      });
+    });
   },
 
   renderInfoRow(location, hasFaceRegistered) {
@@ -570,14 +729,14 @@ const UserProfileSystem = {
           <div class="media-card-thumb">
             <img src="${thumbUrl}" alt="" loading="lazy">
             <span class="media-type-badge broadcast-duration-badge">${durationLabel}</span>
-          </div>
-          <div class="broadcast-rec-actions">
-            <button class="broadcast-rec-visibility-btn${isPublic ? ' active' : ''}" title="${isPublic ? 'Haritadan kaldır' : 'Haritada göster'}">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-            <button class="broadcast-rec-delete-btn" title="Sil">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-            </button>
+            <div class="broadcast-rec-actions">
+              <button class="broadcast-rec-visibility-btn${isPublic ? ' active' : ''}" title="${isPublic ? 'Haritadan kaldır' : 'Haritada göster'}">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+              <button class="broadcast-rec-delete-btn" title="Sil">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+              </button>
+            </div>
           </div>
           <span class="media-card-time">${timeAgo}</span>
         </div>
