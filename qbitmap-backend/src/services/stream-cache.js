@@ -20,10 +20,12 @@ class StreamCache {
     // Max cameras to cache simultaneously (prevent unbounded memory growth)
     this.maxCameras = 500;
 
-    // Start periodic cleanup (every 60 seconds)
+    // Start periodic cleanup (every 60 seconds). .unref() so this timer
+    // alone doesn't keep the event loop alive on SIGTERM.
     this.cleanupInterval = setInterval(() => {
       this.cleanupStaleData();
     }, 60000);
+    this.cleanupInterval.unref();
   }
 
   /**

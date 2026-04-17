@@ -120,7 +120,10 @@ function start() {
     if (count > 0) logger.info({ recovered: count }, 'Recovered stuck AI jobs');
   }).catch(() => {});
 
+  // .unref() so the poll tick can't block SIGTERM — stop() still clears it
+  // explicitly, this is belt-and-suspenders.
   pollTimer = setInterval(pollOnce, POLL_INTERVAL);
+  pollTimer.unref();
   logger.info({ pollInterval: POLL_INTERVAL, maxConcurrency: MAX_CONCURRENCY }, 'Video AI queue started (DB-backed)');
   pollOnce();
 }

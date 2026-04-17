@@ -6,6 +6,7 @@
 // `exec(\`ffmpeg ${args.join(' ')}\`)` or template literals.
 const { execFile } = require('child_process');
 const fs = require('fs');
+const { Semaphore } = require('./semaphore');
 const logger = require('./logger').child({ module: 'thumbnail' });
 
 const FFMPEG_PATH = '/usr/bin/ffmpeg';
@@ -15,6 +16,16 @@ const THUMB_WIDTH = 320;
 const PREVIEW_WIDTH = 800;
 const WEBP_QUALITY = 40;
 const PREVIEW_QUALITY = 70;
+
+// Cap concurrent ffmpeg processes. Without this, a bulk video-message
+// upload fans out 2 ffmpeg calls per file (thumb + preview) in parallel
+// and can pin every core at once — on 8-vCPU hosts that's still tolerable,
+// but bursty and starves the AI queues sharing the box. Default 4 leaves
+// half the cores for node + MySQL + AI workers; override via
+// FFMPEG_CONCURRENCY env if the mix changes. Must be >=1.
+const FFMPEG_CONCURRENCY = Math.max(1, parseInt(process.env.FFMPEG_CONCURRENCY || '4', 10) || 4);
+const ffmpegSem = new Semaphore(FFMPEG_CONCURRENCY);
+logger.info({ concurrency: FFMPEG_CONCURRENCY }, 'ffmpeg semaphore initialized');
 
 /**
  * Generate a WebP thumbnail from a video file.
@@ -64,7 +75,9 @@ function generateThumbnail(videoPath, thumbPath, opts = {}) {
     thumbPath
   ];
 
-  return new Promise((resolve) => {
+  // One permit covers the primary exec plus the fallback on failure, so a
+  // single generation never double-counts toward the concurrency cap.
+  return ffmpegSem.run(() => new Promise((resolve) => {
     execFile(FFMPEG_PATH, args, { timeout: 10000 }, (err) => {
       if (err) {
         // Fallback: try frame at 0s (video may be shorter than seek time)
@@ -82,7 +95,7 @@ function generateThumbnail(videoPath, thumbPath, opts = {}) {
         resolve(true);
       }
     });
-  });
+  }));
 }
 
 /**
@@ -119,7 +132,7 @@ function generatePhotoThumbnail(imagePath, thumbPath, opts = {}) {
     thumbPath
   ];
 
-  return new Promise((resolve) => {
+  return ffmpegSem.run(() => new Promise((resolve) => {
     execFile(FFMPEG_PATH, args, { timeout: 10000 }, (err) => {
       if (err) {
         logger.warn({ err }, 'Photo thumbnail generation failed');
@@ -128,7 +141,7 @@ function generatePhotoThumbnail(imagePath, thumbPath, opts = {}) {
         resolve(true);
       }
     });
-  });
+  }));
 }
 
 module.exports = {

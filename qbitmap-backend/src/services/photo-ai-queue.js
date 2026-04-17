@@ -159,8 +159,10 @@ function start() {
     if (count > 0) logger.info({ recovered: count }, 'Recovered stuck AI jobs');
   }).catch(() => {});
 
-  // Start polling
+  // Start polling. .unref() so the 3s poll tick can't block SIGTERM —
+  // stop() still clearInterval's it explicitly, this is belt-and-suspenders.
   pollTimer = setInterval(pollOnce, POLL_INTERVAL);
+  pollTimer.unref();
   logger.info({ pollInterval: POLL_INTERVAL, maxConcurrency: MAX_CONCURRENCY }, 'Photo AI queue started (DB-backed)');
   // Initial poll
   pollOnce();

@@ -40,8 +40,11 @@ function start() {
   // mkdirSync at boot is fine — happens once before server listens.
   fs.mkdirSync(STORAGE_DIR, { recursive: true });
   _loadLocalSegments();
+  // .unref() so these background timers can't block SIGTERM — stop() still
+  // clears the interval explicitly, this is belt-and-suspenders.
   syncTimer = setInterval(tick, SYNC_INTERVAL);
-  setTimeout(tick, 3000);
+  syncTimer.unref();
+  setTimeout(tick, 3000).unref();
   logger.info({ api: TESLACAM_API }, 'TeslaCAM sync service started');
 }
 

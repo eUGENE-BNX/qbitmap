@@ -12,9 +12,12 @@ class SettingsCache {
     this.TTL = 5 * 60 * 1000; // 5 minutes
 
     // [PERF-18] Store interval ID so shutdown() can clear it.
+    // .unref() so this maintenance timer doesn't keep the event loop alive
+    // on SIGTERM.
     this._cleanupInterval = setInterval(() => {
       this.cleanupExpired();
     }, 5 * 60 * 1000);
+    this._cleanupInterval.unref();
   }
 
   /**

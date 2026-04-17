@@ -18,10 +18,13 @@ class VoiceCallService {
     // Separate cooldown tracking for face detection: deviceId -> lastCallTime
     this.faceCooldowns = new Map();
 
-    // Periodic cleanup of expired cooldowns to prevent memory leak
+    // Periodic cleanup of expired cooldowns to prevent memory leak.
+    // .unref() so this maintenance timer doesn't hold the event loop open
+    // on SIGTERM.
     this._cleanupInterval = setInterval(() => {
       this.cleanupExpiredCooldowns();
     }, 60000); // Clean every minute
+    this._cleanupInterval.unref();
   }
 
   // ==================== SETTINGS GETTERS (from database) ====================

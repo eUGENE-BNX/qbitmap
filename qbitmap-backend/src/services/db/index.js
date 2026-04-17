@@ -23,7 +23,10 @@ class DatabaseService {
     this._cameraAccessKeys = new Map(); // cameraId → Set<cacheKey>
     this._userAccessKeys = new Map();   // userId → Set<cacheKey>
 
-    // Periodic cleanup of expired access cache entries (every 5 minutes)
+    // Periodic cleanup of expired access cache entries (every 5 minutes).
+    // .unref() so this maintenance timer alone can't keep the event loop
+    // alive on SIGTERM — explicit clearInterval in index.js shutdown still
+    // runs, this is belt-and-suspenders for abnormal exits.
     this.accessCacheCleanupInterval = setInterval(() => {
       const now = Date.now();
       for (const [key, entry] of this.accessCache.entries()) {
@@ -32,6 +35,7 @@ class DatabaseService {
         }
       }
     }, 5 * 60 * 1000);
+    this.accessCacheCleanupInterval.unref();
 
     this._ready = this._initialize();
   }

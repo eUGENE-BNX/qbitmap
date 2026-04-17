@@ -13,8 +13,11 @@ class FrameCache {
     this.TTL = 5000; // 5 seconds TTL (reduced from 30s - only keep latest frame)
     this.MAX_FRAMES = 500; // Hard limit to prevent memory issues
 
-    // Start cleanup interval (every 2 seconds for faster cleanup)
+    // Start cleanup interval (every 2 seconds for faster cleanup).
+    // .unref() so this background maintenance timer doesn't keep the event
+    // loop alive on SIGTERM.
     this.cleanupInterval = setInterval(() => this.cleanup(), 2000);
+    this.cleanupInterval.unref();
   }
 
   /**

@@ -1,3 +1,8 @@
+// Installs the shared keep-alive dispatcher as the global undici dispatcher.
+// Required first so the side effect runs before any other module can
+// trigger an outbound fetch at require-time.
+require('./src/utils/http-agent');
+
 const buildServer = require('./src/server');
 const config = require('./src/config');
 const { cleanupTokenCache } = require('./src/utils/jwt');
