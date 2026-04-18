@@ -156,19 +156,13 @@ const MyCamerasSystem = {
   },
 
   getCameraType(camera) {
-    if (camera.camera_type === 'whep') return 'rtsp';
     if (camera.camera_type === 'city') return 'city';
     if (camera.device_id?.startsWith('RTMP_')) return 'rtmp';
-    if (camera.is_whep) return 'rtsp';
-    return 'device';
+    return 'rtsp';
   },
 
   isCameraOnline(camera) {
-    const isWhep = camera.camera_type === 'whep';
-    const isCity = camera.camera_type === 'city';
-    if (isWhep || isCity) return true;
-    const lastActivity = camera.lastFrameAt || camera.last_seen;
-    return lastActivity && (Date.now() - new Date(lastActivity).getTime() < 60000);
+    return true;
   },
 
   getFilteredCameras() {
@@ -184,7 +178,7 @@ const MyCamerasSystem = {
   },
 
   getCameraCounts() {
-    const counts = { all: this.cameras.length, rtsp: 0, rtmp: 0, device: 0, city: 0, online: 0, offline: 0 };
+    const counts = { all: this.cameras.length, rtsp: 0, rtmp: 0, city: 0, online: 0, offline: 0 };
     for (const c of this.cameras) {
       const type = this.getCameraType(c);
       counts[type] = (counts[type] || 0) + 1;

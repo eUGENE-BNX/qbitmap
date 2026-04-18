@@ -1,9 +1,8 @@
 const { notifyH3CameraChange, notifyH3CameraRemove, notifyH3ContentItem, notifyH3ContentItemRemove } = require('../../utils/h3-sync');
-const settingsCache = require('../settings-cache');
 const logger = require('../../utils/logger').child({ module: 'db-cameras' });
 
 // Columns returned by getCameraById / getCameraByDeviceId — the two hot-path
-// lookups used on every frame upload, WS subscribe, and route auth check.
+// lookups used on every WS subscribe and route auth check.
 // Intentionally excludes face_detection_enabled, face_detection_interval,
 // and alarm_trigger_names: those live behind the dedicated
 // getFaceDetectionSettings() query and are never read off the generic
@@ -11,7 +10,7 @@ const logger = require('../../utils/logger').child({ module: 'db-cameras' });
 // them keeps the row payload small — alarm_trigger_names in particular is
 // a TEXT column that can grow arbitrarily. Admin-side flows that need
 // every column should build a bespoke query.
-const CAMERA_COLS = 'id, device_id, user_id, name, lng, lat, is_public, stream_mode, last_seen, camera_type, whep_url, voice_call_enabled, mediamtx_path, onvif_camera_id, rtsp_source_url, audio_muted, created_at';
+const CAMERA_COLS = 'id, device_id, user_id, name, lng, lat, is_public, camera_type, whep_url, voice_call_enabled, mediamtx_path, onvif_camera_id, rtsp_source_url, audio_muted, created_at';
 
 module.exports = function(DatabaseService) {
 
@@ -21,50 +20,17 @@ DatabaseService.prototype._safePagination = function(page, limit, maxLimit = 100
   return { page, limit, offset: (page - 1) * limit };
 };
 
-DatabaseService.prototype.registerCamera = async function(deviceId) {
-  const [result] = await this.pool.execute(
-    'INSERT IGNORE INTO cameras (device_id, last_seen) VALUES (?, NOW())',
-    [deviceId]
-  );
-
-  if (result.affectedRows > 0) {
-    return this.getCameraByDeviceId(deviceId);
-  }
-
-  // Update last_seen if already exists
-  await this.pool.execute(
-    'UPDATE cameras SET last_seen = NOW() WHERE device_id = ?',
-    [deviceId]
-  );
-
-  return this.getCameraByDeviceId(deviceId);
-};
-
 DatabaseService.prototype.getCameraByDeviceId = async function(deviceId) {
   const [rows] = await this.pool.execute(`SELECT ${CAMERA_COLS} FROM cameras WHERE device_id = ?`, [deviceId]);
   return rows[0];
 };
 
 DatabaseService.prototype.getCameraSettings = async function(cameraId) {
-  // Check cache first
-  const cached = settingsCache.get(cameraId);
-  if (cached) {
-    return cached;
-  }
-
   const [rows] = await this.pool.execute('SELECT * FROM camera_settings WHERE camera_id = ?', [cameraId]);
-  const settings = rows[0];
-
-  if (settings) {
-    settingsCache.set(cameraId, settings);
-  }
-
-  return settings;
+  return rows[0];
 };
 
 DatabaseService.prototype.updateCameraSettings = async function(cameraId, settingsJson) {
-  settingsCache.invalidate(cameraId);
-
   const [rows] = await this.pool.execute('SELECT * FROM camera_settings WHERE camera_id = ?', [cameraId]);
   const existing = rows[0];
 
@@ -87,25 +53,6 @@ DatabaseService.prototype.updateCameraSettings = async function(cameraId, settin
 DatabaseService.prototype.getAllCameraIds = async function() {
   const [rows] = await this.pool.execute('SELECT id FROM cameras');
   return rows.map(row => row.id);
-};
-
-DatabaseService.prototype.claimCamera = async function(userId, deviceId) {
-  const camera = await this.getCameraByDeviceId(deviceId);
-
-  if (!camera) {
-    return { success: false, error: 'Camera not found. Make sure the device has connected at least once.' };
-  }
-
-  if (camera.user_id !== null) {
-    if (camera.user_id === userId) {
-      return { success: false, error: 'You already own this camera.' };
-    }
-    return { success: false, error: 'This camera is already claimed by another user.' };
-  }
-
-  await this.pool.execute('UPDATE cameras SET user_id = ? WHERE id = ?', [userId, camera.id]);
-
-  return { success: true, camera: await this.getCameraById(camera.id) };
 };
 
 DatabaseService.prototype.getCameraById = async function(cameraId) {
@@ -313,11 +260,11 @@ DatabaseService.prototype.getPublicCamerasByBbox = async function(bbox, page = 1
 
   // Exclude city cameras: served via /city-cameras to keep payloads disjoint
   const [items] = await this.pool.execute(`
-    SELECT id, device_id, name, lng, lat, stream_mode, last_seen, created_at, camera_type, whep_url, rtsp_source_url, mediamtx_path
+    SELECT id, device_id, name, lng, lat, created_at, camera_type, whep_url, rtsp_source_url, mediamtx_path
     FROM cameras
     WHERE is_public = 1 AND camera_type <> 'city'
       AND lng BETWEEN ? AND ? AND lat BETWEEN ? AND ?
-    ORDER BY last_seen DESC
+    ORDER BY created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `, [bbox.west, bbox.east, bbox.south, bbox.north]);
 
@@ -341,10 +288,10 @@ DatabaseService.prototype.getPublicCamerasPaginated = async function(page = 1, l
 
   // Exclude city cameras: served via /city-cameras to keep payloads disjoint
   const [items] = await this.pool.query(`
-    SELECT id, device_id, name, lng, lat, stream_mode, last_seen, created_at, camera_type, whep_url, rtsp_source_url, mediamtx_path
+    SELECT id, device_id, name, lng, lat, created_at, camera_type, whep_url, rtsp_source_url, mediamtx_path
     FROM cameras
     WHERE is_public = 1 AND camera_type <> 'city'
-    ORDER BY last_seen DESC
+    ORDER BY created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `);
 
@@ -362,10 +309,10 @@ DatabaseService.prototype.getUserCamerasPaginated = async function(userId, page 
   const offset = (page - 1) * limit;
 
   const [items] = await this.pool.execute(`
-    SELECT id, device_id, name, lng, lat, is_public, stream_mode, last_seen, created_at, camera_type, whep_url, audio_muted
+    SELECT id, device_id, name, lng, lat, is_public, created_at, camera_type, whep_url, audio_muted
     FROM cameras
     WHERE user_id = ?
-    ORDER BY last_seen DESC
+    ORDER BY created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `, [userId]);
 
@@ -454,14 +401,9 @@ DatabaseService.prototype.deleteCamera = async function(cameraId, userId) {
   }
 };
 
-DatabaseService.prototype.updateCameraLastSeen = async function(cameraId) {
-  await this.pool.execute('UPDATE cameras SET last_seen = NOW() WHERE id = ?', [cameraId]);
-};
-
 DatabaseService.prototype.getUserCameraTypeCounts = async function(userId) {
   const [rows] = await this.pool.execute(`
     SELECT COUNT(*) as total,
-           COUNT(CASE WHEN camera_type = 'device' THEN 1 END) as device_count,
            COUNT(CASE WHEN camera_type = 'whep' THEN 1 END) as whep_count
     FROM cameras WHERE user_id = ?
   `, [userId]);

@@ -169,22 +169,6 @@ DatabaseService.prototype.checkFeatureLimit = async function(userId, feature) {
   const usage = await this.getUserTodayUsage(userId);
 
   switch (feature) {
-    case 'cameras': {
-      const [rows] = await this.pool.execute(
-        "SELECT COUNT(*) as count FROM cameras WHERE user_id = ? AND camera_type = 'device'",
-        [userId]
-      );
-      const currentCameras = rows[0].count;
-
-      if (limits.max_cameras === -1) return { allowed: true };
-      return {
-        allowed: currentCameras < limits.max_cameras,
-        current: currentCameras,
-        limit: limits.max_cameras,
-        reason: currentCameras >= limits.max_cameras ? 'Camera limit reached' : null
-      };
-    }
-
     case 'whep_cameras': {
       const [rows] = await this.pool.execute(
         "SELECT COUNT(*) as count FROM cameras WHERE user_id = ? AND camera_type = 'whep'",
@@ -363,7 +347,6 @@ DatabaseService.prototype.getAdminStats = async function() {
     [totalUsersRows],
     [activeUsersRows],
     [totalCamerasRows],
-    [onlineCamerasRows],
     [aiRows],
     [videoCountRows],
     [photoCountRows],
@@ -372,9 +355,6 @@ DatabaseService.prototype.getAdminStats = async function() {
     this.pool.execute('SELECT COUNT(*) as count FROM users'),
     this.pool.execute('SELECT COUNT(*) as count FROM users WHERE is_active = 1'),
     this.pool.execute('SELECT COUNT(*) as count FROM cameras'),
-    this.pool.execute(
-      'SELECT COUNT(*) as count FROM cameras WHERE last_seen > DATE_SUB(NOW(), INTERVAL 5 MINUTE)'
-    ),
     this.pool.execute(
       'SELECT SUM(ai_analysis_count) as count FROM user_usage WHERE usage_date = ?',
       [today]
@@ -398,7 +378,6 @@ DatabaseService.prototype.getAdminStats = async function() {
     total_users: totalUsersRows[0].count,
     active_users: activeUsersRows[0].count,
     total_cameras: totalCamerasRows[0].count,
-    online_cameras: onlineCamerasRows[0].count,
     today_ai_queries: aiRows[0].count || 0,
     total_videos: videoCountRows[0].count,
     total_photos: photoCountRows[0].count,

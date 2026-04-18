@@ -17,7 +17,6 @@
   /* Type Badge Colors */
   --badge-rtsp-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --badge-rtmp-bg: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-  --badge-device-bg: linear-gradient(135deg, #10b981 0%, #059669 100%);
   --badge-city-bg: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
 }
 
@@ -375,7 +374,6 @@
 
 .camera-type-badge-compact.rtsp { background: var(--badge-rtsp-bg); }
 .camera-type-badge-compact.rtmp { background: var(--badge-rtmp-bg); }
-.camera-type-badge-compact.device { background: var(--badge-device-bg); }
 .camera-type-badge-compact.city { background: var(--badge-city-bg); }
 
 /* Quick Actions */

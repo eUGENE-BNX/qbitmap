@@ -32,9 +32,8 @@ class CleanupService {
       this.runMaintenance();
     });
 
-    // Run stale broadcast cleanup every 15 seconds (offset by 5s to avoid
-    // collision with stream-cache cleanup). .unref() both timers so neither
-    // blocks SIGTERM; stop() still clearInterval's the stored handle.
+    // Run stale broadcast cleanup every 15 seconds. .unref() both timers so
+    // neither blocks SIGTERM; stop() still clearInterval's the stored handle.
     const bootstrapTimer = setTimeout(() => {
       this.broadcastCleanupInterval = setInterval(() => {
         this.cleanupStaleBroadcasts();

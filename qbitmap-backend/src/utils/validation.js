@@ -109,22 +109,6 @@ const aiAnalyzeSchema = z.object({
   }).optional()
 }).passthrough();
 
-// ==================== SETTINGS SCHEMAS ====================
-
-const cameraSettingsSchema = z.object({
-  // Allow any settings structure but limit size
-}).passthrough().refine(
-  (data) => JSON.stringify(data).length < 50000,
-  { message: 'Settings too large' }
-);
-
-// ==================== DEVICE ID VALIDATION ====================
-
-const deviceIdSchema = z.string()
-  .min(3)
-  .max(50)
-  .regex(/^[A-Za-z0-9_-]+$/, 'Invalid device ID format');
-
 // ==================== VALIDATION HELPER ====================
 
 /**
@@ -198,8 +182,6 @@ module.exports = {
   linkCameraSchema,
   webhookEventSchema,
   addRtspCameraSchema,
-  cameraSettingsSchema,
-  deviceIdSchema,
   adminUpdateUserSchema,
   adminPlanSchema,
   aiAnalyzeSchema,

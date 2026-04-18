@@ -3,7 +3,7 @@ import { Logger } from '../utils.js';
 
 /**
  * QBitmap Camera System - Recording Module
- * Handles video recording - server-side for WHEP, client-side for device cameras
+ * Handles video recording - server-side recording for WHEP cameras
  */
 
 const RecordingMixin = {
@@ -181,13 +181,7 @@ const RecordingMixin = {
     const popupEl = popupData?.popup.getElement();
     const btn = popupEl?.querySelector('.record-btn');
 
-    // Check if WHEP camera - use server-side recording
-    if (camera.camera_type === 'whep') {
-      await this.toggleServerRecording(deviceId, btn);
-    } else {
-      // Device camera - use client-side canvas recording
-      this.toggleClientRecording(deviceId, btn);
-    }
+    await this.toggleServerRecording(deviceId, btn);
   },
 
   /**
@@ -333,155 +327,6 @@ const RecordingMixin = {
     } else if (camera?.whep_url) {
       await this.startWhepStream(deviceId, camera.whep_url);
     }
-  },
-
-  /**
-   * Toggle client-side recording (for device cameras)
-   */
-  toggleClientRecording(deviceId, btn) {
-    if (this.isRecording && this.recordingDeviceId === deviceId) {
-      this.stopClientRecording();
-      if (btn) btn.classList.remove('recording');
-    } else {
-      // Stop any existing recording first
-      if (this.isRecording) {
-        const oldPopupData = this.popups.get(this.recordingDeviceId);
-        if (oldPopupData) {
-          const oldBtn = oldPopupData.popup.getElement()?.querySelector('.record-btn');
-          if (oldBtn) oldBtn.classList.remove('recording');
-        }
-        this.stopClientRecording();
-      }
-      this.startClientRecording(deviceId);
-      if (btn) btn.classList.add('recording');
-    }
-  },
-
-  /**
-   * Start client-side recording (canvas-based)
-   */
-  startClientRecording(deviceId) {
-    try {
-      this.recordCanvas = document.createElement('canvas');
-      this.recordCanvas.width = 1280;
-      this.recordCanvas.height = 720;
-
-      const stream = this.recordCanvas.captureStream(1);
-      this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-      this.recordedChunks = [];
-      this.recordedChunksSize = 0; // Track total size for memory limit
-      this.recordingDeviceId = deviceId;
-
-      this.mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          // Check memory limit before adding chunk
-          if (this.recordedChunksSize + e.data.size > this.MAX_RECORDING_SIZE) {
-            Logger.warn('[Recording] Max size reached, stopping recording');
-            this.stopClientRecording();
-            return;
-          }
-          this.recordedChunks.push(e.data);
-          this.recordedChunksSize += e.data.size;
-        }
-      };
-
-      this.mediaRecorder.onstop = () => this.downloadClientRecording();
-      this.mediaRecorder.start();
-      this.isRecording = true;
-
-      Logger.log('[Recording] Client recording started');
-    } catch (error) {
-      Logger.error('[Recording] Start error:', error);
-    }
-  },
-
-  /**
-   * Stop client-side recording
-   */
-  stopClientRecording() {
-    if (this.mediaRecorder?.state !== 'inactive') {
-      this.mediaRecorder.stop();
-    }
-    this.isRecording = false;
-    this.recordingDeviceId = null;
-
-    // Clear canvas reference to free memory
-    if (this.recordCanvas) {
-      this.recordCanvas = null;
-    }
-    this.mediaRecorder = null;
-
-    Logger.log('[Recording] Client recording stopped');
-  },
-
-  /**
-   * Download client recording
-   */
-  downloadClientRecording() {
-    if (!this.recordedChunks || this.recordedChunks.length === 0) return;
-
-    const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `camera_${this.recordingDeviceId || 'rec'}_${Date.now()}.webm`;
-    a.click();
-
-    // Cleanup: revoke blob URL and clear chunks to free memory
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-    }, 1000);
-
-    // Clear chunks array to free memory
-    this.recordedChunks = [];
-    this.recordedChunksSize = 0;
-    Logger.log('[Recording] Memory cleared after download');
-  },
-
-  /**
-   * Capture frame to recording (for device cameras)
-   */
-  captureFrameToRecording(deviceId) {
-    if (!this.isRecording || !this.recordCanvas || this.recordingDeviceId !== deviceId) return;
-
-    const popupData = this.popups.get(deviceId);
-    if (!popupData) return;
-
-    const popupEl = popupData.popup.getElement();
-    const img = popupEl?.querySelector('.camera-frame');
-    if (!img?.complete) return;
-
-    try {
-      const ctx = this.recordCanvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, 1280, 720);
-    } catch (e) {
-      Logger.error('[Recording] Capture error:', e);
-    }
-  },
-
-  // Legacy compatibility - keep old function names working
-  startRecording(deviceId) {
-    const camera = this.cameras.find(c => c.device_id === deviceId);
-    if (camera?.camera_type === 'whep') {
-      this.toggleServerRecording(deviceId);
-    } else {
-      this.startClientRecording(deviceId);
-    }
-  },
-
-  stopRecording() {
-    if (this.recordingDeviceId) {
-      const camera = this.cameras.find(c => c.device_id === this.recordingDeviceId);
-      if (camera?.camera_type === 'whep') {
-        this.toggleServerRecording(this.recordingDeviceId);
-      } else {
-        this.stopClientRecording();
-      }
-    }
-  },
-
-  downloadRecording() {
-    this.downloadClientRecording();
   },
 
   /**

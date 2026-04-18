@@ -45,15 +45,11 @@ const PopupCoreMixin = {
    */
   getPopupHTML(camera) {
     const displayName = escapeHtml(camera.name || camera.device_id);
-    const isWhep = camera.camera_type === 'whep';
     const isCity = camera.camera_type === 'city';
+    const dataType = isCity ? 'city' : 'whep';
 
-    // For WHEP/City cameras, show video element instead of img
-    if (isWhep || isCity) {
-      const dataType = isCity ? 'city' : 'whep';
-
-      // WHEP cameras get zone and record buttons, city cameras don't
-      const whepOnlyButtons = isCity ? '' : `
+    // WHEP cameras get zone and record buttons, city cameras don't
+    const whepOnlyButtons = isCity ? '' : `
               <button class="cam-btn toggle-zones-btn zones-hidden-state" title="Alanları göster" style="display:none;">
                 <svg class="eye-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
@@ -144,53 +140,6 @@ const PopupCoreMixin = {
           </div>
         </div>
       `;
-    }
-
-    // Regular device camera
-    return `
-      <div class="camera-popup-content" data-device-id="${escapeHtml(camera.device_id)}" data-camera-type="device">
-        <div class="camera-popup-header">
-          <div class="camera-popup-title">
-            <span class="camera-id">${displayName}</span>
-            <span class="camera-time"></span>
-          </div>
-          <div class="camera-popup-buttons">
-            <button class="cam-btn ai-btn ai-active-btn" title="AI Durdur" style="display:none;">
-              <span style="font-weight:900;font-size:11px;color:#000;">AI</span>
-            </button>
-            <button class="cam-btn mjpeg-btn" title="MJPEG Stream">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M23 7l-7 5 7 5V7z"></path>
-                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-              </svg>
-            </button>
-            <button class="cam-btn settings-btn" title="Ayarlar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-            </button>
-            ${AuthSystem.isLoggedIn() ? ReportSystem.getCamBtnHtml() : ''}
-            <button class="cam-btn close-btn" title="Kapat">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="camera-popup-body">
-          <div class="camera-frame-container loading">
-            <div class="camera-loading">
-              <div class="spinner"></div>
-              <span>Yükleniyor...</span>
-            </div>
-            <img class="camera-frame" alt="Camera Frame" crossorigin="anonymous">
-            <div class="camera-error">Görüntü alınamadı</div>
-          </div>
-        </div>
-      </div>
-    `;
   },
 
   /**
@@ -215,7 +164,6 @@ const PopupCoreMixin = {
     }
 
     const deviceId = camera.device_id;
-    const isWhep = camera.camera_type === 'whep';
     const isCity = camera.camera_type === 'city';
 
     // If this camera's popup is already open, just return
@@ -245,24 +193,22 @@ const PopupCoreMixin = {
     this.map.easeTo({ center: coordinates, duration: 300 });
 
     // Store popup info
-    this.popups.set(deviceId, { popup, refreshInterval: null, camera, isWhep: isWhep || isCity, isCity, _openedAt: performance.now() });
+    this.popups.set(deviceId, { popup, refreshInterval: null, camera, isWhep: true, isCity, _openedAt: performance.now() });
 
-    Analytics.event('camera_view', { camera_id: deviceId, camera_type: camera.camera_type || 'device' });
+    Analytics.event('camera_view', { camera_id: deviceId, camera_type: camera.camera_type });
 
     // Wire up event listeners after popup is in DOM
     setTimeout(() => this.setupPopupListeners(deviceId), 0);
 
-    // Apply resolution class for WHEP cameras
-    if (isWhep || isCity) {
-      this.applyResolutionClass(deviceId);
-    }
+    // Apply resolution class
+    this.applyResolutionClass(deviceId);
 
-    // City cameras and WHEP cameras: HLS default, WHEP fallback
-    if ((isCity || isWhep) && camera.hls_url) {
+    // HLS default, WHEP fallback
+    if (camera.hls_url) {
       await this.startHlsPlayback(deviceId, camera.hls_url);
-    } else if ((isCity || isWhep) && camera.whep_url) {
+    } else if (camera.whep_url) {
       await this.startWhepStream(deviceId, camera.whep_url);
-    } else if (isCity || isWhep) {
+    } else {
       // No URL available - show error
       const popupEl = this.popups.get(deviceId)?.popup.getElement();
       const frameContainer = popupEl?.querySelector('.camera-frame-container');
@@ -270,10 +216,6 @@ const PopupCoreMixin = {
         frameContainer.classList.remove('loading');
         frameContainer.classList.add('error');
       }
-    } else {
-      // Regular device camera - load frame
-      await this.loadFrame(deviceId);
-      await this.setupRefreshInterval(deviceId);
     }
 
     // Load and render clickable zones
@@ -307,9 +249,7 @@ const PopupCoreMixin = {
     if (!popupEl) return;
 
     const closeBtn = popupEl.querySelector('.close-btn');
-    const settingsBtn = popupEl.querySelector('.settings-btn');
     const recordBtn = popupEl.querySelector('.record-btn');
-    const mjpegBtn = popupEl.querySelector('.mjpeg-btn');
     const aiBtn = popupEl.querySelector('.ai-btn');
     const audioBtn = popupEl.querySelector('.audio-btn');
     const drawZoneBtn = popupEl.querySelector('.draw-zone-btn');
@@ -321,9 +261,7 @@ const PopupCoreMixin = {
     const reportBtn = popupEl.querySelector('.report-btn');
     if (reportBtn) reportBtn.onclick = () => ReportSystem.showReportDialog('camera', deviceId);
     if (protocolToggleBtn) protocolToggleBtn.onclick = () => this.toggleStreamProtocol(deviceId);
-    if (settingsBtn) settingsBtn.onclick = () => this.openSettings(deviceId);
     if (recordBtn) recordBtn.onclick = () => this.toggleRecording(deviceId);
-    if (mjpegBtn) mjpegBtn.onclick = () => this.toggleMjpeg(deviceId);
     if (aiBtn) aiBtn.onclick = () => this.stopAIFromTitle(deviceId);
     if (drawZoneBtn) drawZoneBtn.onclick = () => this.toggleDrawMode(deviceId);
     if (toggleZonesBtn) toggleZonesBtn.onclick = () => this.toggleZonesVisibility(deviceId);
@@ -414,9 +352,6 @@ const PopupCoreMixin = {
     // Initialize AI search mode
     popupData.aiSearchMode = false;
 
-    // Initialize MJPEG button state
-    this.updateMjpegButtonState(deviceId);
-
     // WHEP kameralar için kayıt butonu durumunu senkronize et
     if (recordBtn) {
       const camera = this.cameras.find(c => c.device_id === deviceId);
@@ -435,10 +370,6 @@ const PopupCoreMixin = {
       }
     }
   },
-
-  /**
-   * Update MJPEG button state based on settings
-   */
 
   async closeCameraPopup(deviceId) {
     const popupData = this.popups.get(deviceId);
@@ -462,9 +393,7 @@ const PopupCoreMixin = {
 
       // Cleanup onclick/ondblclick handlers to prevent memory leaks
       const closeBtn = popupEl.querySelector('.close-btn');
-      const settingsBtn = popupEl.querySelector('.settings-btn');
       const recordBtn = popupEl.querySelector('.record-btn');
-      const mjpegBtn = popupEl.querySelector('.mjpeg-btn');
       const aiBtn = popupEl.querySelector('.ai-btn');
       const audioBtn = popupEl.querySelector('.audio-btn');
       const drawZoneBtn = popupEl.querySelector('.draw-zone-btn');
@@ -479,9 +408,7 @@ const PopupCoreMixin = {
       const reportBtn = popupEl.querySelector('.report-btn');
       if (reportBtn) reportBtn.onclick = null;
       if (closeBtn) closeBtn.onclick = null;
-      if (settingsBtn) settingsBtn.onclick = null;
       if (recordBtn) recordBtn.onclick = null;
-      if (mjpegBtn) mjpegBtn.onclick = null;
       if (aiBtn) aiBtn.onclick = null;
       if (audioBtn) audioBtn.onclick = null;
       if (drawZoneBtn) drawZoneBtn.onclick = null;
@@ -564,16 +491,8 @@ const PopupCoreMixin = {
       popupData.whepWatchdog = null;
     }
 
-    // Note: AI monitoring continues globally even when popup is closed
-    // Interval keeps running for WHEP cameras (capture service)
-    // For device cameras, interval will pause until popup reopens (needs video element)
-
-    // Stop recording if this popup was recording (only for device cameras, not WHEP)
-    // WHEP cameras use server-side recording that continues independently
-    const camera = this.cameras.find(c => c.device_id === deviceId);
-    if (this.isRecording && this.recordingDeviceId === deviceId && camera?.camera_type !== 'whep') {
-      this.stopRecording();
-    }
+    // Note: AI monitoring continues globally even when popup is closed.
+    // WHEP cameras use server-side recording that continues independently.
 
     // Remove from map
     this.popups.delete(deviceId);

@@ -201,7 +201,7 @@ const CameraActionsMixin = {
       <span>Haritada konumu seçmek için tıklayın</span>
       <button class="cancel-pick-btn">İptal</button>
     `;
-    instruction.querySelector('.cancel-pick-btn').addEventListener('click', () => MyCamerasSystem.cancelLocationPick());
+    instruction.querySelector('.cancel-pick-btn').addEventListener('click', () => this.cancelLocationPick());
     document.body.appendChild(instruction);
 
     // Add map click handler with high priority
@@ -321,9 +321,9 @@ const CameraActionsMixin = {
         <div id="delete-error" class="claim-error"></div>
       </div>
     `;
-    modal.querySelector('.modal-overlay').addEventListener('click', () => MyCamerasSystem.closeDeleteModal());
-    modal.querySelector('.delete-cancel-btn').addEventListener('click', () => MyCamerasSystem.closeDeleteModal());
-    modal.querySelector('.delete-confirm-btn').addEventListener('click', () => MyCamerasSystem.deleteCamera(cameraId, isWhep));
+    modal.querySelector('.modal-overlay').addEventListener('click', () => this.closeDeleteModal());
+    modal.querySelector('.delete-cancel-btn').addEventListener('click', () => this.closeDeleteModal());
+    modal.querySelector('.delete-confirm-btn').addEventListener('click', () => this.deleteCamera(cameraId, isWhep));
     document.body.appendChild(modal);
   },
 

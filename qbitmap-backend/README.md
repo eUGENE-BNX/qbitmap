@@ -1,12 +1,15 @@
 # QBitmap Backend Server
 
-ESP32-CAM streaming backend for QBitmap map application.
+Streaming and map backend for the QBitmap application. Handles user-owned
+WHEP/RTSP/RTMP cameras, public city (HLS) cameras, face detection/alarm flow,
+voice-call bridge, and video/photo messaging.
 
 ## Architecture
 
 - **Framework**: Fastify (high-performance Node.js web framework)
 - **Database**: MySQL 8 via `mysql2/promise` connection pool
-- **Authentication**: Google OAuth + JWT (HttpOnly cookies) for users; HMAC-SHA256 for ESP32 devices
+- **Authentication**: Google OAuth + JWT (HttpOnly cookies) for users
+- **Streaming**: MediaMTX (RTSP/RTMP/WHEP/HLS) behind Caddy
 - **Deployment**: systemd service + Caddy reverse proxy with auto-HTTPS
 
 ## API Endpoints
@@ -16,100 +19,27 @@ ESP32-CAM streaming backend for QBitmap map application.
 GET https://stream.qbitmap.com/health
 ```
 
-### Device Registration
-```bash
-POST https://stream.qbitmap.com/api/devices
-Headers:
-  X-Device-ID: {device_id}
-  X-Device-Token: {hmac_sha256(device_id, "chihuahua7")}
+### Public Cameras
+- `GET /api/public/cameras` — paginated public cameras (supports bbox filter)
+- `GET /api/public/city-cameras` — all city (HLS) cameras
 
-Response:
-{
-  "status": "registered",
-  "camera_id": 1,
-  "device_id": "0c9ad0f1ec44",
-  "message": "Device registered successfully"
-}
-```
-
-### Frame Upload (with Settings Sync)
-```bash
-POST https://stream.qbitmap.com/api/devices/{device_id}/frame
-Headers:
-  X-Device-ID: {device_id}
-  X-Device-Token: {hmac_token}
-  X-Config-Version: {current_version}
-  Content-Type: image/jpeg
-Body: JPEG binary data
-
-Response (settings update needed):
-{
-  "status": "ok",
-  "frame_id": 123,
-  "settings": {
-    "resolution": "UXGA",
-    "quality": 12,
-    "fps": 1.0
-  },
-  "config_version": 2
-}
-
-Response (no settings update):
-{
-  "status": "ok",
-  "frame_id": 124
-}
-```
-
-### Get Camera Info
-```bash
-GET https://stream.qbitmap.com/api/devices/{device_id}
-Headers:
-  X-Device-ID: {device_id}
-  X-Device-Token: {hmac_token}
-
-Response:
-{
-  "camera": {
-    "id": 1,
-    "device_id": "0c9ad0f1ec44",
-    "name": "My Camera",
-    "location": null,
-    "is_public": false,
-    "stream_mode": "snapshot",
-    "last_seen": "2025-11-24 08:10:43",
-    "created_at": "2025-11-24 08:10:43"
-  },
-  "settings": {
-    "config_version": 1,
-    "settings": {...},
-    "updated_at": "2025-11-24 08:32:20"
-  },
-  "frame_count": 150
-}
-```
-
-## Settings Sync - "Piggyback" Method
-
-Settings are synced via frame upload responses to eliminate polling overhead:
-
-1. ESP32 uploads frame with `X-Config-Version: 5`
-2. Backend checks if newer settings exist
-3. If yes: Response includes settings + `X-Config-Version: 7` header
-4. If no: Response is minimal with just frame_id
-
-This reduces HTTP requests by ~50% compared to separate polling.
+### User Cameras (JWT auth)
+- `GET /api/users/me/cameras` — current user's cameras
+- `POST /api/users/me/cameras/whep` — create WHEP camera
+- `POST /api/users/me/cameras/rtsp` — create RTSP camera (with MediaMTX + ONVIF)
+- `POST /api/users/me/cameras/rtmp` — create RTMP camera (GoPro/OBS)
+- `GET /api/users/me/cameras/:cameraId` — single camera details
+- `DELETE /api/users/me/cameras/:cameraId` — release camera
 
 ## Database Schema
 
 ### Tables
 - **users**: Google OAuth user accounts
-- **cameras**: Device registry with location, visibility, stream mode
-- **camera_settings**: JSON settings with versioning
-- **frames**: JPEG frames (last 1500 per camera)
-
-### Cleanup Job
-Runs every 6 hours via node-cron to keep last 1500 frames per camera.
+- **cameras**: Camera registry (WHEP/CITY/RTSP/RTMP) with location, visibility
+- **camera_settings**: JSON settings (AI monitoring config for city cameras)
+- **live_broadcasts**: Active user broadcasts
+- **alarms**, **face_detection_log**, **camera_faces**, **ai_monitoring**
+- **user_plans**, **user_usage**, **user_plan_overrides**
 
 ## Service Management
 
@@ -146,7 +76,6 @@ systemctl status qbitmap-backend
 │   │   ├── db/                # Per-domain SQL modules (users, cameras, …)
 │   │   └── cleanup.js         # Retention + MediaMTX reconciliation
 │   └── utils/
-│       ├── auth.js            # HMAC validation for device tokens
 │       └── jwt.js             # JWT + authHook for user sessions
 ```
 
@@ -167,53 +96,8 @@ npm run dev
 npm start
 ```
 
-## Testing
-
-### Generate Device Token
-```bash
-node test-device.js
-```
-
-### Test Registration
-```bash
-curl -X POST https://stream.qbitmap.com/api/devices \
-  -H "X-Device-ID: 0c9ad0f1ec44" \
-  -H "X-Device-Token: 807a799728ce2548245bf54a91204e59bc7085798bd49d5cedfa26e2603b1c7d"
-```
-
-### Test Frame Upload
-```bash
-curl -X POST https://stream.qbitmap.com/api/devices/0c9ad0f1ec44/frame \
-  -H "X-Device-ID: 0c9ad0f1ec44" \
-  -H "X-Device-Token: 807a799728ce2548245bf54a91204e59bc7085798bd49d5cedfa26e2603b1c7d" \
-  -H "X-Config-Version: 0" \
-  -H "Content-Type: image/jpeg" \
-  --data-binary "@/path/to/test.jpg"
-```
-
-## Performance
-
-- **Request throughput**: ~76,000 req/sec (Fastify)
-- **Frame storage**: Last 1500 frames per camera
-- **Cleanup frequency**: Every 6 hours
-- **Settings sync overhead**: Zero (piggyback method)
-
-## Next Steps
-
-1. ✅ Backend API with device endpoints
-2. ✅ Settings sync via frame upload
-3. ✅ Frame cleanup cron job
-4. ✅ systemd service
-5. ✅ Caddy reverse proxy with HTTPS
-6. 🔲 Google OAuth integration
-7. 🔲 Frontend camera management UI
-8. 🔲 ESP32 firmware updates
-
 ## Notes
 
-- HMAC shared secret: loaded from env `DEVICE_SHARED_SECRET` (set via
-  `/etc/qbitmap/secrets.env`, must match firmware build). Do NOT commit or
-  document literal values.
 - Default port: 3000 (proxied via Caddy)
 - Database: MySQL 8 on `localhost:3306`, DB name `qbitmap` (per `/etc/qbitmap/secrets.env`)
 - Service name: `qbitmap-backend.service`

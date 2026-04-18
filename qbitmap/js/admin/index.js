@@ -135,7 +135,6 @@ const AdminPanel = {
       document.getElementById('stat-users').textContent = stats.total_users;
       document.getElementById('stat-active').textContent = stats.active_users;
       document.getElementById('stat-cameras').textContent = stats.total_cameras;
-      document.getElementById('stat-online').textContent = stats.online_cameras;
       document.getElementById('stat-ai').textContent = stats.today_ai_queries;
       document.getElementById('stat-videos').textContent = stats.total_videos;
       document.getElementById('stat-photos').textContent = stats.total_photos;

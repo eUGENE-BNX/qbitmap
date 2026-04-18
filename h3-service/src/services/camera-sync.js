@@ -16,7 +16,7 @@ async function upsertCamera(camera) {
        h3_res14 = h3_latlng_to_cell(POINT(EXCLUDED.lng, EXCLUDED.lat), 14),
        synced_at = NOW()`,
     [camera.qbitmap_id, camera.device_id, camera.lat, camera.lng,
-     camera.name, camera.camera_type || 'device', camera.is_public || false]
+     camera.name, camera.camera_type || 'whep', camera.is_public || false]
   );
 
   await pool.query('SELECT refresh_h3_counts()');
@@ -43,7 +43,7 @@ async function fullSync(cameras) {
            h3_res14 = h3_latlng_to_cell(POINT(EXCLUDED.lng, EXCLUDED.lat), 14),
            synced_at = NOW()`,
         [cam.id || cam.qbitmap_id, cam.device_id, cam.lat, cam.lng,
-         cam.name, cam.camera_type || 'device', !!cam.is_public]
+         cam.name, cam.camera_type || 'whep', !!cam.is_public]
       );
     }
 

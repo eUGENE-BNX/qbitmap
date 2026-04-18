@@ -1,6 +1,5 @@
 const db = require('../services/database');
 const { authHook } = require('../utils/jwt');
-const frameCache = require('../services/frame-cache');
 const mediamtx = require('../services/mediamtx');
 const { validateBody, addRtspCameraSchema, safePath, parseId } = require('../utils/validation');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
@@ -58,7 +57,6 @@ async function userRoutes(fastify, options) {
       return {
         owned: {
           total: owned.total,
-          device: owned.device_count,
           whep: owned.whep_count
         },
         sharedWithMe
@@ -134,10 +132,9 @@ async function userRoutes(fastify, options) {
       return reply.code(404).send({ error: 'User not found' });
     }
 
-    // Get current counts - single query instead of 3 separate queries
+    // Get current counts
     const cameraCounts = await db.getUserCameraTypeCounts(request.user.userId);
     const cameraCount = cameraCounts.total;
-    const deviceCameraCount = cameraCounts.device_count;
     const whepCameraCount = cameraCounts.whep_count;
 
     return {
@@ -149,11 +146,6 @@ async function userRoutes(fastify, options) {
           unlimited: limits.ai_daily_limit === -1
         },
         cameras: {
-          device: {
-            used: deviceCameraCount,
-            limit: limits.max_cameras,
-            unlimited: limits.max_cameras === -1
-          },
           whep: {
             used: whepCameraCount,
             limit: limits.max_whep_cameras,
@@ -175,41 +167,7 @@ async function userRoutes(fastify, options) {
   // Get current user's cameras
   fastify.get('/me/cameras', async (request, reply) => {
     const cameras = await db.getUserCameras(request.user.userId);
-
-    // Add latest frame info for each camera
-    const camerasWithFrames = cameras.map(camera => {
-      const cachedFrame = frameCache.get(camera.id);
-      return {
-        ...camera,
-        hasRecentFrame: !!cachedFrame,
-        lastFrameAt: cachedFrame ? cachedFrame.capturedAt.toISOString() : null
-      };
-    });
-
-    return { cameras: camerasWithFrames };
-  });
-
-  // Claim a camera (device type)
-  fastify.post('/me/cameras/claim', async (request, reply) => {
-    const { device_id } = request.body;
-
-    if (!device_id) {
-      return reply.code(400).send({ error: 'device_id is required' });
-    }
-
-    const result = await db.claimCamera(request.user.userId, device_id);
-
-    if (!result.success) {
-      return reply.code(400).send({ error: result.error });
-    }
-
-    logger.info({ user: request.user.email, deviceId: device_id }, 'Camera claimed');
-
-    return {
-      status: 'ok',
-      message: 'Camera claimed successfully',
-      camera: result.camera
-    };
+    return { cameras };
   });
 
   // Create a WHEP camera (WebRTC stream)
@@ -591,8 +549,6 @@ async function userRoutes(fastify, options) {
     }
 
     const camera = await db.getCameraById(cameraId);
-    const settings = await db.getCameraSettings(cameraId);
-    const cachedFrame = frameCache.get(cameraId);
 
     return {
       camera: {
@@ -602,18 +558,7 @@ async function userRoutes(fastify, options) {
         lng: camera.lng,
         lat: camera.lat,
         is_public: !!camera.is_public,
-        stream_mode: camera.stream_mode,
-        last_seen: camera.last_seen,
         created_at: camera.created_at
-      },
-      settings: settings ? {
-        config_version: settings.config_version,
-        settings: JSON.parse(settings.settings_json),
-        updated_at: settings.updated_at
-      } : null,
-      stats: {
-        has_cached_frame: !!cachedFrame,
-        last_frame_at: cachedFrame ? cachedFrame.capturedAt.toISOString() : null
       }
     };
   });
@@ -716,17 +661,7 @@ async function userRoutes(fastify, options) {
     const cameras = await db.getSharedCameras(userId);
     fastify.log.info({ userId, count: cameras.length }, '[SharedCameras] Found cameras');
 
-    // Add latest frame info for each camera
-    const camerasWithFrames = cameras.map(camera => {
-      const cachedFrame = frameCache.get(camera.id);
-      return {
-        ...camera,
-        hasRecentFrame: !!cachedFrame,
-        lastFrameAt: cachedFrame ? cachedFrame.capturedAt.toISOString() : null
-      };
-    });
-
-    return { cameras: camerasWithFrames };
+    return { cameras };
   });
 
   // ==================== DELETE CAMERA (with cleanup) ====================

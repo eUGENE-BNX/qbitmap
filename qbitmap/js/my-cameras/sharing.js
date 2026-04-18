@@ -47,9 +47,9 @@ const SharingMixin = {
         </div>
       </div>
     `;
-    modal.querySelector('.modal-overlay').addEventListener('click', () => MyCamerasSystem.closeShareModal());
-    modal.querySelector('.share-submit-btn').addEventListener('click', () => MyCamerasSystem.shareCamera());
-    modal.querySelector('.share-close-btn').addEventListener('click', () => MyCamerasSystem.closeShareModal());
+    modal.querySelector('.modal-overlay').addEventListener('click', () => this.closeShareModal());
+    modal.querySelector('.share-submit-btn').addEventListener('click', () => this.shareCamera());
+    modal.querySelector('.share-close-btn').addEventListener('click', () => this.closeShareModal());
     document.body.appendChild(modal);
 
     // Focus email input
@@ -106,7 +106,7 @@ const SharingMixin = {
       `).join('');
 
       sharesList.querySelectorAll('.remove-share-btn').forEach(btn => {
-        btn.addEventListener('click', () => MyCamerasSystem.removeShare(Number(btn.dataset.shareId)));
+        btn.addEventListener('click', () => this.removeShare(Number(btn.dataset.shareId)));
       });
 
     } catch (error) {

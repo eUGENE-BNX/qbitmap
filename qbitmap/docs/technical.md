@@ -133,7 +133,6 @@ Bu doküman, QBitmap platformu ve tüm yan servislerinin teknik yeteneklerini, e
 **Yönetim:** systemd (qbitmap-backend.service)
 
 ### 2.1 Kamera CRUD ve Yönetim
-- **Cihaz kamerası** oluşturma (ESP32 vb.)
 - **WHEP kamera** oluşturma (WebRTC, özellik limiti kontrolü)
 - **RTSP kamera** oluşturma — MediaMTX'e path ekleme + ONVIF servisine kayıt (transactional rollback)
 - **RTMP kamera** oluşturma (GoPro/OBS)

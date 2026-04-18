@@ -3,33 +3,6 @@ import { Logger, escapeHtml } from "../../utils.js";
 import { AuthSystem } from "../../auth.js";
 
 const SearchFaceMixin = {
-  async updateMjpegButtonState(deviceId) {
-    const popupData = this.popups.get(deviceId);
-    if (!popupData) return;
-
-    const popupEl = popupData.popup.getElement();
-    const mjpegBtn = popupEl?.querySelector('.mjpeg-btn');
-    if (!mjpegBtn) return;
-
-    try {
-      const response = await fetch(`${this.apiSettings}/${deviceId}`);
-      if (response.ok) {
-        const data = await response.json();
-        const mjpegEnabled = data.settings?.mjpeg_enabled || false;
-
-        if (mjpegEnabled) {
-          mjpegBtn.classList.add('active');
-          mjpegBtn.title = 'MJPEG Stream (Açık)';
-        } else {
-          mjpegBtn.classList.remove('active');
-          mjpegBtn.title = 'MJPEG Stream (Kapalı)';
-        }
-      }
-    } catch (e) {
-      Logger.warn('[Cameras] Could not get MJPEG state');
-    }
-  },
-
   /**
    * Toggle zoom: 320x180 <-> 640x360 (via double-click on video)
    */

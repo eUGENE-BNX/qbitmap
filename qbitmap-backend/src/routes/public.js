@@ -1,13 +1,19 @@
 const crypto = require('crypto');
 const db = require('../services/database');
-const frameCache = require('../services/frame-cache');
-const streamCache = require('../services/stream-cache');
 const { authHook, optionalAuthHook } = require('../utils/jwt');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const { safeProxyFetch, SafeProxyError } = require('../utils/safe-proxy-fetch');
-const { validateBody, cameraSettingsSchema } = require('../utils/validation');
+const { validateBody } = require('../utils/validation');
+const { z } = require('zod');
 const logger = require('../utils/logger').child({ module: 'public' });
 const { services } = require('../config');
+
+// Generic camera settings schema — stores WHEP/City AI monitoring config.
+// Size-capped (50KB) passthrough to allow future keys without bumping validation.
+const cameraSettingsSchema = z.object({}).passthrough().refine(
+  (data) => JSON.stringify(data).length < 50000,
+  { message: 'Settings too large' }
+);
 
 // Allowed WHEP server hosts (prevent SSRF attacks)
 const ALLOWED_WHEP_HOSTS = [...services.allowedWhepHosts];
@@ -265,114 +271,12 @@ async function publicRoutes(fastify, options) {
     }
   });
 
-  // Get frame JPEG image (supports both DB frame ID and "cached")
-  // Note: Accessible to anyone who knows the device_id (for user's own cameras)
-  fastify.get('/frames/:frameId', { preHandler: optionalAuthHook }, async (request, reply) => {
-    const { frameId } = request.params;
-
-    try {
-      // Special handling for cached frames
-      if (frameId === 'cached') {
-        // Need device_id or camera_id to get cached frame
-        const deviceId = request.query.device_id;
-        if (!deviceId) {
-          return reply.code(400).send({ error: 'device_id required for cached frames' });
-        }
-
-        const camera = await db.getCameraByDeviceId(deviceId);
-        if (!camera) {
-          return reply.code(404).send({ error: 'Camera not found' });
-        }
-
-        // Security: Check ownership for private cameras
-        if (!camera.is_public) {
-          if (!request.user) {
-            return reply.code(401).send({ error: 'Authentication required for private camera' });
-          }
-          if (camera.user_id !== request.user.userId) {
-            return reply.code(403).send({ error: 'Not authorized to access this camera' });
-          }
-        }
-
-        const cachedFrame = frameCache.get(camera.id);
-        if (!cachedFrame) {
-          return reply.code(404).send({ error: 'No cached frame available' });
-        }
-
-        reply.type('image/jpeg');
-        
-        reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
-        reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-        reply.header('Pragma', 'no-cache');
-        reply.header('Expires', '0');
-        return cachedFrame.frameData;
-      }
-
-      // Historical frame lookup (DEPRECATED - frames no longer stored in DB)
-      // Use /frames/cached?device_id=XXX for live frames instead
-      return reply.code(410).send({
-        error: 'Historical frame storage has been deprecated',
-        hint: 'Use /frames/cached?device_id=XXX for live frames'
-      });
-    } catch (error) {
-      logger.error({ err: error, frameId }, 'Frame image error');
-      return reply.code(500).send({ error: 'Failed to retrieve frame image' });
-    }
-  });
-
-  // Get latest frame info for a camera (FAST - uses cache first)
-  fastify.get('/cameras/:deviceId/latest', { preHandler: optionalAuthHook }, async (request, reply) => {
-    const { deviceId } = request.params;
-
-    try {
-      const camera = await db.getCameraByDeviceId(deviceId);
-      if (!camera) {
-        return reply.code(404).send({ error: 'Camera not found' });
-      }
-
-      // Security: Check ownership for private cameras
-      if (!camera.is_public) {
-        if (!request.user) {
-          return reply.code(401).send({ error: 'Authentication required for private camera' });
-        }
-        if (camera.user_id !== request.user.userId) {
-          return reply.code(403).send({ error: 'Not authorized to access this camera' });
-        }
-      }
-
-      // Get frame from memory cache (frames are no longer stored in DB)
-      const cachedFrame = frameCache.get(camera.id);
-      if (!cachedFrame) {
-        return reply.code(404).send({ error: 'No live frame available (camera may be offline)' });
-      }
-
-      return {
-        camera: {
-          id: camera.id,
-          device_id: camera.device_id,
-          name: camera.name,
-          last_seen: camera.last_seen,
-          is_public: camera.is_public
-        },
-        frame: {
-          id: 'cached',
-          file_size: cachedFrame.size,
-          captured_at: cachedFrame.capturedAt.toISOString().replace('T', ' ').substring(0, 19) + 'Z',
-          source: 'cache'
-        }
-      };
-    } catch (error) {
-      logger.error({ err: error, deviceId }, 'Latest frame error');
-      return reply.code(500).send({ error: 'Failed to retrieve frame' });
-    }
-  });
-
-  // Get camera settings (filtered by ownership)
+  // Camera settings (AI monitoring config). Shared by WHEP (user) and City
+  // (admin) cameras; public consumers get a whitelisted subset only.
   const PUBLIC_SETTINGS_FIELDS = [
-    'capture_interval_ms',
     'ai_capture_interval_ms',
     'ai_detection_enabled',
-    'mjpeg_enabled'
+    'stream_resolution'
   ];
 
   fastify.get('/settings/:deviceId', { preHandler: optionalAuthHook }, async (request, reply) => {
@@ -387,11 +291,7 @@ async function publicRoutes(fastify, options) {
       const settings = await db.getCameraSettings(camera.id);
 
       if (!settings) {
-        return {
-          config_version: 0,
-          settings: {},
-          message: 'No settings configured yet'
-        };
+        return { config_version: 0, settings: {}, message: 'No settings configured yet' };
       }
 
       const isOwner = request.user?.userId && camera.user_id === request.user.userId;
@@ -413,7 +313,6 @@ async function publicRoutes(fastify, options) {
     }
   });
 
-  // Update camera settings - REQUIRES AUTHENTICATION AND OWNERSHIP
   fastify.put('/settings/:deviceId', {
     preHandler: [authHook, validateBody(cameraSettingsSchema)]
   }, async (request, reply) => {
@@ -425,127 +324,24 @@ async function publicRoutes(fastify, options) {
         return reply.code(404).send({ error: 'Camera not found' });
       }
 
-      // Security: Verify ownership
       if (camera.user_id !== request.user.userId) {
         logger.warn({ userId: request.user.userId, ownerId: camera.user_id, deviceId }, 'Unauthorized settings update attempt');
         return reply.code(403).send({ error: 'Not authorized to modify this camera' });
       }
 
       const newSettings = request.body;
-
-      const settingsJson = JSON.stringify(newSettings);
-      const newVersion = await db.updateCameraSettings(camera.id, settingsJson);
+      const newVersion = await db.updateCameraSettings(camera.id, JSON.stringify(newSettings));
 
       logger.info({ cameraId: camera.id, configVersion: newVersion }, 'Settings updated');
 
       return {
         status: 'ok',
         config_version: newVersion,
-        settings: newSettings,
-        message: 'Settings updated successfully. Device will sync on next frame upload.'
+        settings: newSettings
       };
     } catch (error) {
       logger.error({ err: error, deviceId }, 'Update settings error');
       return reply.code(500).send({ error: 'Failed to update settings' });
-    }
-  });
-
-  // MJPEG live stream endpoint
-  // Security: Only accessible to camera owner, shared users, or if camera is public
-  fastify.get('/stream/:deviceId', { preHandler: optionalAuthHook }, async (request, reply) => {
-    const { deviceId } = request.params;
-
-    try {
-      const camera = await db.getCameraByDeviceId(deviceId);
-      if (!camera) {
-        return reply.code(404).send({ error: 'Camera not found' });
-      }
-
-      // Security check: public cameras are open, private cameras require auth
-      if (!camera.is_public) {
-        const userId = request.user?.userId;
-        if (!userId) {
-          return reply.code(401).send({ error: 'Authentication required for private camera' });
-        }
-
-        const access = await db.hasAccessToCamera(userId, deviceId);
-        if (!access.hasAccess) {
-          return reply.code(403).send({ error: 'Not authorized to view this camera' });
-        }
-      }
-
-      // Check if camera has active stream
-      if (!streamCache.hasActiveStream(camera.id)) {
-        return reply.code(503).send({
-          error: 'No active stream',
-          message: 'Camera is not streaming. Enable MJPEG in camera settings.'
-        });
-      }
-
-      logger.info({ deviceId }, 'Stream client connected');
-
-      // Set MJPEG headers
-      reply.raw.writeHead(200, {
-        'Content-Type': 'multipart/x-mixed-replace; boundary=frame',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Connection': 'keep-alive',
-      });
-
-      // Register client for frame updates
-      streamCache.addClient(camera.id, reply);
-
-      // Send initial frame if available
-      const initialFrame = streamCache.get(camera.id);
-      if (initialFrame) {
-        reply.raw.write('--frame\r\n');
-        reply.raw.write(`Content-Type: image/jpeg\r\nContent-Length: ${initialFrame.size}\r\n\r\n`);
-        reply.raw.write(initialFrame.buffer);
-        reply.raw.write('\r\n');
-      }
-
-      // Handle client disconnect
-      request.raw.on('close', () => {
-        logger.info({ deviceId }, 'Stream client disconnected');
-        streamCache.removeClient(camera.id, reply);
-      });
-
-      // Keep connection open - don't return, let streamCache push frames
-      return reply;
-
-    } catch (error) {
-      logger.error({ err: error, deviceId }, 'Stream error');
-      return reply.code(500).send({ error: 'Stream failed' });
-    }
-  });
-
-  // Stream status endpoint
-  fastify.get('/stream/:deviceId/status', async (request, reply) => {
-    const { deviceId } = request.params;
-
-    try {
-      const camera = await db.getCameraByDeviceId(deviceId);
-      if (!camera) {
-        return reply.code(404).send({ error: 'Camera not found' });
-      }
-
-      const hasStream = streamCache.hasActiveStream(camera.id);
-      const clientCount = streamCache.getClientCount(camera.id);
-      const latestFrame = streamCache.get(camera.id);
-
-      return {
-        device_id: deviceId,
-        camera_id: camera.id,
-        streaming: hasStream,
-        clients: clientCount,
-        last_frame: latestFrame ? {
-          size: latestFrame.size,
-          timestamp: latestFrame.timestamp.toISOString()
-        } : null
-      };
-    } catch (error) {
-      logger.error({ err: error, deviceId }, 'Stream status error');
-      return reply.code(500).send({ error: 'Failed to get stream status' });
     }
   });
 
@@ -892,9 +688,9 @@ async function publicRoutes(fastify, options) {
   // Rate-limit caps brute-force attempts on X-Service-Key. Real consumer
   // (h3-service full-sync) runs on the order of once per day; 10/min is far
   // above normal usage. timingSafeEqual + length guard prevents
-  // character-by-character secret recovery via response-time side channel;
-  // same pattern as utils/auth.js:42. Long-term: move to HMAC(body, key) +
-  // timestamp to defeat replay if the key leaks via logs/proxy caches.
+  // character-by-character secret recovery via response-time side channel.
+  // Long-term: move to HMAC(body, key) + timestamp to defeat replay if the
+  // key leaks via logs/proxy caches.
   fastify.get('/all-camera-coordinates', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
   }, async (request, reply) => {

@@ -34,9 +34,8 @@ module.exports = {
       ? ['https://qbitmap.com', 'https://stream.qbitmap.com']
       : ['http://localhost:3000', 'http://localhost:8080', 'http://127.0.0.1:3000'],
     credentials: true,
-    exposedHeaders: ['X-Config-Version'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Device-ID', 'X-Device-Token', 'X-Config-Version']
+    allowedHeaders: ['Content-Type', 'Authorization']
   },
   oauth: {
     google: {
@@ -50,9 +49,6 @@ module.exports = {
   jwt: {
     secret: requireEnv('JWT_SECRET'),
     expiresIn: '7d'
-  },
-  auth: {
-    sharedSecret: requireEnv('DEVICE_SHARED_SECRET')
   },
   frontend: {
     url: process.env.FRONTEND_URL || (isProduction ? 'https://qbitmap.com' : 'http://localhost:8080')

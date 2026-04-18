@@ -348,7 +348,7 @@ const CameraSystem = {
             name: camera.name || camera.device_id,
             state: existingFeature?.properties?.state || initialState,
             isShared: !!camera.isShared,
-            camera_type: camera.camera_type || 'device'
+            camera_type: camera.camera_type || 'whep'
           }
         };
       })

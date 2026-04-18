@@ -8,7 +8,6 @@ const DashboardMixin = {
       { key: 'all', label: 'Tümü' },
       { key: 'rtsp', label: 'RTSP' },
       { key: 'rtmp', label: 'RTMP' },
-      { key: 'device', label: 'Device' },
       { key: 'city', label: 'City' }
     ];
 
@@ -341,7 +340,7 @@ const DashboardMixin = {
 
     content.innerHTML = html;
 
-    content.querySelector('.add-camera-btn')?.addEventListener('click', () => MyCamerasSystem.showClaimModal());
+    content.querySelector('.add-camera-btn')?.addEventListener('click', () => this.showClaimModal());
 
     // Load voice call states after rendering
     setTimeout(() => this.loadVoiceCallStates(), 100);

@@ -71,9 +71,7 @@ CREATE TABLE IF NOT EXISTS cameras (
   lng DOUBLE,
   lat DOUBLE,
   is_public TINYINT(1) DEFAULT 0,
-  stream_mode VARCHAR(50) DEFAULT 'snapshot',
-  last_seen DATETIME,
-  camera_type VARCHAR(50) DEFAULT 'device',
+  camera_type VARCHAR(50) DEFAULT 'whep',
   whep_url TEXT,
   voice_call_enabled TINYINT(1) DEFAULT 0,
   audio_muted TINYINT(1) DEFAULT 0,
@@ -86,12 +84,10 @@ CREATE TABLE IF NOT EXISTS cameras (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_cameras_user (user_id),
   INDEX idx_cameras_public (is_public),
-  INDEX idx_cameras_user_lastseen (user_id, last_seen DESC),
   INDEX idx_cameras_mediamtx_path (mediamtx_path),
   INDEX idx_cameras_onvif_camera_id (onvif_camera_id),
   INDEX idx_cameras_user_public (user_id, is_public),
   INDEX idx_cameras_user_type (user_id, camera_type),
-  INDEX idx_cameras_last_seen (last_seen),
   INDEX idx_cameras_public_geo (is_public, camera_type, lng, lat),
   CONSTRAINT fk_cameras_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

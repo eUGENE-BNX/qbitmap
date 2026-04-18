@@ -7,7 +7,7 @@ const db = require('../services/database');
 
 /**
  * Create a limit check middleware for a specific feature
- * @param {string} feature - Feature to check (cameras, whep_cameras, ai_analysis, etc.)
+ * @param {string} feature - Feature to check (whep_cameras, ai_analysis, etc.)
  * @returns {Function} Fastify preHandler
  */
 function checkFeatureLimit(feature) {

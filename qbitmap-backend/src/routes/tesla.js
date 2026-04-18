@@ -489,7 +489,7 @@ async function teslaApiRoutes(fastify) {
 async function teslaTelemetryRoutes(fastify) {
 
   fastify.post('/telemetry-event', async (request, reply) => {
-    // [SEC-06] Constant-time comparison — mirrors utils/auth.js:42 pattern.
+    // [SEC-06] Constant-time comparison.
     // A plain `!==` leaks the matching prefix length through response
     // timing, letting an attacker iteratively recover the shared secret.
     // Buffer.from(... || '') handles a missing header without throwing, and

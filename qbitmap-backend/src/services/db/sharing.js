@@ -105,7 +105,7 @@ DatabaseService.prototype.removeCameraShare = async function(shareId, ownerUserI
 
 DatabaseService.prototype.getSharedCameras = async function(userId) {
   const [rows] = await this.pool.execute(`
-    SELECT c.id, c.device_id, c.name, c.lng, c.lat, c.stream_mode, c.last_seen,
+    SELECT c.id, c.device_id, c.name, c.lng, c.lat,
            c.camera_type, c.whep_url, cs.permission, cs.created_at as shared_at,
            owner.email as owner_email, owner.display_name as owner_name
     FROM camera_shares cs

@@ -120,10 +120,10 @@ DatabaseService.prototype.getUsersWithVisibleLocation = async function() {
 
 DatabaseService.prototype.getUserCameras = async function(userId) {
   const [rows] = await this.pool.execute(`
-    SELECT id, device_id, name, lng, lat, is_public, stream_mode, last_seen, created_at, camera_type, whep_url, mediamtx_path, onvif_camera_id, audio_muted
+    SELECT id, device_id, name, lng, lat, is_public, created_at, camera_type, whep_url, mediamtx_path, onvif_camera_id, audio_muted
     FROM cameras
     WHERE user_id = ?
-    ORDER BY last_seen DESC
+    ORDER BY created_at DESC
   `, [userId]);
   return rows;
 };

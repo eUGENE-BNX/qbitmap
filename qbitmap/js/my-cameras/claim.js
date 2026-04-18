@@ -20,7 +20,6 @@ const ClaimMixin = {
           <select id="claim-camera-type" aria-describedby="camera-type-desc">
             <option value="rtsp">IP Kamera (RTSP)</option>
             <option value="rtmp">RTMP Kamera (GoPro, OBS)</option>
-            <option value="device">ESP32-CAM (Device ID)</option>
             <option value="city" id="city-camera-option" style="display: none;">Şehir Kamerası (HLS)</option>
           </select>
           <span id="camera-type-desc" class="sr-only">Eklemek istediğiniz kamera tipini seçin</span>
@@ -77,16 +76,6 @@ const ClaimMixin = {
               <small id="port-hint" style="color: #666; margin-left: 8px;">Tapo: 2020 | Diğer: 80, 8080</small>
             </div>
           </div>
-        </div>
-
-        <!-- Device ID Section (ESP32-CAM) -->
-        <div id="device-id-section" style="display: none;" role="group" aria-labelledby="device-section-label">
-          <span id="device-section-label" class="sr-only">ESP32-CAM Cihaz Ayarları</span>
-          <p class="modal-desc">ESP32-CAM cihazınızın Device ID'sini girin. Bu ID, kamera ilk bağlandığında serial monitörde görünür.</p>
-          <label for="claim-device-id" class="sr-only">Device ID</label>
-          <input type="text" id="claim-device-id" placeholder="Örn: 78EC2CEBD724" autocomplete="off" maxlength="20" pattern="[A-Za-z0-9]+" aria-describedby="device-id-hint device-id-error">
-          <small id="device-id-hint" style="color: #666; display: block; margin-top: 4px;">12 haneli hexadecimal kod (örn: 78EC2CEBD724)</small>
-          <span id="device-id-error" class="field-error" style="display: none; color: #f44336; font-size: 12px;" role="alert"></span>
         </div>
 
         <!-- RTMP Camera Section (GoPro, OBS, etc.) -->
@@ -180,12 +169,12 @@ const ClaimMixin = {
     document.body.appendChild(modal);
 
     // Bind event handlers
-    modal.querySelector('.modal-overlay').addEventListener('click', () => MyCamerasSystem.closeClaimModal());
-    modal.querySelector('.claim-cancel-btn').addEventListener('click', () => MyCamerasSystem.closeClaimModal());
-    document.getElementById('claim-submit-btn').addEventListener('click', () => MyCamerasSystem.claimCamera());
-    document.getElementById('claim-camera-type').addEventListener('change', () => MyCamerasSystem.toggleCameraTypeInputs());
-    document.getElementById('rtsp-enable-onvif').addEventListener('change', () => MyCamerasSystem.toggleOnvifOptions());
-    document.getElementById('rtsp-onvif-profile').addEventListener('change', () => MyCamerasSystem.onProfileChange());
+    modal.querySelector('.modal-overlay').addEventListener('click', () => this.closeClaimModal());
+    modal.querySelector('.claim-cancel-btn').addEventListener('click', () => this.closeClaimModal());
+    document.getElementById('claim-submit-btn').addEventListener('click', () => this.claimCamera());
+    document.getElementById('claim-camera-type').addEventListener('change', () => this.toggleCameraTypeInputs());
+    document.getElementById('rtsp-enable-onvif').addEventListener('change', () => this.toggleOnvifOptions());
+    document.getElementById('rtsp-onvif-profile').addEventListener('change', () => this.onProfileChange());
 
     // Add RTSP URL parser listener
     document.getElementById('rtsp-url').addEventListener('input', (e) => {
@@ -330,13 +319,11 @@ const ClaimMixin = {
    */
   toggleCameraTypeInputs() {
     const cameraType = document.getElementById('claim-camera-type').value;
-    const deviceSection = document.getElementById('device-id-section');
     const rtspSection = document.getElementById('rtsp-section');
     const rtmpSection = document.getElementById('rtmp-section');
     const citySection = document.getElementById('city-section');
 
     // Hide all sections first
-    deviceSection.style.display = 'none';
     rtspSection.style.display = 'none';
     rtmpSection.style.display = 'none';
     citySection.style.display = 'none';
@@ -350,9 +337,6 @@ const ClaimMixin = {
     } else if (cameraType === 'city') {
       citySection.style.display = 'block';
       document.getElementById('city-camera-name').focus();
-    } else {
-      deviceSection.style.display = 'block';
-      document.getElementById('claim-device-id').focus();
     }
   },
 
@@ -421,9 +405,9 @@ const ClaimMixin = {
         </div>
       </div>
     `;
-    modal.querySelector('.modal-overlay').addEventListener('click', () => MyCamerasSystem.closeRtmpUrlModal());
-    modal.querySelector('.rtmp-copy-btn').addEventListener('click', () => MyCamerasSystem.copyRtmpUrl());
-    modal.querySelector('.rtmp-close-btn').addEventListener('click', () => MyCamerasSystem.closeRtmpUrlModal());
+    modal.querySelector('.modal-overlay').addEventListener('click', () => this.closeRtmpUrlModal());
+    modal.querySelector('.rtmp-copy-btn').addEventListener('click', () => this.copyRtmpUrl());
+    modal.querySelector('.rtmp-close-btn').addEventListener('click', () => this.closeRtmpUrlModal());
     document.body.appendChild(modal);
   },
 
@@ -503,7 +487,6 @@ const ClaimMixin = {
 
     errorDiv.textContent = '';
     clearFieldError('rtsp-url', 'rtsp-url-error');
-    clearFieldError('claim-device-id', 'device-id-error');
 
     try {
       this._isSubmitting = true;
@@ -608,30 +591,8 @@ const ClaimMixin = {
           })
         });
       } else {
-        // Device camera (ESP32-CAM)
-        const input = document.getElementById('claim-device-id');
-        const deviceId = input.value.trim().toUpperCase();
-
-        if (!deviceId) {
-          showFieldError('claim-device-id', 'device-id-error', 'Device ID gerekli');
-          return;
-        }
-
-        // Validate device ID format (12 hex characters)
-        if (!/^[A-F0-9]{12}$/.test(deviceId)) {
-          showFieldError('claim-device-id', 'device-id-error', 'Device ID 12 haneli hexadecimal olmalı (örn: 78EC2CEBD724)');
-          return;
-        }
-
-        setLoading(true);
-        progressText.textContent = 'Cihaz ekleniyor...';
-
-        response = await fetch(`${this.apiBase}/me/cameras/claim`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ device_id: deviceId })
-        });
+        errorDiv.textContent = 'Geçersiz kamera tipi';
+        return;
       }
 
       const data = await response.json();
@@ -641,8 +602,6 @@ const ClaimMixin = {
         // Show field-specific error if applicable
         if (cameraType === 'rtsp' && ((data.error?.message ?? data.error)?.includes('URL') || (data.error?.message ?? data.error)?.includes('RTSP') || (data.error?.message ?? data.error)?.includes('IP'))) {
           showFieldError('rtsp-url', 'rtsp-url-error', (data.error?.message ?? data.error) || data.details || 'Kamera eklenemedi');
-        } else if (cameraType === 'device' && (data.error?.message ?? data.error)?.includes('Device')) {
-          showFieldError('claim-device-id', 'device-id-error', (data.error?.message ?? data.error) || data.details || 'Cihaz eklenemedi');
         } else {
           errorDiv.textContent = (data.error?.message ?? data.error) || data.details || 'Kamera eklenemedi';
         }
@@ -669,8 +628,6 @@ const ClaimMixin = {
         }
       } else if (cameraType === 'city') {
         AuthSystem.showNotification('Şehir kamerası başarıyla eklendi', 'success');
-      } else {
-        AuthSystem.showNotification('Cihaz başarıyla eklendi', 'success');
       }
 
       await this.loadCameras();

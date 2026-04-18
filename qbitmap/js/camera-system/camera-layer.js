@@ -56,7 +56,7 @@ const CameraLayerMixin = {
           name: camera.name || camera.device_id,
           state: camera.isShared ? 'shared' : 'normal', // shared/normal/monitoring/alarm
           isShared: !!camera.isShared,
-          camera_type: camera.camera_type || 'device'
+          camera_type: camera.camera_type || 'whep'
         }
       }))
     };

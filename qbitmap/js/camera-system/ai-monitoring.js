@@ -359,18 +359,10 @@ const AIMonitoringMixin = {
     // Fallback to popup-based capture if no base64 yet
     if (!base64 && popupData) {
       const popupEl = popupData.popup.getElement();
-      // Try WHEP video element first (class is camera-video)
       const videoEl = popupEl?.querySelector('.camera-video');
       if (videoEl && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
         base64 = this.videoToBase64(videoEl);
         Logger.log(`[AI] Frame captured from video element (fallback)`);
-      } else {
-        // Try MJPEG/snapshot image
-        const frameImg = popupEl?.querySelector('.camera-frame');
-        if (frameImg?.complete && frameImg.naturalWidth > 0) {
-          base64 = this.imageToBase64(frameImg);
-          Logger.log(`[AI] Frame captured from image element`);
-        }
       }
     }
 
@@ -534,18 +526,6 @@ const AIMonitoringMixin = {
       if (resolveAnalysis) resolveAnalysis();
       aiState.analysisPromise = null;
     }
-  },
-
-  /**
-   * Convert image element to base64
-   */
-  imageToBase64(imgElement) {
-    const canvas = document.createElement('canvas');
-    canvas.width = imgElement.naturalWidth;
-    canvas.height = imgElement.naturalHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(imgElement, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
   },
 
   /**

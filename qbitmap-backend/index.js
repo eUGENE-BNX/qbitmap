@@ -10,12 +10,9 @@ const dbPool = require('./src/services/db-pool');
 const photoAiQueue = require('./src/services/photo-ai-queue');
 const videoAiQueue = require('./src/services/video-ai-queue');
 const wsService = require('./src/services/websocket');
-const streamCache = require('./src/services/stream-cache');
-const frameCache = require('./src/services/frame-cache');
 const cleanupService = require('./src/services/cleanup');
 const teslacamSync = require('./src/services/teslacam-sync');
 const voiceCallService = require('./src/services/voice-call');
-const settingsCache = require('./src/services/settings-cache');
 const db = require('./src/services/database');
 const metrics = require('./src/services/metrics');
 const { runStartupChecks } = require('./src/utils/startup-checks');
@@ -116,10 +113,6 @@ async function shutdown(signal) {
 
   // Cleanup caches and timers
   cleanupTokenCache();
-  frameCache.shutdown();
-  streamCache.shutdown();
-  // [PERF-18] Clear interval-based caches that would leak on hot reload
-  settingsCache.shutdown();
   if (db.accessCacheCleanupInterval) {
     clearInterval(db.accessCacheCleanupInterval);
     db.accessCacheCleanupInterval = null;

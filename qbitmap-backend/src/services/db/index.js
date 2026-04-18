@@ -1,5 +1,4 @@
 const pool = require('../db-pool');
-const settingsCache = require('../settings-cache');
 const logger = require('../../utils/logger').child({ module: 'db' });
 const { services } = require('../../config');
 const fs = require('fs');

@@ -290,9 +290,6 @@ async function buildServer() {
   // Register public API routes (no auth)
   await fastify.register(require('./routes/public'), { prefix: '/api/public' });
 
-  // Register device routes (with device auth)
-  await fastify.register(require('./routes/devices'), { prefix: '/api/devices' });
-
   // Register user routes (with JWT auth)
   // Register AI proxy routes
   await fastify.register(require('./routes/ai'), { prefix: '/api/ai' });
