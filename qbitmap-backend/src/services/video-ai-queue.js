@@ -11,7 +11,9 @@ const { resolveLanguageForCoords } = require('../utils/geo-language');
 const circuitBreaker = require('./ai-circuit-breaker').video;
 
 const TIMEOUT = 180000; // 180s for video analysis
-const MAX_CONCURRENCY = 2;
+// Videos pull many frames into one prompt — heavier than photo. Keep lower
+// concurrency by default; override with VIDEO_AI_CONCURRENCY if GPU allows.
+const MAX_CONCURRENCY = Math.max(1, parseInt(process.env.VIDEO_AI_CONCURRENCY || '2', 10) || 2);
 const POLL_INTERVAL = 3000; // Check DB every 3s for new jobs
 
 function buildPrompt(languageName) {

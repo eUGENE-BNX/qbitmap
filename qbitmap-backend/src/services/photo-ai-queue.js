@@ -6,6 +6,7 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const { execFile } = require('child_process');
 const db = require('./database');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
@@ -23,7 +24,15 @@ const AI_MAX_H = 1080;
 
 function downscaleForAi(srcPath) {
   return new Promise((resolve, reject) => {
-    const outPath = path.join(os.tmpdir(), `ai_${path.basename(srcPath)}.jpg`);
+    // Per-call unique tmpfile: prevents 5 parallel jobs from clobbering each
+    // other's downscaled JPEG (one job's `finally{ unlink }` would race against
+    // another job's `readFile` → ENOENT or half-written bytes that vLLM rejects
+    // as "cannot identify image file"). Strip the source extension first so we
+    // don't end up with `*.jpg.jpg` style double-extensions.
+    const ext = path.extname(srcPath);
+    const stem = path.basename(srcPath, ext);
+    const nonce = crypto.randomBytes(8).toString('hex');
+    const outPath = path.join(os.tmpdir(), `ai_${stem}_${nonce}.jpg`);
     const args = [
       '-i', srcPath,
       '-vf', `scale='min(${AI_MAX_W},iw)':'min(${AI_MAX_H},ih)':force_original_aspect_ratio=decrease`,
@@ -39,7 +48,12 @@ function downscaleForAi(srcPath) {
 }
 
 const TIMEOUT = 60000; // 60s for photo analysis
-const MAX_CONCURRENCY = 3;
+// vLLM batches in-flight requests, so per-job concurrency translates to
+// per-batch parallelism on the GPU. Sweet spot depends on the model + GPU
+// memory; default 5 lets a single 5-photo message process in one round.
+// Override with PHOTO_AI_CONCURRENCY env if the GPU can sustain more (e.g.
+// 8-12 for medium models on A100/H100) or needs to back off.
+const MAX_CONCURRENCY = Math.max(1, parseInt(process.env.PHOTO_AI_CONCURRENCY || '5', 10) || 5);
 const POLL_INTERVAL = 3000; // Check DB every 3s for new jobs
 
 function buildPrompt(languageName) {
