@@ -149,11 +149,18 @@
   display: block;
 }
 
-/* Stats mini grid (right side of header) */
+/* Right side of header: stats row + location chip stacked */
+.profile-header-right {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: auto;
+  min-width: 0;
+}
+
 .profile-header-stats {
   display: flex;
   gap: 2px;
-  margin-left: auto;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -644,15 +651,8 @@
 }
 
 /* ===============================
-   Info Row (Location + Face chips)
+   Location chip (sits under stats)
    =============================== */
-
-.profile-info-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
 
 .profile-info-chip {
   display: flex;
@@ -664,7 +664,6 @@
   font-size: 12px;
   color: #3c4043;
   border: 1px solid #e8eaed;
-  flex: 1;
   min-width: 0;
 }
 
@@ -732,45 +731,10 @@
   background: #ffcdd2;
 }
 
-/* Success chip (face registered) */
-.profile-info-chip--success {
-  background: #e8f5e9;
-  border-color: #a5d6a7;
-}
-
-.profile-info-chip--success svg {
-  color: #4caf50;
-}
-
-.profile-info-chip--success .chip-text {
-  color: #2e7d32;
-}
-
 /* Empty chip */
 .profile-info-chip--empty {
   background: #f8f9fa;
   border-style: dashed;
-}
-
-/* Upload chip (face not registered) */
-.profile-info-chip--upload {
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.profile-info-chip--upload:hover {
-  background: #e8f0fe;
-  border-color: #1a73e8;
-}
-
-.profile-info-chip--upload.dragover {
-  background: #e8f0fe;
-  border-color: #1a73e8;
-  border-style: dashed;
-}
-
-.profile-info-chip--upload input[type="file"] {
-  display: none;
 }
 
 /* Small toggle switch (for chip) */
@@ -1041,12 +1005,16 @@
     flex-shrink: 0;
   }
 
-  .profile-header-stats {
+  .profile-header-right {
     margin-left: 0;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .profile-header-stats {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 6px;
-    flex: 1;
     min-width: 0;
   }
 
@@ -1077,14 +1045,6 @@
     width: 95px;
     height: 65px;
     display: block;
-  }
-
-  .profile-info-row {
-    flex-direction: column;
-  }
-
-  .profile-info-chip {
-    flex: unset;
   }
 
   .profile-stats-grid {

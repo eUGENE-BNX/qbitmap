@@ -11,22 +11,17 @@ import { LocationService } from './services/location-service.js';
 
 /**
  * QBitmap User Profile Panel
- * Manage user profile, stats, recent media, and face recognition
+ * Manage user profile, stats, recent media, and location
  */
 
 const UserProfileSystem = {
   apiBase: QBitmapConfig.api.users,
   isOpen: false,
   isLoading: false,
-  hasFaceRegistered: false,
 
   init() {
     this.createPanel();
-    window.addEventListener('auth:login', () => this.checkFaceStatus());
-    window.addEventListener('auth:logout', () => {
-      this.hasFaceRegistered = false;
-      this.close();
-    });
+    window.addEventListener('auth:logout', () => this.close());
   },
 
   createPanel() {
@@ -78,7 +73,6 @@ const UserProfileSystem = {
       const response = await fetch(`${this.apiBase}/me`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to load profile');
       const user = await response.json();
-      this.hasFaceRegistered = user.hasFaceRegistered;
 
       // Fetch extra stats in parallel
       const [cameraStats, recentMessages, landStats, teslaVehicles, broadcastRecordings] = await Promise.all([
@@ -135,31 +129,17 @@ const UserProfileSystem = {
     } catch { return []; }
   },
 
-  async checkFaceStatus() {
-    try {
-      const response = await fetch(`${this.apiBase}/me`, { credentials: 'include' });
-      if (response.ok) {
-        const user = await response.json();
-        this.hasFaceRegistered = user.hasFaceRegistered;
-      }
-    } catch (error) {
-      Logger.error('[Profile] Status check error:', error);
-    }
-  },
-
   renderProfile(user, extras) {
     const content = document.querySelector('.profile-panel-content');
     const { cameraStats, recentMessages, landStats, teslaVehicles, broadcastRecordings } = extras;
 
     content.innerHTML = `
       ${this.renderHeaderCard(user, cameraStats, landStats)}
-      ${this.renderInfoRow(user.location, user.hasFaceRegistered)}
       ${this.renderRecentMessages(recentMessages)}
       ${this.renderBroadcastRecordings(broadcastRecordings)}
       ${teslaVehicles.length > 0 ? teslaVehicles.map(v => this.renderTeslaSection(v)).join('') : this.renderTeslaConnectCard()}
     `;
 
-    this.setupEventListeners();
     this.setupLocationListeners(user.location);
     this.setupTeslaListeners(content);
 
@@ -191,11 +171,14 @@ const UserProfileSystem = {
             <span class="profile-qbits">Qbits: ${points}</span>
           </div>
         </div>
-        <div class="profile-header-stats">
-          ${rank ? `<div class="profile-stat-mini profile-stat-rank"><span class="stat-value">${rank}</span><span class="stat-label">Sıralama</span></div>` : ''}
-          <div class="profile-stat-mini"><span class="stat-value">${camTotal}</span><span class="stat-label">Kamera</span></div>
-          <div class="profile-stat-mini"><span class="stat-value">${camShared}</span><span class="stat-label">Paylaşılan</span></div>
-          <div class="profile-stat-mini"><span class="stat-value">${areaM2}</span><span class="stat-label">Arazi</span></div>
+        <div class="profile-header-right">
+          <div class="profile-header-stats">
+            ${rank ? `<div class="profile-stat-mini profile-stat-rank"><span class="stat-value">${rank}</span><span class="stat-label">Sıralama</span></div>` : ''}
+            <div class="profile-stat-mini"><span class="stat-value">${camTotal}</span><span class="stat-label">Kamera</span></div>
+            <div class="profile-stat-mini"><span class="stat-value">${camShared}</span><span class="stat-label">Paylaşılan</span></div>
+            <div class="profile-stat-mini"><span class="stat-value">${areaM2}</span><span class="stat-label">Arazi</span></div>
+          </div>
+          ${this.renderLocationChip(user.location)}
         </div>
       </div>
     `;
@@ -621,12 +604,11 @@ const UserProfileSystem = {
     });
   },
 
-  renderInfoRow(location, hasFaceRegistered) {
+  renderLocationChip(location) {
     const hasLocation = location && location.lat && location.lng;
     const showOnMap = location?.showOnMap || false;
 
-    // Location chip
-    const locationChip = hasLocation ? `
+    return hasLocation ? `
       <div class="profile-info-chip">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
@@ -650,33 +632,6 @@ const UserProfileSystem = {
         </svg>
         <span class="chip-text">Konum yok</span>
         <button class="chip-action-btn chip-action-btn--primary" data-action="find-location">Bul</button>
-      </div>
-    `;
-
-    // Face chip
-    const faceChip = hasFaceRegistered ? `
-      <div class="profile-info-chip profile-info-chip--success">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-        <span class="chip-text">Yüz kayıtlı</span>
-        <button class="profile-face-delete-btn chip-action-btn chip-action-btn--danger">Sil</button>
-      </div>
-    ` : `
-      <div class="profile-info-chip profile-info-chip--upload" id="face-upload-area">
-        <input type="file" id="face-file-input" accept="image/jpeg,image/png">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-        </svg>
-        <span class="chip-text">Yüz tanıma</span>
-        <span class="chip-action-btn chip-action-btn--primary">Yükle</span>
-      </div>
-    `;
-
-    return `
-      <div class="profile-info-row">
-        ${locationChip}
-        ${faceChip}
       </div>
     `;
   },
@@ -999,107 +954,6 @@ const UserProfileSystem = {
     return m2.toLocaleString('tr-TR') + ' m²';
   },
 
-  // Face upload/registered rendering is now handled by renderInfoRow
-
-  setupEventListeners() {
-    const uploadArea = document.getElementById('face-upload-area');
-    const fileInput = document.getElementById('face-file-input');
-    if (!uploadArea || !fileInput) return;
-
-    uploadArea.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => {
-      if (e.target.files.length > 0) this.uploadFace(e.target.files[0]);
-    });
-    uploadArea.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      uploadArea.classList.add('dragover');
-    });
-    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-    uploadArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadArea.classList.remove('dragover');
-      if (e.dataTransfer.files.length > 0) this.uploadFace(e.dataTransfer.files[0]);
-    });
-
-    // Bind face delete button
-    const deleteBtn = document.querySelector('.profile-face-delete-btn');
-    if (deleteBtn) deleteBtn.addEventListener('click', () => UserProfileSystem.deleteFace());
-  },
-
-  async uploadFace(file) {
-    if (!['image/jpeg', 'image/png'].includes(file.type)) {
-      AuthSystem.showNotification('Sadece JPEG ve PNG dosyaları kabul edilir', 'error');
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      AuthSystem.showNotification('Dosya boyutu 2MB\'dan küçük olmalı', 'error');
-      return;
-    }
-    const isValidSize = await this.validateImageSize(file);
-    if (!isValidSize) {
-      AuthSystem.showNotification('Görsel en fazla 1920x1080 piksel olabilir', 'error');
-      return;
-    }
-
-    this.showLoading('Yüz kaydediliyor...');
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await fetch(`${this.apiBase}/me/face`, {
-        method: 'PUT', credentials: 'include', body: formData
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error((result.error?.message ?? result.error) || 'Yüz kaydedilemedi');
-
-      this.hasFaceRegistered = true;
-      AuthSystem.showNotification('Yüzünüz başarıyla kaydedildi!', 'success');
-      await this.loadProfile();
-    } catch (error) {
-      Logger.error('[Profile] Upload error:', error);
-      AuthSystem.showNotification(error.message || 'Yüz kaydedilemedi', 'error');
-      await this.loadProfile();
-    }
-  },
-
-  validateImageSize(file) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => { URL.revokeObjectURL(img.src); resolve(img.width <= 1920 && img.height <= 1080); };
-      img.onerror = () => resolve(false);
-      img.src = URL.createObjectURL(file);
-    });
-  },
-
-  async deleteFace() {
-    if (!confirm('Yüz kaydınızı silmek istediğinize emin misiniz?')) return;
-
-    this.showLoading('Kayıt siliniyor...');
-    try {
-      const response = await fetch(`${this.apiBase}/me/face`, {
-        method: 'DELETE', credentials: 'include'
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error((result.error?.message ?? result.error) || 'Kayıt silinemedi');
-
-      this.hasFaceRegistered = false;
-      AuthSystem.showNotification('Yüz kaydı silindi', 'success');
-      await this.loadProfile();
-    } catch (error) {
-      Logger.error('[Profile] Delete error:', error);
-      AuthSystem.showNotification(error.message || 'Kayıt silinemedi', 'error');
-      await this.loadProfile();
-    }
-  },
-
-  showLoading(message) {
-    const faceChip = document.querySelector('.profile-info-chip--success, .profile-info-chip--upload');
-    if (faceChip) {
-      faceChip.innerHTML = `
-        <div class="spinner spinner-sm"></div>
-        <span class="chip-text">${escapeHtml(message)}</span>
-      `;
-    }
-  }
 };
 
 // Init immediately (this file is lazy-loaded after DOMContentLoaded)
