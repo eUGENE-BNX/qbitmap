@@ -124,13 +124,13 @@ DatabaseService.prototype.getAlarmById = async function(alarmId) {
 
 DatabaseService.prototype.getFaceDetectionSettings = async function(cameraId) {
   const [rows] = await this.pool.execute(
-    'SELECT face_detection_enabled, face_detection_interval, alarm_trigger_names FROM cameras WHERE id = ?',
+    'SELECT face_detection_enabled, face_detection_interval, face_match_threshold, alarm_trigger_names FROM cameras WHERE id = ?',
     [cameraId]
   );
   return rows[0];
 };
 
-DatabaseService.prototype.updateFaceDetectionSettings = async function(cameraId, userId, enabled, interval, alarmTriggerNames) {
+DatabaseService.prototype.updateFaceDetectionSettings = async function(cameraId, userId, enabled, interval, alarmTriggerNames, matchThreshold) {
   if (!(await this.isUserCameraOwner(userId, cameraId))) {
     return { success: false, error: 'Not authorized' };
   }
@@ -139,6 +139,10 @@ DatabaseService.prototype.updateFaceDetectionSettings = async function(cameraId,
   if (enabled !== undefined) { updates.push('face_detection_enabled = ?'); params.push(enabled ? 1 : 0); }
   if (interval !== undefined) { updates.push('face_detection_interval = ?'); params.push(interval); }
   if (alarmTriggerNames !== undefined) { updates.push('alarm_trigger_names = ?'); params.push(alarmTriggerNames); }
+  if (matchThreshold !== undefined) {
+    const t = Math.min(Math.max(parseInt(matchThreshold, 10) || 70, 50), 95);
+    updates.push('face_match_threshold = ?'); params.push(t);
+  }
   if (updates.length > 0) {
     params.push(cameraId);
     await this.pool.execute('UPDATE cameras SET ' + updates.join(', ') + ' WHERE id = ?', params);
@@ -146,59 +150,214 @@ DatabaseService.prototype.updateFaceDetectionSettings = async function(cameraId,
   return { success: true };
 };
 
-DatabaseService.prototype.getCameraFaces = async function(cameraId) {
+// Global user-level face library. getCameraFaces is kept as a thin alias so
+// the old route contract stays intact — it now reads user_faces scoped to
+// the camera's owner instead of per-camera rows.
+DatabaseService.prototype.getUserFaces = async function(userId) {
   const [rows] = await this.pool.execute(
-    'SELECT id, person_id, name, face_image_url, trigger_alarm, created_at FROM camera_faces WHERE camera_id = ? ORDER BY created_at DESC',
-    [cameraId]
+    'SELECT id, person_id, name, face_image_url, trigger_alarm, created_at FROM user_faces WHERE user_id = ? ORDER BY created_at DESC',
+    [userId]
   );
   return rows;
 };
 
-DatabaseService.prototype.addCameraFace = async function(cameraId, personId, name, faceImageUrl) {
-  const [result] = await this.pool.execute(
-    'INSERT INTO camera_faces (camera_id, person_id, name, face_image_url) VALUES (?, ?, ?, ?)',
-    [cameraId, personId, name, faceImageUrl]
-  );
-  return { success: true, faceId: result.insertId };
+DatabaseService.prototype.getCameraFaces = async function(cameraId) {
+  const [cam] = await this.pool.execute('SELECT user_id FROM cameras WHERE id = ?', [cameraId]);
+  if (!cam[0]) return [];
+  return this.getUserFaces(cam[0].user_id);
 };
 
-DatabaseService.prototype.removeCameraFace = async function(faceId, cameraId) {
-  const [rows] = await this.pool.execute('SELECT * FROM camera_faces WHERE id = ? AND camera_id = ?', [faceId, cameraId]);
+DatabaseService.prototype.addUserFace = async function(userId, personId, name, faceImageUrl) {
+  try {
+    const [result] = await this.pool.execute(
+      'INSERT INTO user_faces (user_id, person_id, name, face_image_url) VALUES (?, ?, ?, ?)',
+      [userId, personId, name, faceImageUrl]
+    );
+    return { success: true, faceId: result.insertId };
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') return { success: false, error: 'Face already exists' };
+    throw e;
+  }
+};
+
+DatabaseService.prototype.removeUserFace = async function(faceId, userId) {
+  const [rows] = await this.pool.execute(
+    'SELECT * FROM user_faces WHERE id = ? AND user_id = ?',
+    [faceId, userId]
+  );
   const face = rows[0];
   if (!face) return { success: false, error: 'Face not found' };
-  await this.pool.execute('DELETE FROM camera_faces WHERE id = ?', [faceId]);
+  await this.pool.execute('DELETE FROM user_faces WHERE id = ?', [faceId]);
   return { success: true, personId: face.person_id };
 };
 
-DatabaseService.prototype.updateFaceAlarm = async function(faceId, cameraId, triggerAlarm) {
-  const [rows] = await this.pool.execute('SELECT * FROM camera_faces WHERE id = ? AND camera_id = ?', [faceId, cameraId]);
-  if (!rows[0]) return { success: false, error: 'Face not found' };
-  await this.pool.execute('UPDATE camera_faces SET trigger_alarm = ? WHERE id = ?', [triggerAlarm ? 1 : 0, faceId]);
+DatabaseService.prototype.updateUserFaceAlarm = async function(faceId, userId, triggerAlarm) {
+  const [result] = await this.pool.execute(
+    'UPDATE user_faces SET trigger_alarm = ? WHERE id = ? AND user_id = ?',
+    [triggerAlarm ? 1 : 0, faceId, userId]
+  );
+  if (result.affectedRows === 0) return { success: false, error: 'Face not found' };
   return { success: true };
 };
 
-DatabaseService.prototype.getFaceByPersonId = async function(cameraId, personId) {
+DatabaseService.prototype.getUserFaceByPersonId = async function(userId, personId) {
   const [rows] = await this.pool.execute(
-    'SELECT id, person_id, name, face_image_url, trigger_alarm FROM camera_faces WHERE camera_id = ? AND person_id = ?',
-    [cameraId, personId]
+    'SELECT id, person_id, name, face_image_url, trigger_alarm FROM user_faces WHERE user_id = ? AND person_id = ?',
+    [userId, personId]
   );
   return rows[0];
 };
 
-DatabaseService.prototype.logFaceDetection = async function(cameraId, faceId, personName, confidence) {
+DatabaseService.prototype.getUserFaceById = async function(faceId, userId) {
+  const [rows] = await this.pool.execute(
+    'SELECT id, person_id, name, face_image_url, trigger_alarm FROM user_faces WHERE id = ? AND user_id = ?',
+    [faceId, userId]
+  );
+  return rows[0];
+};
+
+DatabaseService.prototype.logFaceDetection = async function(cameraId, userFaceId, personName, confidence) {
   await this.pool.execute(
-    'INSERT INTO face_detection_log (camera_id, face_id, person_name, confidence) VALUES (?, ?, ?, ?)',
-    [cameraId, faceId, personName, confidence]
+    'INSERT INTO face_detection_log (camera_id, user_face_id, person_name, confidence) VALUES (?, ?, ?, ?)',
+    [cameraId, userFaceId || null, personName, confidence]
   );
 };
 
 DatabaseService.prototype.getFaceDetectionLogs = async function(cameraId, limit = 10) {
   const safeLimit = Math.min(Math.max(parseInt(limit) || 10, 1), 200);
   const [rows] = await this.pool.execute(
-    `SELECT l.id, l.face_id, l.person_name, l.confidence, l.detected_at, f.face_image_url FROM face_detection_log l LEFT JOIN camera_faces f ON l.face_id = f.id WHERE l.camera_id = ? ORDER BY l.detected_at DESC LIMIT ${safeLimit}`,
+    `SELECT l.id, l.user_face_id AS face_id, l.person_name, l.confidence, l.detected_at, uf.face_image_url
+     FROM face_detection_log l
+     LEFT JOIN user_faces uf ON l.user_face_id = uf.id
+     WHERE l.camera_id = ? ORDER BY l.detected_at DESC LIMIT ${safeLimit}`,
     [cameraId]
   );
   return rows;
+};
+
+// Detection count for a given face across all of user's cameras in a
+// time window. Used by face-absence-monitor to decide whether a window
+// passed without the person being seen.
+DatabaseService.prototype.countFaceDetectionsForUser = async function(userFaceId, userId, startIso, endIso) {
+  const [rows] = await this.pool.execute(
+    `SELECT COUNT(*) AS n
+     FROM face_detection_log l
+     JOIN cameras c ON c.id = l.camera_id
+     WHERE l.user_face_id = ? AND c.user_id = ?
+       AND l.detected_at >= ? AND l.detected_at <= ?`,
+    [userFaceId, userId, startIso, endIso]
+  );
+  return rows[0]?.n || 0;
+};
+
+// -----------------------------------------------------------------
+// Absence rules CRUD (face_absence_rules / face_absence_events)
+// -----------------------------------------------------------------
+
+DatabaseService.prototype.getFaceAbsenceRules = async function(userId) {
+  const [rows] = await this.pool.execute(
+    `SELECT r.*, uf.name AS face_name, uf.face_image_url
+     FROM face_absence_rules r
+     JOIN user_faces uf ON uf.id = r.user_face_id
+     WHERE r.user_id = ?
+     ORDER BY r.created_at DESC`,
+    [userId]
+  );
+  return rows;
+};
+
+DatabaseService.prototype.getFaceAbsenceRuleById = async function(ruleId, userId) {
+  const [rows] = await this.pool.execute(
+    `SELECT r.*, uf.name AS face_name, uf.face_image_url
+     FROM face_absence_rules r
+     JOIN user_faces uf ON uf.id = r.user_face_id
+     WHERE r.id = ? AND r.user_id = ?`,
+    [ruleId, userId]
+  );
+  return rows[0];
+};
+
+DatabaseService.prototype.addFaceAbsenceRule = async function(userId, data) {
+  const { user_face_id, label, start_time, end_time, day_of_week_mask, enabled, voice_call_enabled } = data;
+  // Verify face belongs to user
+  const face = await this.getUserFaceById(user_face_id, userId);
+  if (!face) return { success: false, error: 'Face not found' };
+  const [result] = await this.pool.execute(
+    `INSERT INTO face_absence_rules
+       (user_id, user_face_id, label, start_time, end_time, day_of_week_mask, enabled, voice_call_enabled)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      userId,
+      user_face_id,
+      label || null,
+      start_time,
+      end_time,
+      day_of_week_mask ?? 127,
+      enabled ? 1 : 0,
+      voice_call_enabled ? 1 : 0
+    ]
+  );
+  return { success: true, ruleId: result.insertId };
+};
+
+DatabaseService.prototype.updateFaceAbsenceRule = async function(ruleId, userId, data) {
+  const fields = ['user_face_id', 'label', 'start_time', 'end_time', 'day_of_week_mask', 'enabled', 'voice_call_enabled'];
+  const updates = [];
+  const params = [];
+  for (const f of fields) {
+    if (data[f] === undefined) continue;
+    let val = data[f];
+    if (f === 'enabled' || f === 'voice_call_enabled') val = val ? 1 : 0;
+    updates.push(`${f} = ?`);
+    params.push(val);
+  }
+  if (updates.length === 0) return { success: true };
+  params.push(ruleId, userId);
+  const [result] = await this.pool.execute(
+    `UPDATE face_absence_rules SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`,
+    params
+  );
+  if (result.affectedRows === 0) return { success: false, error: 'Rule not found' };
+  return { success: true };
+};
+
+DatabaseService.prototype.deleteFaceAbsenceRule = async function(ruleId, userId) {
+  const [result] = await this.pool.execute(
+    'DELETE FROM face_absence_rules WHERE id = ? AND user_id = ?',
+    [ruleId, userId]
+  );
+  if (result.affectedRows === 0) return { success: false, error: 'Rule not found' };
+  return { success: true };
+};
+
+// Cron helper: find rules whose window just ended and haven't fired today.
+// Rule matches when:
+//   • enabled = 1
+//   • end_time falls inside the last minute
+//   • today's weekday bit is set in day_of_week_mask
+//   • face_absence_events row for (rule, today) does NOT yet exist
+DatabaseService.prototype.getDueAbsenceRules = async function() {
+  const [rows] = await this.pool.execute(
+    `SELECT r.*
+     FROM face_absence_rules r
+     LEFT JOIN face_absence_events e
+       ON e.rule_id = r.id AND e.window_date = CURDATE()
+     WHERE r.enabled = 1
+       AND r.end_time BETWEEN DATE_SUB(CURTIME(), INTERVAL 90 SECOND) AND CURTIME()
+       AND (r.day_of_week_mask & (1 << WEEKDAY(CURDATE()))) != 0
+       AND e.id IS NULL`
+  );
+  return rows;
+};
+
+// INSERT IGNORE keeps this idempotent: if two cron ticks race, the second
+// sees the UNIQUE (rule_id, window_date) constraint hit and does nothing.
+DatabaseService.prototype.recordAbsenceEvent = async function(ruleId) {
+  const [result] = await this.pool.execute(
+    'INSERT IGNORE INTO face_absence_events (rule_id, window_date) VALUES (?, CURDATE())',
+    [ruleId]
+  );
+  return result.affectedRows > 0;
 };
 
 DatabaseService.prototype.getCamerasWithFaceDetection = async function() {
@@ -247,12 +406,13 @@ DatabaseService.prototype.getActiveFaceDetectionCameras = async function(userId)
 };
 
 DatabaseService.prototype.getUserFacesWithCameraNames = async function(userId) {
+  // Post-refactor: faces are user-scoped, not per-camera. Kept under the old
+  // name so existing broadcast route keeps working; camera_name is always null.
   const [rows] = await this.pool.execute(`
-    SELECT cf.id, cf.person_id, cf.name, cf.face_image_url, cf.trigger_alarm, c.name as camera_name
-    FROM camera_faces cf
-    JOIN cameras c ON cf.camera_id = c.id
-    WHERE c.user_id = ?
-    ORDER BY cf.name
+    SELECT id, person_id, name, face_image_url, trigger_alarm, NULL AS camera_name
+    FROM user_faces
+    WHERE user_id = ?
+    ORDER BY name
   `, [userId]);
   return rows;
 };

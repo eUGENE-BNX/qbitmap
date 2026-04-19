@@ -22,6 +22,7 @@ const cleanupService = require('./services/cleanup');
 const teslaTokenService = require('./services/tesla-token');
 const teslaPoller = require('./services/tesla-poller');
 const teslacamSync = require('./services/teslacam-sync');
+const faceAbsenceMonitor = require('./services/face-absence-monitor');
 const wsService = require('./services/websocket');
 const mediamtx = require('./services/mediamtx');
 
@@ -314,6 +315,7 @@ async function buildServer() {
   // Register status routes (system health monitoring)
   await fastify.register(require('./routes/status'), { prefix: '/api/status' });
   await fastify.register(require('./routes/face-detection'), { prefix: '/api/face-detection' });
+  await fastify.register(require('./routes/face-absence'), { prefix: '/api/face-absence' });
 
   // Register video message routes
   await fastify.register(require('./routes/video-messages'), { prefix: '/api/video-messages' });
@@ -359,6 +361,10 @@ async function buildServer() {
 
   // Start TeslaCAM sync service (downloads segments from car's Pi)
   teslacamSync.start();
+
+  // Start face-absence cron monitor (pushes alarms when watched faces
+  // go unseen in their configured time windows)
+  faceAbsenceMonitor.start();
 
   // Initialize WebSocket server after server is ready
   fastify.ready((err) => {

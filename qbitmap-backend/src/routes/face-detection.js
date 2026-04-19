@@ -9,23 +9,14 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 
-// Helper function to get camera by device_id and check ownership
 async function getCameraByDeviceId(deviceId, userId) {
   const camera = await db.getCameraByDeviceId(deviceId);
-
-  if (!camera) {
-    return { error: "Camera not found", camera: null };
-  }
-
-  if (camera.user_id !== userId) {
-    return { error: "Not authorized", camera: null };
-  }
-
+  if (!camera) return { error: "Camera not found", camera: null };
+  if (camera.user_id !== userId) return { error: "Not authorized", camera: null };
   return { error: null, camera };
 }
 
 async function faceDetectionRoutes(fastify, options) {
-  // All routes require authentication
   fastify.addHook("preHandler", authHook);
 
   // Route-level rate limit for face detection (resource-intensive)
@@ -33,12 +24,11 @@ async function faceDetectionRoutes(fastify, options) {
 
   /**
    * GET /api/face-detection/active
-   * Get all cameras with face detection enabled for current user
+   * Cameras with face detection enabled for current user.
    */
   fastify.get("/active", async (request, reply) => {
     try {
       const cameras = await db.getActiveFaceDetectionCameras(request.user.userId);
-
       return { cameras };
     } catch (error) {
       logger.error({ error }, "Failed to get active face detection cameras");
@@ -47,24 +37,138 @@ async function faceDetectionRoutes(fastify, options) {
   });
 
   /**
+   * GET /api/face-detection/library
+   * User's full face library (same list regardless of which camera opened the modal).
+   */
+  fastify.get("/library", async (request, reply) => {
+    const faces = await db.getUserFaces(request.user.userId);
+    return { faces };
+  });
+
+  /**
+   * POST /api/face-detection/library
+   * Add a new face to the user's library. Not camera-scoped: the matcher
+   * service is already global, so each person_id should live in exactly
+   * one user_faces row.
+   */
+  fastify.post("/library", {
+    preHandler: async (request, reply) => {
+      // Reuse checkFaceLimit via a synthetic cameraId (function now counts user_faces).
+      const userId = request.user?.userId;
+      if (!userId) return reply.code(401).send({ error: "Authentication required" });
+      const result = await db.checkFaceLimit(userId, null);
+      if (!result.allowed) {
+        return reply.code(403).send({ error: result.reason || "Face limit reached", current: result.current, limit: result.limit });
+      }
+    },
+    ...faceRateLimit
+  }, async (request, reply) => {
+    const data = await request.file();
+    if (!data) return reply.code(400).send({ error: "No file uploaded" });
+
+    const name = data.fields?.name?.value || "Unknown";
+
+    const chunks = [];
+    for await (const chunk of data.file) chunks.push(chunk);
+    const buffer = Buffer.concat(chunks);
+
+    const allowedTypes = ["image/jpeg", "image/png"];
+    if (!allowedTypes.includes(data.mimetype)) return reply.code(400).send({ error: "Only JPEG and PNG allowed" });
+    if (buffer.length > 2 * 1024 * 1024) return reply.code(400).send({ error: "File size must be less than 2MB" });
+    if (!validateMagicBytes(buffer, data.mimetype)) return reply.code(400).send({ error: "File content does not match declared type" });
+
+    try {
+      const tag = "user_" + request.user.userId + "_" + Date.now();
+      const createResult = await faceApi.createPerson(name, tag);
+      if (!createResult.ok || !createResult.data?.result?.id) {
+        logger.error({ createResult }, "Failed to create person");
+        return reply.code(500).send({ error: "Failed to create face profile" });
+      }
+
+      const personId = createResult.data.result.id;
+      const addFaceResult = await faceApi.addFace(personId, buffer, data.mimetype);
+      if (!addFaceResult.ok) {
+        await faceApi.deletePerson(personId);
+        return reply.code(400).send({ error: addFaceResult.data?.error || "Failed to register face" });
+      }
+
+      const uploadsDir = path.resolve(__dirname, "../../uploads/camera-faces");
+      await fs.promises.mkdir(uploadsDir, { recursive: true });
+      const ext = data.mimetype === "image/png" ? "png" : "jpg";
+      const filename = "u" + request.user.userId + "_" + personId + "_" + crypto.randomUUID() + "." + ext;
+      const filePath = path.resolve(uploadsDir, filename);
+      if (!filePath.startsWith(uploadsDir + path.sep)) {
+        logger.error({ filename, filePath, uploadsDir }, "Path traversal attempt blocked");
+        return reply.code(400).send({ error: "Invalid filename" });
+      }
+      await fs.promises.writeFile(filePath, buffer);
+
+      const faceImageUrl = "/uploads/camera-faces/" + filename;
+      const dbResult = await db.addUserFace(request.user.userId, personId, name, faceImageUrl);
+      if (!dbResult.success) {
+        await faceApi.deletePerson(personId);
+        return reply.code(409).send({ error: dbResult.error });
+      }
+
+      logger.info({ userId: request.user.userId, personId, name, user: request.user.email }, "Face added to library");
+
+      return {
+        success: true,
+        face: { id: dbResult.faceId, person_id: personId, name, face_image_url: faceImageUrl, trigger_alarm: 0 }
+      };
+    } catch (error) {
+      logger.error({ err: error }, "Failed to add face");
+      return reply.code(500).send({ error: "Failed to add face" });
+    }
+  });
+
+  /**
+   * DELETE /api/face-detection/library/:faceId
+   */
+  fastify.delete("/library/:faceId", async (request, reply) => {
+    const { faceId } = request.params;
+    const result = await db.removeUserFace(parseInt(faceId), request.user.userId);
+    if (!result.success) return reply.code(404).send({ error: result.error });
+
+    if (result.personId) {
+      try { await faceApi.deletePerson(result.personId); }
+      catch (e) { logger.warn({ personId: result.personId }, "Failed to delete from Face API"); }
+    }
+
+    logger.info({ faceId, user: request.user.email }, "Face removed from library");
+    return { success: true };
+  });
+
+  /**
+   * PATCH /api/face-detection/library/:faceId/alarm
+   */
+  fastify.patch("/library/:faceId/alarm", async (request, reply) => {
+    const { faceId } = request.params;
+    const { trigger_alarm } = request.body || {};
+    const result = await db.updateUserFaceAlarm(parseInt(faceId), request.user.userId, trigger_alarm);
+    if (!result.success) return reply.code(404).send({ error: result.error });
+    return { success: true, trigger_alarm };
+  });
+
+  /**
    * GET /api/face-detection/:deviceId/settings
-   * Get face detection settings for a camera
+   * Per-camera detection knobs plus the (user-global) face list, kept in one
+   * response so the modal's "Bu Kamera" tab can render in a single request.
    */
   fastify.get("/:deviceId/settings", async (request, reply) => {
     const { deviceId } = request.params;
     const { error, camera } = await getCameraByDeviceId(deviceId, request.user.userId);
-    
-    if (error) {
-      return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
-    }
+    if (error) return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
 
     const settings = await db.getFaceDetectionSettings(camera.id);
-    const faces = await db.getCameraFaces(camera.id);
+    const faces = await db.getUserFaces(request.user.userId);
     const recentLogs = await db.getFaceDetectionLogs(camera.id, 5);
 
     return {
-      enabled: !!settings?.face_detection_enabled, alarm_trigger_names: settings?.alarm_trigger_names || "",
+      enabled: !!settings?.face_detection_enabled,
+      alarm_trigger_names: settings?.alarm_trigger_names || "",
       interval: settings?.face_detection_interval || 10,
+      match_threshold: settings?.face_match_threshold || 70,
       faces,
       recentDetections: recentLogs
     };
@@ -72,54 +176,46 @@ async function faceDetectionRoutes(fastify, options) {
 
   /**
    * PATCH /api/face-detection/:deviceId/settings
-   * Update face detection settings (enable/disable, interval)
    */
   fastify.patch("/:deviceId/settings", async (request, reply) => {
     const { deviceId } = request.params;
-    const { enabled, interval, alarm_trigger_names } = request.body || {};
-    
+    const { enabled, interval, alarm_trigger_names, match_threshold } = request.body || {};
+
     const { error, camera } = await getCameraByDeviceId(deviceId, request.user.userId);
-    
-    if (error) {
-      return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
-    }
+    if (error) return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
 
     const result = await db.updateFaceDetectionSettings(
-      camera.id, 
-      request.user.userId, 
-      enabled, 
+      camera.id,
+      request.user.userId,
+      enabled,
       interval,
-      alarm_trigger_names
+      alarm_trigger_names,
+      match_threshold
     );
+    if (!result.success) return reply.code(403).send({ error: result.error });
 
-    if (!result.success) {
-      return reply.code(403).send({ error: result.error });
-    }
-
-    logger.info({ deviceId, enabled, interval, user: request.user.email }, "Face detection settings updated");
-
-    return { success: true, enabled, interval };
+    logger.info({ deviceId, enabled, interval, match_threshold, user: request.user.email }, "Face detection settings updated");
+    return { success: true, enabled, interval, match_threshold };
   });
 
   /**
    * GET /api/face-detection/:deviceId/faces
-   * List all reference faces for a camera
+   * Backward-compat alias — still returns the user's full library, since
+   * the UI hit this endpoint before the refactor.
    */
   fastify.get("/:deviceId/faces", async (request, reply) => {
     const { deviceId } = request.params;
     const { error, camera } = await getCameraByDeviceId(deviceId, request.user.userId);
-    
-    if (error) {
-      return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
-    }
-
-    const faces = await db.getCameraFaces(camera.id);
+    if (error) return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
+    const faces = await db.getUserFaces(request.user.userId);
     return { faces };
   });
 
   /**
    * POST /api/face-detection/:deviceId/faces
-   * Add a reference face to a camera
+   * Legacy camera-scoped add-face — still accepted for backward compat but
+   * writes to the user's global library. The deviceId is only used to
+   * verify ownership.
    */
   fastify.post("/:deviceId/faces", {
     preHandler: checkFaceLimitMiddleware,
@@ -127,93 +223,61 @@ async function faceDetectionRoutes(fastify, options) {
   }, async (request, reply) => {
     const { deviceId } = request.params;
     const { error, camera } = await getCameraByDeviceId(deviceId, request.user.userId);
-    
-    if (error) {
-      return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
-    }
+    if (error) return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
 
     const data = await request.file();
-    if (!data) {
-      return reply.code(400).send({ error: "No file uploaded" });
-    }
+    if (!data) return reply.code(400).send({ error: "No file uploaded" });
 
     const name = data.fields?.name?.value || "Unknown";
 
-    // Read file buffer
     const chunks = [];
-    for await (const chunk of data.file) {
-      chunks.push(chunk);
-    }
+    for await (const chunk of data.file) chunks.push(chunk);
     const buffer = Buffer.concat(chunks);
 
-    // Validate file
     const allowedTypes = ["image/jpeg", "image/png"];
-    if (!allowedTypes.includes(data.mimetype)) {
-      return reply.code(400).send({ error: "Only JPEG and PNG allowed" });
-    }
-
-    if (buffer.length > 2 * 1024 * 1024) {
-      return reply.code(400).send({ error: "File size must be less than 2MB" });
-    }
-
-    // Validate actual file content matches declared MIME type
-    if (!validateMagicBytes(buffer, data.mimetype)) {
-      return reply.code(400).send({ error: "File content does not match declared type" });
-    }
+    if (!allowedTypes.includes(data.mimetype)) return reply.code(400).send({ error: "Only JPEG and PNG allowed" });
+    if (buffer.length > 2 * 1024 * 1024) return reply.code(400).send({ error: "File size must be less than 2MB" });
+    if (!validateMagicBytes(buffer, data.mimetype)) return reply.code(400).send({ error: "File content does not match declared type" });
 
     try {
-      // Create person in Face API
-      const tag = "camera_" + camera.id + "_" + Date.now();
+      const tag = "user_" + request.user.userId + "_" + Date.now();
       const createResult = await faceApi.createPerson(name, tag);
-
       if (!createResult.ok || !createResult.data?.result?.id) {
         logger.error({ createResult }, "Failed to create person");
         return reply.code(500).send({ error: "Failed to create face profile" });
       }
 
       const personId = createResult.data.result.id;
-
-      // Add face to person
       const addFaceResult = await faceApi.addFace(personId, buffer, data.mimetype);
-
       if (!addFaceResult.ok) {
-        // Cleanup: delete the person we just created
         await faceApi.deletePerson(personId);
-        return reply.code(400).send({ 
-          error: addFaceResult.data?.error || "Failed to register face" 
-        });
+        return reply.code(400).send({ error: addFaceResult.data?.error || "Failed to register face" });
       }
 
-      // Save face image locally
       const uploadsDir = path.resolve(__dirname, "../../uploads/camera-faces");
       await fs.promises.mkdir(uploadsDir, { recursive: true });
       const ext = data.mimetype === "image/png" ? "png" : "jpg";
-      const filename = camera.id + "_" + personId + "_" + crypto.randomUUID() + "." + ext;
+      const filename = "u" + request.user.userId + "_" + personId + "_" + crypto.randomUUID() + "." + ext;
       const filePath = path.resolve(uploadsDir, filename);
-      // Defense in depth: filename is server-generated today, but reject any
-      // future change that lets the resolved path escape uploadsDir.
       if (!filePath.startsWith(uploadsDir + path.sep)) {
         logger.error({ filename, filePath, uploadsDir }, "Path traversal attempt blocked");
         return reply.code(400).send({ error: "Invalid filename" });
       }
       await fs.promises.writeFile(filePath, buffer);
 
-      // Save to database
       const faceImageUrl = "/uploads/camera-faces/" + filename;
-      const dbResult = await db.addCameraFace(camera.id, personId, name, faceImageUrl);
+      const dbResult = await db.addUserFace(request.user.userId, personId, name, faceImageUrl);
+      if (!dbResult.success) {
+        await faceApi.deletePerson(personId);
+        return reply.code(409).send({ error: dbResult.error });
+      }
 
-      logger.info({ deviceId, personId, name, user: request.user.email }, "Face added");
+      logger.info({ deviceId, personId, name, user: request.user.email }, "Face added via camera route");
 
       return {
         success: true,
-        face: {
-          id: dbResult.faceId,
-          person_id: personId,
-          name,
-          face_image_url: faceImageUrl
-        }
+        face: { id: dbResult.faceId, person_id: personId, name, face_image_url: faceImageUrl, trigger_alarm: 0 }
       };
-
     } catch (error) {
       logger.error({ err: error, deviceId }, "Failed to add face");
       return reply.code(500).send({ error: "Failed to add face" });
@@ -222,167 +286,128 @@ async function faceDetectionRoutes(fastify, options) {
 
   /**
    * DELETE /api/face-detection/:deviceId/faces/:faceId
-   * Remove a reference face
+   * Legacy alias — deletes from user's library; deviceId used only for auth.
    */
   fastify.delete("/:deviceId/faces/:faceId", async (request, reply) => {
     const { deviceId, faceId } = request.params;
-    const { error, camera } = await getCameraByDeviceId(deviceId, request.user.userId);
-    
-    if (error) {
-      return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
-    }
+    const { error } = await getCameraByDeviceId(deviceId, request.user.userId);
+    if (error) return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
 
-    const result = await db.removeCameraFace(parseInt(faceId), camera.id);
+    const result = await db.removeUserFace(parseInt(faceId), request.user.userId);
+    if (!result.success) return reply.code(404).send({ error: result.error });
 
-    if (!result.success) {
-      return reply.code(404).send({ error: result.error });
-    }
-
-    // Delete from Face API
     if (result.personId) {
-      try {
-        await faceApi.deletePerson(result.personId);
-      } catch (e) {
-        logger.warn({ personId: result.personId }, "Failed to delete from Face API");
-      }
+      try { await faceApi.deletePerson(result.personId); }
+      catch (e) { logger.warn({ personId: result.personId }, "Failed to delete from Face API"); }
     }
 
     logger.info({ deviceId, faceId, user: request.user.email }, "Face removed");
-
     return { success: true };
   });
 
   /**
    * PATCH /api/face-detection/:deviceId/faces/:faceId/alarm
-   * Toggle alarm for a face
+   * Legacy alias — toggles alarm on the user-level face.
    */
   fastify.patch("/:deviceId/faces/:faceId/alarm", async (request, reply) => {
     const { deviceId, faceId } = request.params;
     const { trigger_alarm } = request.body || {};
-    const { error, camera } = await getCameraByDeviceId(deviceId, request.user.userId);
-    if (error) { return reply.code(error === "Not authorized" ? 403 : 404).send({ error }); }
-    const result = await db.updateFaceAlarm(parseInt(faceId), camera.id, trigger_alarm);
-    if (!result.success) { return reply.code(404).send({ error: result.error }); }
+    const { error } = await getCameraByDeviceId(deviceId, request.user.userId);
+    if (error) return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
+    const result = await db.updateUserFaceAlarm(parseInt(faceId), request.user.userId, trigger_alarm);
+    if (!result.success) return reply.code(404).send({ error: result.error });
     logger.info({ deviceId, faceId, trigger_alarm, user: request.user.email }, "Face alarm toggled");
     return { success: true, trigger_alarm };
   });
 
   /**
    * GET /api/face-detection/:deviceId/logs
-   * Get recent face detection logs
    */
   fastify.get("/:deviceId/logs", async (request, reply) => {
     const { deviceId } = request.params;
     const limit = parseInt(request.query.limit) || 10;
-    
     const { error, camera } = await getCameraByDeviceId(deviceId, request.user.userId);
-    
-    if (error) {
-      return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
-    }
+    if (error) return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
 
     const logs = await db.getFaceDetectionLogs(camera.id, limit);
     return { logs };
   });
+
   /**
    * POST /api/face-detection/:deviceId/log
-   * Log a face detection event and trigger voice call if conditions are met
+   * Client-side detection found a match; we persist it + maybe fire voice call.
+   * Lookup is now user-scoped — a match for Ahmet triggers alarm on any of
+   * this user's cameras, not only the one he was originally enrolled on.
    */
   fastify.post("/:deviceId/log", async (request, reply) => {
     const { deviceId } = request.params;
-    const { face_id, person_id, name, confidence } = request.body || {};
+    const { person_id, name, confidence } = request.body || {};
 
     const { error, camera } = await getCameraByDeviceId(deviceId, request.user.userId);
-    if (error) {
-      return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
-    }
+    if (error) return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
 
     try {
-      // Log the face detection
-      await db.logFaceDetection(camera.id, face_id, name, confidence);
-
-      // Voice call trigger check:
-      // 1. Face must have trigger_alarm=true
-      // 2. Camera must have voice_call_enabled=true
-      // 3. Camera must have face_detection_enabled=true
+      let userFace = null;
       if (person_id) {
-        const face = await db.getFaceByPersonId(camera.id, person_id);
+        userFace = await db.getUserFaceByPersonId(request.user.userId, person_id);
+      }
 
-        if (face && face.trigger_alarm) {
-          const voiceCallEnabled = await db.getVoiceCallEnabled(camera.id);
-          const faceSettings = await db.getFaceDetectionSettings(camera.id);
+      await db.logFaceDetection(camera.id, userFace?.id, name, confidence);
 
-          if (voiceCallEnabled && faceSettings?.face_detection_enabled) {
-            // Trigger voice call asynchronously (don't block response)
-            setImmediate(async () => {
-              try {
-                const result = await voiceCallService.initiateCallForFace(
-                  deviceId,
-                  camera.name || deviceId,
-                  face.name || name || 'Unknown'
-                );
+      // Voice call gates (unchanged): face.trigger_alarm + camera.voice_call_enabled + camera.face_detection_enabled
+      if (userFace && userFace.trigger_alarm) {
+        const voiceCallEnabled = await db.getVoiceCallEnabled(camera.id);
+        const faceSettings = await db.getFaceDetectionSettings(camera.id);
 
-                if (result.success) {
-                  logger.info({
-                    deviceId,
-                    faceName: face.name,
-                    personId: person_id,
-                    callId: result.callId
-                  }, 'Face detection voice call triggered');
-                } else {
-                  logger.info({
-                    deviceId,
-                    faceName: face.name,
-                    reason: result.reason
-                  }, 'Face detection voice call not triggered');
-                }
-              } catch (err) {
-                logger.error({ err, deviceId, personId: person_id }, 'Face detection voice call error');
+        if (voiceCallEnabled && faceSettings?.face_detection_enabled) {
+          setImmediate(async () => {
+            try {
+              const result = await voiceCallService.initiateCallForFace(
+                deviceId,
+                camera.name || deviceId,
+                userFace.name || name || 'Unknown'
+              );
+
+              if (result.success) {
+                logger.info({ deviceId, faceName: userFace.name, personId: person_id, callId: result.callId }, 'Face detection voice call triggered');
+              } else {
+                logger.info({ deviceId, faceName: userFace.name, reason: result.reason }, 'Face detection voice call not triggered');
               }
-            });
-          }
+            } catch (err) {
+              logger.error({ err, deviceId, personId: person_id }, 'Face detection voice call error');
+            }
+          });
         }
       }
 
-      return { success: true };
+      return { success: true, trigger_alarm: !!userFace?.trigger_alarm };
     } catch (e) {
-      logger.error({ e, deviceId }, "Failed to log face detection");
+      logger.error({ err: e, deviceId }, "Failed to log face detection");
       return reply.code(500).send({ error: "Failed to log" });
     }
   });
 
   /**
    * POST /api/face-detection/:deviceId/recognize
-   * Recognize faces in an image (proxies to Face API with auth)
+   * Proxy to Face API with auth.
    */
   fastify.post("/:deviceId/recognize", { ...faceRateLimit }, async (request, reply) => {
     const { deviceId } = request.params;
-
-    const { error, camera } = await getCameraByDeviceId(deviceId, request.user.userId);
-    if (error) {
-      return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
-    }
+    const { error } = await getCameraByDeviceId(deviceId, request.user.userId);
+    if (error) return reply.code(error === "Not authorized" ? 403 : 404).send({ error });
 
     const data = await request.file();
-    if (!data) {
-      return reply.code(400).send({ error: "No image uploaded" });
-    }
+    if (!data) return reply.code(400).send({ error: "No image uploaded" });
 
-    // Read file buffer
     const chunks = [];
-    for await (const chunk of data.file) {
-      chunks.push(chunk);
-    }
+    for await (const chunk of data.file) chunks.push(chunk);
     const buffer = Buffer.concat(chunks);
 
-    // Call Face API with authentication
     const result = await faceApi.recognizeFace(buffer, data.mimetype || "image/jpeg");
-
     if (!result.ok) {
       logger.warn({ deviceId, status: result.status }, "Face recognition failed");
       return reply.code(result.status).send(result.data);
     }
-
     return result.data;
   });
 }

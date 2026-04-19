@@ -70,7 +70,7 @@ const WebSocketMixin = {
         }
 
         // Urgent messages (alarms, auth) process immediately
-        if (message.type === 'alarm_triggered' || message.type === 'auth_success' || message.type === 'auth_error' || message.type === 'initial_state') {
+        if (message.type === 'alarm_triggered' || message.type === 'auth_success' || message.type === 'auth_error' || message.type === 'initial_state' || message.type === 'face_absence_alarm') {
           this.handleWebSocketMessage(message);
           return;
         }
@@ -180,6 +180,14 @@ const WebSocketMixin = {
 
       case 'auth_error':
         Logger.warn('[WS] Authentication failed:', payload.error);
+        break;
+
+      case 'face_absence_alarm':
+        if (typeof this.showFaceAbsenceAlert === 'function') {
+          this.showFaceAbsenceAlert(payload);
+        } else {
+          Logger.warn('[WS] face_absence_alarm received but handler missing');
+        }
         break;
 
       default:

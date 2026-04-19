@@ -237,7 +237,7 @@ DatabaseService.prototype.checkFeatureLimit = async function(userId, feature) {
   }
 };
 
-DatabaseService.prototype.checkFaceLimit = async function(userId, cameraId) {
+DatabaseService.prototype.checkFaceLimit = async function(userId, _cameraId) {
   const limits = await this.getUserEffectiveLimits(userId);
   if (!limits) return { allowed: false, reason: 'User not found' };
   if (!limits.face_recognition_enabled) {
@@ -246,9 +246,11 @@ DatabaseService.prototype.checkFaceLimit = async function(userId, cameraId) {
 
   if (limits.max_faces_per_camera === -1) return { allowed: true };
 
+  // Post-refactor: faces are user-scoped in user_faces. The column name
+  // max_faces_per_camera is now effectively "max faces total for this user".
   const [rows] = await this.pool.execute(
-    'SELECT COUNT(*) as count FROM camera_faces WHERE camera_id = ?',
-    [cameraId]
+    'SELECT COUNT(*) as count FROM user_faces WHERE user_id = ?',
+    [userId]
   );
   const currentFaces = rows[0].count;
 
@@ -256,7 +258,7 @@ DatabaseService.prototype.checkFaceLimit = async function(userId, cameraId) {
     allowed: currentFaces < limits.max_faces_per_camera,
     current: currentFaces,
     limit: limits.max_faces_per_camera,
-    reason: currentFaces >= limits.max_faces_per_camera ? 'Face limit per camera reached' : null
+    reason: currentFaces >= limits.max_faces_per_camera ? 'Face limit reached' : null
   };
 };
 

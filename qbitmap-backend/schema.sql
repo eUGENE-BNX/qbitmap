@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS cameras (
   rtsp_source_url TEXT,
   face_detection_enabled TINYINT(1) DEFAULT 0,
   face_detection_interval INT DEFAULT 10,
+  face_match_threshold TINYINT UNSIGNED NOT NULL DEFAULT 70,
   alarm_trigger_names TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_cameras_user (user_id),
@@ -283,17 +284,71 @@ CREATE TABLE IF NOT EXISTS camera_faces (
 -- =================================================================
 -- 16. face_detection_log
 -- =================================================================
+-- =================================================================
+-- 15b. user_faces (global per-user face library)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS user_faces (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  person_id VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  face_image_url TEXT,
+  trigger_alarm TINYINT(1) DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_user_person (user_id, person_id),
+  INDEX idx_uf_user (user_id),
+  CONSTRAINT fk_uf_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS face_detection_log (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   camera_id INT UNSIGNED NOT NULL,
   face_id INT UNSIGNED,
+  user_face_id INT UNSIGNED,
   person_name VARCHAR(255),
   confidence DOUBLE,
   detected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_face_log_camera (camera_id, detected_at DESC),
   INDEX idx_face_log_time (detected_at),
+  INDEX idx_fdl_user_face (user_face_id, detected_at),
   CONSTRAINT fk_face_log_camera FOREIGN KEY (camera_id) REFERENCES cameras(id) ON DELETE CASCADE,
-  CONSTRAINT fk_face_log_face FOREIGN KEY (face_id) REFERENCES camera_faces(id) ON DELETE SET NULL
+  CONSTRAINT fk_face_log_face FOREIGN KEY (face_id) REFERENCES camera_faces(id) ON DELETE SET NULL,
+  CONSTRAINT fk_fdl_uf FOREIGN KEY (user_face_id) REFERENCES user_faces(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================
+-- 16c. face_absence_rules (recurring time windows to watch for absences)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS face_absence_rules (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  user_face_id INT UNSIGNED NOT NULL,
+  label VARCHAR(255),
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  day_of_week_mask TINYINT UNSIGNED NOT NULL DEFAULT 127,
+  enabled TINYINT(1) DEFAULT 1,
+  voice_call_enabled TINYINT(1) DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_far_user (user_id),
+  INDEX idx_far_enabled_end (enabled, end_time),
+  CONSTRAINT fk_far_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_far_face FOREIGN KEY (user_face_id) REFERENCES user_faces(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================
+-- 16d. face_absence_events (idempotency ledger — one row per rule/day)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS face_absence_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  rule_id INT UNSIGNED NOT NULL,
+  window_date DATE NOT NULL,
+  triggered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  acknowledged_at DATETIME NULL,
+  UNIQUE KEY uk_rule_date (rule_id, window_date),
+  INDEX idx_fae_triggered (triggered_at),
+  CONSTRAINT fk_fae_rule FOREIGN KEY (rule_id) REFERENCES face_absence_rules(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================

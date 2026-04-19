@@ -8,23 +8,45 @@ import { Logger, escapeHtml } from '../utils.js';
 
 const FaceDetectionMixin = {
   // Face detection state per camera
-  faceDetectionState: new Map(), // deviceId -> { enabled, intervalId, interval, faces, isProcessing }
+  faceDetectionState: new Map(), // deviceId -> { enabled, intervalId, interval, isProcessing, streamId, lastDetection }
+
+  // Cached global face library shared across all cameras (user-level).
+  // Refreshed on start, on add/remove, and on settings changes.
+  _faceLibrary: [],
 
   // Face recognition API URL (from config)
   get FACE_API_URL() { return QBitmapConfig.api.faceMatcher; },
+
+  async _reloadFaceLibrary() {
+    try {
+      const res = await fetch(`${QBitmapConfig.api.public.replace('/public', '')}/face-detection/library`, {
+        credentials: 'include'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        this._faceLibrary = data.faces || [];
+      }
+    } catch (e) {
+      Logger.warn('[FaceDetection] Failed to reload library:', e);
+    }
+    return this._faceLibrary;
+  },
 
   /**
    * Initialize face detection on startup (loads cameras with detection enabled)
    */
   async initFaceDetection() {
     try {
+      // Prime the global library once up-front so per-camera starts skip
+      // N identical /library fetches.
+      await this._reloadFaceLibrary();
+
       const response = await fetch(`${QBitmapConfig.api.public.replace('/public', '')}/face-detection/active`, {
         credentials: 'include'
       });
 
       if (response.ok) {
         const data = await response.json();
-        // Start detection for each camera that has it enabled
         for (const camera of (data.cameras || [])) {
           if (camera.face_detection_enabled) {
             await this.startFaceDetection(camera.device_id, camera.face_detection_interval || 10);
@@ -54,23 +76,26 @@ const FaceDetectionMixin = {
       return;
     }
 
-    // Load reference faces
-    let faces = [];
-    try {
-      const facesRes = await fetch(`${QBitmapConfig.api.public.replace('/public', '')}/face-detection/${deviceId}/faces`, {
-        credentials: 'include'
-      });
-      if (facesRes.ok) {
-        const data = await facesRes.json();
-        faces = data.faces || [];
-      }
-    } catch (e) {
-      Logger.warn('[FaceDetection] Failed to load faces:', e);
+    // Ensure global library + per-camera threshold are loaded.
+    // No per-camera face list any more: detection matches against the
+    // user's entire library and alarms fire for any face with trigger_alarm.
+    if (this._faceLibrary.length === 0) {
+      await this._reloadFaceLibrary();
     }
-
-    if (faces.length === 0) {
+    if (this._faceLibrary.length === 0) {
       return;
     }
+
+    let matchThreshold = 70;
+    try {
+      const sRes = await fetch(`${QBitmapConfig.api.public.replace('/public', '')}/face-detection/${deviceId}/settings`, {
+        credentials: 'include'
+      });
+      if (sRes.ok) {
+        const sData = await sRes.json();
+        if (sData.match_threshold) matchThreshold = parseInt(sData.match_threshold, 10) || 70;
+      }
+    } catch (e) { /* fall back to 70 */ }
 
     // Extract stream ID from WHEP URL
     const streamId = this.extractStreamIdFromWhepUrl(camera.whep_url);
@@ -93,10 +118,10 @@ const FaceDetectionMixin = {
       enabled: true,
       intervalId: null,
       interval: intervalSeconds,
-      faces: faces,
       streamId: streamId,
       isProcessing: false,
-      lastDetection: null
+      lastDetection: null,
+      matchThreshold
     };
 
     // Start interval
@@ -108,7 +133,7 @@ const FaceDetectionMixin = {
     // Run first detection
     setTimeout(() => this.processFaceDetection(deviceId), 3000);
 
-    Logger.log(`[FaceDetection] Started for ${deviceId} (interval: ${intervalSeconds}s, faces: ${faces.length})`);
+    Logger.log(`[FaceDetection] Started for ${deviceId} (interval: ${intervalSeconds}s, library: ${this._faceLibrary.length}, threshold: ${matchThreshold})`);
   },
 
   /**
@@ -145,25 +170,20 @@ const FaceDetectionMixin = {
     state.isProcessing = true;
 
     try {
-      // Get latest frame from capture service
       const frameUrl = `${this.CAPTURE_SERVICE_URL}/frame/${state.streamId}`;
       const frameResponse = await fetch(frameUrl);
-
       if (!frameResponse.ok) {
         state.isProcessing = false;
         return;
       }
 
       const frameBlob = await frameResponse.blob();
-
-      // Get person IDs from faces
-      const personIds = state.faces.map(f => f.person_id).filter(Boolean);
-      if (personIds.length === 0) {
+      const library = this._faceLibrary;
+      if (!library || library.length === 0) {
         state.isProcessing = false;
         return;
       }
 
-      // Send to backend for recognition
       const formData = new FormData();
       formData.append('image', frameBlob, 'frame.jpg');
 
@@ -179,28 +199,28 @@ const FaceDetectionMixin = {
       }
 
       const result = await recognizeResponse.json();
+      const threshold = state.matchThreshold || 70;
 
-      // Check for matches
       if (result.success && Array.isArray(result.result) && result.result.length > 0) {
         for (const match of result.result) {
-          if (!match.isMatchFound || match.score < 70) {
+          if (!match.isMatchFound || match.score < threshold) {
             continue;
           }
 
-          // Find face by name (case-insensitive for Turkish chars)
-          let matchedFace = state.faces.find(f =>
+          // Match against the full user library (post-refactor: a face added
+          // on any camera is valid for any camera). name-based fallback still
+          // kicks in because matcher returns names, not person_ids.
+          let matchedFace = library.find(f =>
             f.name?.localeCompare(match.name, 'tr', { sensitivity: 'base' }) === 0
           );
 
-          // Fallback: If only 1 face registered and name didn't match, use that face
-          if (!matchedFace && state.faces.length === 1) {
-            matchedFace = state.faces[0];
+          if (!matchedFace && library.length === 1) {
+            matchedFace = library[0];
           }
 
-          // Fallback 2: Try partial match (first word matches)
           if (!matchedFace) {
             const matchFirstName = match.name?.split(' ')[0]?.toLowerCase();
-            matchedFace = state.faces.find(f => {
+            matchedFace = library.find(f => {
               const faceFirstName = f.name?.split(' ')[0]?.toLowerCase();
               return matchFirstName && faceFirstName && matchFirstName === faceFirstName;
             });
@@ -210,14 +230,12 @@ const FaceDetectionMixin = {
 
           Logger.log(`[FaceDetection] Match: ${faceName} (score: ${match.score})`);
 
-          // Log to backend
           try {
             await fetch(`${QBitmapConfig.api.public.replace('/public', '')}/face-detection/${deviceId}/log`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
               body: JSON.stringify({
-                face_id: matchedFace?.id,
                 person_id: matchedFace?.person_id,
                 name: faceName,
                 confidence: match.score
@@ -227,12 +245,10 @@ const FaceDetectionMixin = {
             Logger.warn('[FaceDetection] Failed to log detection:', e);
           }
 
-          // Only show alert if trigger_alarm is enabled
           if (!matchedFace?.trigger_alarm) {
             continue;
           }
 
-          // Prevent duplicate alerts (30s cooldown)
           const now = Date.now();
           const lastKey = `${deviceId}_${faceName}`;
           if (state.lastDetection?.key === lastKey && (now - state.lastDetection.time) < 30000) {
@@ -240,7 +256,6 @@ const FaceDetectionMixin = {
           }
           state.lastDetection = { key: lastKey, time: now };
 
-          // Show alert
           const faceImageUrl = matchedFace?.face_image_url || null;
           await this.showFaceDetectionAlert(deviceId, faceName, match.score, faceImageUrl);
         }
@@ -334,24 +349,72 @@ const FaceDetectionMixin = {
   },
 
   /**
-   * Refresh faces for a camera (called when faces are added/removed)
+   * Refresh faces for a camera (called when faces are added/removed).
+   * Library is now user-global so we refresh the shared cache; deviceId
+   * is kept for call-site compatibility.
    */
-  async refreshFaceDetectionFaces(deviceId) {
-    const state = this.faceDetectionState.get(deviceId);
-    if (!state) return;
+  async refreshFaceDetectionFaces(_deviceId) {
+    await this._reloadFaceLibrary();
+    Logger.log(`[FaceDetection] Refreshed global library: ${this._faceLibrary.length}`);
+  },
 
-    try {
-      const facesRes = await fetch(`${QBitmapConfig.api.public.replace('/public', '')}/face-detection/${deviceId}/faces`, {
-        credentials: 'include'
-      });
-      if (facesRes.ok) {
-        const data = await facesRes.json();
-        state.faces = data.faces || [];
-        Logger.log(`[FaceDetection] Refreshed faces for ${deviceId}: ${state.faces.length}`);
-      }
-    } catch (e) {
-      Logger.warn('[FaceDetection] Failed to refresh faces:', e);
+  /**
+   * Show absence alarm popup. Triggered by server WebSocket push when a
+   * configured time window closes without any of the user's cameras having
+   * seen the watched face.
+   */
+  async showFaceAbsenceAlert(payload) {
+    const { faceName, faceImageUrl, label, startTime, endTime } = payload || {};
+
+    if (typeof this.playAlarmSound === 'function') {
+      this.playAlarmSound();
     }
+
+    let alertEl = document.getElementById('face-absence-alert');
+    if (!alertEl) {
+      alertEl = document.createElement('div');
+      alertEl.id = 'face-absence-alert';
+      alertEl.className = 'face-detection-alert face-absence-alert';
+      document.body.appendChild(alertEl);
+    }
+
+    const windowStr = startTime && endTime
+      ? `${startTime.slice(0, 5)}–${endTime.slice(0, 5)}`
+      : '';
+
+    alertEl.innerHTML = `
+      <div class="face-alert-content face-absence-content">
+        <div class="face-alert-image" id="face-absence-image-container"></div>
+        <div class="face-alert-info">
+          <div class="face-alert-label face-absence-label">YÜZ GÖRÜLMEDİ</div>
+          <div class="face-alert-name">${escapeHtml(faceName || 'Bilinmeyen')}</div>
+          ${label ? `<div class="face-alert-camera">${escapeHtml(label)}</div>` : ''}
+          <div class="face-alert-confidence face-absence-window">${escapeHtml(windowStr)}</div>
+        </div>
+        <button class="face-alert-close">&times;</button>
+      </div>
+    `;
+
+    alertEl.querySelector('.face-alert-close').onclick = () => alertEl.classList.remove('show');
+
+    const imageContainer = alertEl.querySelector('#face-absence-image-container');
+    if (faceImageUrl) {
+      const img = document.createElement('img');
+      img.src = faceImageUrl;
+      img.alt = faceName || '';
+      img.className = 'face-alert-thumb';
+      img.onerror = () => {
+        imageContainer.innerHTML = `<div class="face-alert-icon-fallback"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-4 4-6 8-6s8 2 8 6"></path></svg></div>`;
+      };
+      imageContainer.appendChild(img);
+    } else {
+      imageContainer.innerHTML = `<div class="face-alert-icon-fallback"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-4 4-6 8-6s8 2 8 6"></path></svg></div>`;
+    }
+
+    alertEl.classList.add('show');
+    setTimeout(() => alertEl.classList.remove('show'), 30000);
+
+    Logger.log(`[FaceDetection] Absence alert: ${faceName} missing in window ${windowStr}`);
   }
 };
 
@@ -489,6 +552,23 @@ faceDetectionStyles.textContent = `
 @keyframes alertPulse {
   0% { transform: scale(0.96); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+/* Absence variant: red accent so the user can tell at a glance it's a
+   "not seen" alarm, not a regular "face detected" alarm. */
+.face-absence-alert {
+  top: 80px; /* stacks below the regular detection alert */
+}
+.face-absence-content {
+  background: rgba(255, 220, 220, 0.55) !important;
+  border-color: rgba(200, 40, 40, 0.25) !important;
+}
+.face-absence-label {
+  color: #b42020 !important;
+}
+.face-absence-window {
+  background: #fde0e0 !important;
+  color: #7a1515 !important;
 }
 `;
 document.head.appendChild(faceDetectionStyles);
