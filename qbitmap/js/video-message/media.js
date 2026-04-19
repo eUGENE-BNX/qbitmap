@@ -143,10 +143,10 @@ const MediaMixin = {
       container.classList.toggle('vmsg-portrait', isPortrait);
 
       if (isMobileLandscape) {
-        // Mobile landscape: height is the constraint, width follows from aspect-ratio
-        container.style.maxWidth = 'none';
-        container.style.width = 'auto';
-        container.style.height = 'calc(100vh - 16px)';
+        // Height/width CSS media query tarafından yönetiliyor; inline stil sadece aspect-ratio.
+        container.style.maxWidth = '';
+        container.style.width = '';
+        container.style.height = '';
       } else {
         container.style.height = '';
         container.style.width = '';
