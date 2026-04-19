@@ -22,16 +22,17 @@ const UserProfileSystem = {
   init() {
     this.createPanel();
     window.addEventListener('auth:logout', () => this.close());
+    window.addEventListener('sidemenu:open', (e) => {
+      if (e.detail?.id !== 'profile') this.close();
+    });
   },
 
   createPanel() {
     const panel = document.createElement('div');
     panel.id = 'profile-panel-overlay';
     panel.className = 'profile-panel-overlay';
-    panel.onclick = (e) => {
-      if (e.target === panel) this.close();
-    };
     panel.innerHTML = `
+      <div class="profile-panel-backdrop"></div>
       <div class="profile-panel">
         <div class="profile-panel-header">
           <h2>Profilim</h2>
@@ -45,6 +46,7 @@ const UserProfileSystem = {
         </div>
       </div>
     `;
+    panel.querySelector('.profile-panel-backdrop').addEventListener('click', () => UserProfileSystem.close());
     panel.querySelector('.profile-panel-close').addEventListener('click', () => UserProfileSystem.close());
     document.body.appendChild(panel);
   },
@@ -54,6 +56,7 @@ const UserProfileSystem = {
       AuthSystem.showNotification('Önce giriş yapmalısınız', 'error');
       return;
     }
+    window.dispatchEvent(new CustomEvent('sidemenu:open', { detail: { id: 'profile' } }));
     const panel = document.getElementById('profile-panel-overlay');
     panel.classList.add('active');
     this.isOpen = true;
@@ -154,32 +157,28 @@ const UserProfileSystem = {
 
   renderHeaderCard(user, cameraStats, landStats) {
     const memberSince = this.formatMemberSince(user.createdAt);
-    const camTotal = cameraStats?.owned?.total ?? '--';
-    const camShared = cameraStats?.sharedWithMe ?? '--';
     const areaM2 = landStats?.totalAreaM2 != null ? this.formatArea(landStats.totalAreaM2) : '--';
     const points = landStats?.totalPoints != null ? landStats.totalPoints.toLocaleString('tr-TR') : '--';
     const rank = landStats?.rank ? `#${landStats.rank}` : null;
 
     return `
       <div class="profile-header-card">
-        <div class="profile-header-left">
-          <img src="${escapeHtml(user.avatarUrl || '/default-avatar.png')}" alt="" class="profile-user-avatar">
-          <div class="profile-user-details">
-            <h3>${escapeHtml(user.displayName || 'Kullanıcı')}</h3>
-            <p>${escapeHtml(user.email)}</p>
-            ${memberSince ? `<span class="profile-member-since">Üye: ${memberSince}</span>` : ''}
-            <span class="profile-qbits">Qbits: ${points}</span>
+        <div class="profile-header-top">
+          <div class="profile-header-left">
+            <img src="${escapeHtml(user.avatarUrl || '/default-avatar.png')}" alt="" class="profile-user-avatar">
+            <div class="profile-user-details">
+              <h3>${escapeHtml(user.displayName || 'Kullanıcı')}</h3>
+              <p>${escapeHtml(user.email)}</p>
+              ${memberSince ? `<span class="profile-member-since">Üye: ${memberSince}</span>` : ''}
+              <span class="profile-qbits">Qbits: ${points}</span>
+            </div>
           </div>
-        </div>
-        <div class="profile-header-right">
           <div class="profile-header-stats">
             ${rank ? `<div class="profile-stat-mini profile-stat-rank"><span class="stat-value">${rank}</span><span class="stat-label">Sıralama</span></div>` : ''}
-            <div class="profile-stat-mini"><span class="stat-value">${camTotal}</span><span class="stat-label">Kamera</span></div>
-            <div class="profile-stat-mini"><span class="stat-value">${camShared}</span><span class="stat-label">Paylaşılan</span></div>
             <div class="profile-stat-mini"><span class="stat-value">${areaM2}</span><span class="stat-label">Arazi</span></div>
           </div>
-          ${this.renderLocationChip(user.location)}
         </div>
+        ${this.renderLocationChip(user.location)}
       </div>
     `;
   },
@@ -643,7 +642,7 @@ const UserProfileSystem = {
       return `<div class="profile-recent-section">${header}<div class="profile-recent-empty">Henüz paylaşım yok</div></div>`;
     }
 
-    const thumbs = messages.slice(0, 5).map(msg => {
+    const thumbs = messages.slice(0, 6).map(msg => {
       const isVideo = msg.media_type === 'video';
       const thumbUrl = `${QBitmapConfig.api.base}/api/video-messages/${encodeURIComponent(msg.message_id)}/thumbnail`;
       const timeAgo = this.formatTimeAgo(msg.created_at);
@@ -668,8 +667,8 @@ const UserProfileSystem = {
       return `<div class="profile-recent-section">${header}<div class="profile-recent-empty">Henüz kayıtlı yayın yok</div></div>`;
     }
 
-    // Show last 5 (single row)
-    const items = recordings.slice(0, 5);
+    // Show last 6 (single row)
+    const items = recordings.slice(0, 6);
     const cards = items.map(rec => {
       const thumbUrl = `${QBitmapConfig.api.base}/api/broadcast-recordings/${encodeURIComponent(rec.recording_id)}/thumbnail`;
       const timeAgo = this.formatTimeAgo(rec.created_at);
@@ -684,14 +683,14 @@ const UserProfileSystem = {
           <div class="media-card-thumb">
             <img src="${thumbUrl}" alt="" loading="lazy">
             <span class="media-type-badge broadcast-duration-badge">${durationLabel}</span>
-            <div class="broadcast-rec-actions">
-              <button class="broadcast-rec-visibility-btn${isPublic ? ' active' : ''}" title="${isPublic ? 'Haritadan kaldır' : 'Haritada göster'}">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
-              <button class="broadcast-rec-delete-btn" title="Sil">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-              </button>
-            </div>
+          </div>
+          <div class="broadcast-rec-actions">
+            <button class="broadcast-rec-visibility-btn${isPublic ? ' active' : ''}" title="${isPublic ? 'Haritadan kaldır' : 'Haritada göster'}">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button class="broadcast-rec-delete-btn" title="Sil">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </button>
           </div>
           <span class="media-card-time">${timeAgo}</span>
         </div>

@@ -41,6 +41,9 @@ const MyCamerasSystem = {
       this.sharedCameras = [];
       if (this.isOpen) this.close();
     });
+    window.addEventListener('sidemenu:open', (e) => {
+      if (e.detail?.id !== 'my-cameras' && this.isOpen) this.close();
+    });
 
     Logger.log('[MyCameras] Dashboard initialized');
   },
@@ -141,6 +144,7 @@ const MyCamerasSystem = {
       return;
     }
 
+    window.dispatchEvent(new CustomEvent('sidemenu:open', { detail: { id: 'my-cameras' } }));
     const dashboard = document.getElementById('my-cameras-dashboard');
     dashboard.classList.add('active');
     this.isOpen = true;
