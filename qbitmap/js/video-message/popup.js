@@ -106,7 +106,7 @@ const PopupMixin = {
              </svg>
            </button>
          </div>`
-      : `${shimmerHtml}<video controls playsinline preload="metadata" crossorigin="use-credentials">
+      : `<video controls playsinline preload="none" poster="${this.apiBase}/${encodeURIComponent(messageId)}/thumbnail?size=preview">
             <source src="${videoUrl}" type="${esc(props.mimeType || 'video/mp4')}">
           </video>`;
 
@@ -285,36 +285,24 @@ const PopupMixin = {
         const imgEl = popupEl.querySelector('.vmsg-popup-photo');
         const carousel = popupEl.querySelector('.vmsg-popup-carousel');
         if (imgEl && carousel) {
-          // Per-popup blob URL cache: index → object URL (released on popup close)
-          const photoCache = new Map();
           let activeIdx = 0;
 
-          const orientImg = () => {
+          imgEl.onload = () => {
             if (imgEl.naturalHeight > imgEl.naturalWidth) {
               const body = imgEl.closest('.video-msg-popup-body');
               if (body && !body.classList.contains('vmsg-portrait-photo-wrap')) {
                 body.classList.add('vmsg-portrait-photo-wrap');
               }
             }
+            carousel.querySelector('.vmsg-media-shimmer')?.remove();
           };
-          imgEl.onload = orientImg;
 
-          const loadIdx = (idx) => {
+          const prefetch = (idx) => {
             const entry = photoUrls[idx];
-            if (!entry) return Promise.resolve(null);
-            if (photoCache.has(idx)) return Promise.resolve(photoCache.get(idx));
-            return fetch(entry.url, { credentials: 'include' })
-              .then(r => r.ok ? r.blob() : null)
-              .then(blob => {
-                if (!blob || blob.size === 0) return null;
-                const url = URL.createObjectURL(blob);
-                photoCache.set(idx, url);
-                return url;
-              })
-              .catch(() => null);
+            if (entry) { const i = new Image(); i.src = entry.url; }
           };
 
-          const setActive = async (newIdx) => {
+          const setActive = (newIdx) => {
             if (photoCount === 0) return;
             activeIdx = ((newIdx % photoCount) + photoCount) % photoCount;
             currentActiveIdx = activeIdx;
@@ -322,18 +310,12 @@ const PopupMixin = {
             const counter = carousel.querySelector('[data-curr]');
             if (counter) counter.textContent = activeIdx + 1;
             carousel.querySelectorAll('.vmsg-popup-dot').forEach((d, i) => d.classList.toggle('active', i === activeIdx));
-            // Render AI description for the new active photo (or placeholder)
             renderAiForActive();
-            // Switch image (use cache or fetch)
-            const url = await loadIdx(activeIdx);
-            if (url) {
-              imgEl.src = url;
-              carousel.querySelector('.vmsg-media-shimmer')?.remove();
-            }
-            // Prefetch neighbors
+            const entry = photoUrls[activeIdx];
+            if (entry) imgEl.src = entry.url;
             if (photoCount > 1) {
-              loadIdx((activeIdx + 1) % photoCount);
-              loadIdx((activeIdx - 1 + photoCount) % photoCount);
+              prefetch((activeIdx + 1) % photoCount);
+              prefetch((activeIdx - 1 + photoCount) % photoCount);
             }
           };
 
@@ -383,8 +365,6 @@ const PopupMixin = {
           // Cleanup on popup close
           popup.on('close', () => {
             document.removeEventListener('keydown', keyHandler);
-            for (const u of photoCache.values()) URL.revokeObjectURL(u);
-            photoCache.clear();
           });
 
           // Expand → carousel-aware fullscreen overlay
@@ -398,11 +378,6 @@ const PopupMixin = {
           imgEl.style.cursor = 'pointer';
           imgEl.onclick = openOverlay;
           if (expandBtn) expandBtn.onclick = openOverlay;
-        }
-      } else {
-        const videoEl = popupEl.querySelector('video');
-        if (videoEl) {
-          this.loadVideoWithCredentials(videoEl, videoUrl);
         }
       }
 
@@ -620,47 +595,6 @@ const PopupMixin = {
     }, 0);
   },
 
-  async loadVideoWithCredentials(videoEl, url) {
-    try {
-      const response = await fetch(url, { credentials: 'include' });
-      if (!response.ok) return;
-      const blob = await response.blob();
-      videoEl.src = URL.createObjectURL(blob);
-      videoEl.parentElement?.querySelector('.vmsg-media-shimmer')?.remove();
-    } catch (e) {
-      Logger.warn('[VideoMessage] Video load failed:', e);
-      videoEl.parentElement?.querySelector('.vmsg-media-shimmer')?.remove();
-    }
-  },
-
-  async loadPhotoWithCredentials(imgEl, url) {
-    const removeShimmer = () => imgEl.parentElement?.querySelector('.vmsg-media-shimmer')?.remove();
-
-    // Try fetch with credentials first (needed for private messages)
-    try {
-      const response = await fetch(url, { credentials: 'include' });
-      if (response.ok) {
-        const blob = await response.blob();
-        if (blob.size > 0) {
-          imgEl.src = URL.createObjectURL(blob);
-          removeShimmer();
-          return;
-        }
-      }
-    } catch (e) {
-      Logger.warn('[VideoMessage] Photo fetch failed, trying direct src:', e);
-    }
-
-    // Fallback: set src directly and let browser handle cookies
-    imgEl.crossOrigin = 'use-credentials';
-    imgEl.onload = removeShimmer;
-    imgEl.onerror = () => {
-      Logger.warn('[VideoMessage] Photo direct load also failed');
-      removeShimmer();
-    };
-    imgEl.src = url;
-  },
-
   openPhotoOverlay(previewUrl, originalUrl, opts = {}) {
     // Remove existing overlay if any
     document.querySelector('.vmsg-photo-overlay')?.remove();
@@ -694,21 +628,13 @@ const PopupMixin = {
     document.body.appendChild(overlay);
 
     const img = overlay.querySelector('img');
-    const objectUrls = []; // track for cleanup
 
-    // Load original quality for the current photo in background
+    // Preload original in background, swap in once fully cached
     const loadOriginal = (url) => {
       if (!url) return;
-      fetch(url, { credentials: 'include' })
-        .then(r => r.ok ? r.blob() : null)
-        .then(blob => {
-          if (blob && blob.size > 0) {
-            const u = URL.createObjectURL(blob);
-            objectUrls.push(u);
-            img.src = u;
-          }
-        })
-        .catch(() => {});
+      const pre = new Image();
+      pre.onload = () => { img.src = url; };
+      pre.src = url;
     };
     loadOriginal(originalUrl);
 
@@ -728,17 +654,8 @@ const PopupMixin = {
       // Reset zoom/pan for clean view of new photo
       scale = 1; panX = 0; panY = 0;
       applyTransform();
-      // Show preview-quality first, then upgrade to original
-      fetch(p.url, { credentials: 'include' })
-        .then(r => r.ok ? r.blob() : null)
-        .then(blob => {
-          if (blob && blob.size > 0) {
-            const u = URL.createObjectURL(blob);
-            objectUrls.push(u);
-            img.src = u;
-          }
-        })
-        .catch(() => {});
+      // Show preview immediately (browser cache hit if already loaded by popup carousel)
+      img.src = p.url;
       loadOriginal(p.originalUrl);
       const counter = overlay.querySelector('[data-curr]');
       if (counter) counter.textContent = activeIdx + 1;
@@ -773,8 +690,6 @@ const PopupMixin = {
     // Close
     const closeOverlay = () => {
       overlay.remove();
-      for (const u of objectUrls) URL.revokeObjectURL(u);
-      objectUrls.length = 0;
       document.removeEventListener('keydown', overlayKeyHandler);
     };
     const overlayKeyHandler = (e) => {
