@@ -25,12 +25,6 @@ const MyCamerasSystem = {
   editingCameraId: null,
   _isSubmitting: false,
 
-  // Compact view state
-  viewMode: 'compact',
-  activeTypeFilter: 'all',
-  activeStatusFilter: 'all',
-  expandedCardIds: new Set(),
-
   init() {
     this.createDashboard();
     this.setupEventDelegation();
@@ -50,17 +44,6 @@ const MyCamerasSystem = {
 
   setupEventDelegation() {
     document.addEventListener('click', (e) => {
-      // Filter bar controls (no data-action attribute)
-      const viewBtn = e.target.closest('.view-btn');
-      if (viewBtn) { this.setViewMode(viewBtn.dataset.view); return; }
-
-      const filterChip = e.target.closest('.filter-chip');
-      if (filterChip) { this.setTypeFilter(filterChip.dataset.type); return; }
-
-      const statusBtn = e.target.closest('.status-btn');
-      if (statusBtn) { this.setStatusFilter(statusBtn.dataset.status); return; }
-
-      // Action buttons
       const target = e.target.closest('[data-action]');
       if (!target) return;
 
@@ -69,7 +52,6 @@ const MyCamerasSystem = {
       const cameraId = target.dataset.cameraId || target.closest('[data-camera-id]')?.dataset.cameraId;
 
       switch (action) {
-        case 'toggle-expand': this.toggleCardExpand(cameraId || deviceId); break;
         case 'watch': {
           const lng = parseFloat(target.dataset.lng);
           const lat = parseFloat(target.dataset.lat);
@@ -159,64 +141,8 @@ const MyCamerasSystem = {
     if (this.cancelLocationPick) this.cancelLocationPick();
   },
 
-  getCameraType(camera) {
-    if (camera.camera_type === 'city') return 'city';
-    if (camera.device_id?.startsWith('RTMP_')) return 'rtmp';
-    return 'rtsp';
-  },
-
   isCameraOnline(camera) {
     return true;
-  },
-
-  getFilteredCameras() {
-    let filtered = [...this.cameras];
-    if (this.activeTypeFilter !== 'all') {
-      filtered = filtered.filter(c => this.getCameraType(c) === this.activeTypeFilter);
-    }
-    if (this.activeStatusFilter !== 'all') {
-      const wantOnline = this.activeStatusFilter === 'online';
-      filtered = filtered.filter(c => this.isCameraOnline(c) === wantOnline);
-    }
-    return filtered;
-  },
-
-  getCameraCounts() {
-    const counts = { all: this.cameras.length, rtsp: 0, rtmp: 0, city: 0, online: 0, offline: 0 };
-    for (const c of this.cameras) {
-      const type = this.getCameraType(c);
-      counts[type] = (counts[type] || 0) + 1;
-      if (this.isCameraOnline(c)) counts.online++; else counts.offline++;
-    }
-    return counts;
-  },
-
-  setViewMode(mode) {
-    this.viewMode = mode;
-    this.renderCameras();
-    document.querySelectorAll('.my-cameras-view-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.view === mode);
-    });
-  },
-
-  setTypeFilter(type) {
-    this.activeTypeFilter = type;
-    this.renderCameras();
-  },
-
-  setStatusFilter(status) {
-    this.activeStatusFilter = status;
-    this.renderCameras();
-  },
-
-  toggleCardExpand(cameraId) {
-    const id = String(cameraId);
-    if (this.expandedCardIds.has(id)) {
-      this.expandedCardIds.delete(id);
-    } else {
-      this.expandedCardIds.add(id);
-    }
-    this.renderCameras();
   },
 
   async loadCameras() {

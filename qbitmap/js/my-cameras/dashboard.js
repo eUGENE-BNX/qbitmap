@@ -2,144 +2,6 @@ import { QBitmapConfig } from "../config.js";
 import { Logger, escapeHtml } from "../utils.js";
 
 const DashboardMixin = {
-  renderFilterBar() {
-    const counts = this.getCameraCounts();
-    const types = [
-      { key: 'all', label: 'Tümü' },
-      { key: 'rtsp', label: 'RTSP' },
-      { key: 'rtmp', label: 'RTMP' },
-      { key: 'city', label: 'City' }
-    ];
-
-    return `
-      <div class="cameras-filter-bar">
-        <div class="view-toggle">
-          <button class="view-btn ${this.viewMode === 'compact' ? 'active' : ''}" data-view="compact" title="Kompakt Görünüm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
-          <button class="view-btn ${this.viewMode === 'expanded' ? 'active' : ''}" data-view="expanded" title="Genişletilmiş Görünüm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="7" height="7"></rect>
-              <rect x="14" y="3" width="7" height="7"></rect>
-              <rect x="3" y="14" width="7" height="7"></rect>
-              <rect x="14" y="14" width="7" height="7"></rect>
-            </svg>
-          </button>
-        </div>
-        <div class="filter-chips">
-          ${types.filter(t => counts[t.key] > 0 || t.key === 'all').map(t => `
-            <button class="filter-chip ${this.activeTypeFilter === t.key ? 'active' : ''}" data-type="${t.key}">
-              ${t.label}<span class="chip-count">${counts[t.key]}</span>
-            </button>
-          `).join('')}
-        </div>
-        <div class="status-filter">
-          <button class="status-btn ${this.activeStatusFilter === 'all' ? 'active' : ''}" data-status="all">Tümü</button>
-          <button class="status-btn ${this.activeStatusFilter === 'online' ? 'active' : ''}" data-status="online">
-            <span class="status-dot online"></span>Online
-          </button>
-          <button class="status-btn ${this.activeStatusFilter === 'offline' ? 'active' : ''}" data-status="offline">
-            <span class="status-dot offline"></span>Offline
-          </button>
-        </div>
-      </div>
-    `;
-  },
-
-  /**
-   * Render compact camera card
-   */
-  renderCompactCard(camera) {
-    const type = this.getCameraType(camera);
-    const isOnline = this.isCameraOnline(camera);
-    const isExpanded = this.expandedCardIds.has(String(camera.id));
-    const isWhep = camera.camera_type === 'whep';
-    const isCity = camera.camera_type === 'city';
-    const locationText = camera.lng && camera.lat
-      ? `${camera.lat.toFixed(4)}, ${camera.lng.toFixed(4)}`
-      : 'Konum belirlenmedi';
-
-    return `
-      <div class="camera-card compact ${isExpanded ? 'expanded' : ''}"
-           data-camera-id="${escapeHtml(camera.id)}"
-           data-type="${type}"
-           data-status="${isOnline ? 'online' : 'offline'}">
-        <div class="camera-compact-row">
-          <div class="camera-status-indicator ${isOnline ? 'online' : 'offline'}"></div>
-          <span class="camera-name-compact">${escapeHtml(camera.name)}</span>
-          <span class="camera-type-badge-compact ${type}">${type.toUpperCase()}</span>
-          <div class="camera-quick-actions">
-            ${camera.lng && camera.lat ? `
-            <button class="quick-action-btn" data-action="watch" data-device-id="${escapeHtml(camera.device_id)}" data-lng="${camera.lng}" data-lat="${camera.lat}" title="Haritada Göster">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-            </button>
-            ` : ''}
-            <button class="quick-action-btn expand-btn ${isExpanded ? 'expanded' : ''}" data-action="toggle-expand" data-camera-id="${camera.id}" title="Detaylar">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="camera-details-panel">
-          <div class="camera-info-compact">
-            <span class="info-item-compact">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                <circle cx="12" cy="10" r="3"></circle>
-              </svg>
-              ${locationText}
-            </span>
-            <span class="info-item-compact">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-              ${camera.is_public ? 'Herkese Açık' : 'Gizli'}
-            </span>
-            ${isWhep && camera.onvif_camera_id ? `
-            <span class="info-item-compact" style="color: #4caf50;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-              ONVIF Bağlı
-            </span>
-            ` : ''}
-          </div>
-          <div class="camera-actions-expanded">
-            ${isCity ? `
-              <button class="btn-secondary btn-sm" data-action="settings" data-device-id="${escapeHtml(camera.device_id)}" data-camera-id="${escapeHtml(camera.id)}">Ayarlar</button>
-              <button class="btn-danger btn-sm" data-action="delete" data-camera-id="${escapeHtml(camera.id)}" data-camera-name="${escapeHtml(camera.name)}" data-camera-type="${escapeHtml(camera.camera_type)}">Sil</button>
-            ` : isWhep ? `
-              <button class="btn-secondary btn-sm btn-voice" data-action="voice" data-device-id="${escapeHtml(camera.device_id)}">Sesli Arama</button>
-              <button class="btn-secondary btn-sm" data-action="recordings" data-device-id="${escapeHtml(camera.device_id)}">Kayıtlar</button>
-              <button class="btn-secondary btn-sm" data-action="face" data-device-id="${escapeHtml(camera.device_id)}">Yüz Tanıma</button>
-              <button class="btn-secondary btn-sm" data-action="settings" data-device-id="${escapeHtml(camera.device_id)}" data-camera-id="${escapeHtml(camera.id)}">Ayarlar</button>
-              <button class="btn-secondary btn-sm" data-action="share" data-camera-id="${escapeHtml(camera.id)}">Paylaş</button>
-              <button class="btn-danger btn-sm" data-action="delete" data-camera-id="${escapeHtml(camera.id)}" data-camera-name="${escapeHtml(camera.name)}" data-camera-type="${escapeHtml(camera.camera_type)}">Sil</button>
-            ` : `
-              <button class="btn-secondary btn-sm" data-action="record" data-device-id="${escapeHtml(camera.device_id)}" data-lng="${camera.lng || ''}" data-lat="${camera.lat || ''}">Kayıt</button>
-              <button class="btn-secondary btn-sm" data-action="location" data-device-id="${escapeHtml(camera.device_id)}" data-camera-id="${escapeHtml(camera.id)}">Konum</button>
-              <button class="btn-secondary btn-sm" data-action="settings" data-device-id="${escapeHtml(camera.device_id)}" data-camera-id="${escapeHtml(camera.id)}">Ayarlar</button>
-              <button class="btn-secondary btn-sm" data-action="share" data-camera-id="${escapeHtml(camera.id)}">Paylaş</button>
-              <button class="btn-danger btn-sm" data-action="delete" data-camera-id="${escapeHtml(camera.id)}" data-camera-name="${escapeHtml(camera.name)}" data-camera-type="${escapeHtml(camera.camera_type)}">Sil</button>
-            `}
-          </div>
-        </div>
-      </div>
-    `;
-  },
-
-  /**
-   * Render expanded camera card (original style)
-   */
   renderExpandedCard(camera) {
     const isWhep = camera.camera_type === 'whep';
     const isCity = camera.camera_type === 'city';
@@ -211,12 +73,8 @@ const DashboardMixin = {
     `;
   },
 
-  /**
-   * Render cameras list
-   */
   renderCameras() {
     const content = document.querySelector('.dashboard-content');
-    const filteredCameras = this.getFilteredCameras();
 
     let html = `
       <div class="cameras-actions">
@@ -242,34 +100,11 @@ const DashboardMixin = {
         </div>
       `;
     } else {
-      // Add filter bar
-      html += this.renderFilterBar();
-
-      // Check if filtered results are empty
-      if (filteredCameras.length === 0) {
-        html += `
-          <div class="cameras-no-results">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              <line x1="8" y1="11" x2="14" y2="11"></line>
-            </svg>
-            <p>Filtreye uygun kamera bulunamadı</p>
-          </div>
-        `;
-      } else {
-        html += `<div class="cameras-list ${this.viewMode === 'compact' ? 'compact-view' : ''}">`;
-
-        for (const camera of filteredCameras) {
-          if (this.viewMode === 'compact') {
-            html += this.renderCompactCard(camera);
-          } else {
-            html += this.renderExpandedCard(camera);
-          }
-        }
-
-        html += '</div>';
+      html += '<div class="cameras-list">';
+      for (const camera of this.cameras) {
+        html += this.renderExpandedCard(camera);
       }
+      html += '</div>';
     }
 
     // Render shared cameras section
