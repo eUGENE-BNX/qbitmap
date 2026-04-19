@@ -261,17 +261,20 @@ const PopupMixin = {
         checkScroll();
       };
 
-      // Listen for AI-ready custom events dispatched by cleanup.handleAiDescriptionReady
-      // so the active photo's text refreshes live without waiting for a switch.
+      // Listen for AI-ready custom events dispatched by cleanup.handleAiDescriptionReady.
+      // Eagerly persist text+lang from the event payload into photoAiState so the
+      // user can navigate away and back without losing the description (race-proof
+      // against any re-fetch of videoMessages cache).
       const aiReadyHandler = (e) => {
         const idx = e.detail?.photoIdx;
+        const text = e.detail?.aiDescription;
+        const lng = (e.detail?.aiDescriptionLang || 'tr').toLowerCase();
+        if (idx != null && text) {
+          photoAiState.set(idx, { text, lang: lng });
+          langCache.set(`${idx}:${lng}`, text);
+        }
         if (idx == null || idx === currentActiveIdx) {
-          // Reset cached state for that idx so renderAiForActive re-reads from videoMessages
-          if (idx != null) photoAiState.delete(idx);
           renderAiForActive();
-        } else {
-          // Background photo: just drop stale popup-local state so the next switch re-reads
-          photoAiState.delete(idx);
         }
       };
       popupEl.addEventListener('vmsg:ai-update', aiReadyHandler);
