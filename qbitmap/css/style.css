@@ -15,11 +15,12 @@ html, body {
 }
 
 #map {
-    position: absolute;
+    /* `fixed` pins the canvas to the visual viewport instead of the body
+       box. In a standalone PWA the body height stops at the gesture-nav
+       safe-area, which left a ~1cm strip under the map; fixed + inset:0
+       covers the whole screen like the profile/my-cameras panels do. */
+    position: fixed;
     inset: 0;
-    /* dvh tracks the Android URL bar / gesture-nav area dynamically.
-       Fallback remains `inset: 0` when dvh isn't supported. */
-    height: 100dvh;
     background: #f6f7fb;
 }
 
