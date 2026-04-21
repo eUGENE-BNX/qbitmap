@@ -3,10 +3,11 @@ import { Logger } from "../../utils.js";
 import { Analytics } from "../../analytics.js";
 
 const StreamingMixin = {
-  // [PWA] Media Session for camera popups. Snapshots the current video
-  // frame once decoded so the lock-screen artwork shows the live camera
-  // view instead of the default PWA logo. WebRTC / HLS streams are
-  // same-origin so the canvas isn't tainted.
+  // [PWA] Media Session for camera popups. Camera name + location on
+  // the lock screen, Stop action closes the popup. Artwork falls back
+  // to the PWA icon — Chrome Android hardware-decodes WebRTC into an
+  // overlay that no canvas / capture API samples reliably, so trying
+  // to pull a live frame isn't worth the complexity.
   _attachCameraMediaSession(popupData, videoEl, deviceId) {
     if (!popupData || !videoEl) return;
     if (popupData.mediaSessionCleanup) {
@@ -17,7 +18,7 @@ const StreamingMixin = {
       const camera = popupData.camera || {};
       const title = camera.name || camera.camera_name || 'Canlı Kamera';
       const location = camera.location_name || camera.address || '';
-      const opts = {
+      popupData.mediaSessionCleanup = wireMediaSession(videoEl, {
         title,
         artist: location || 'Canlı',
         album: 'QBitmap Canlı Yayın',
@@ -25,111 +26,7 @@ const StreamingMixin = {
         skipPause: true, // pause on a live feed is misleading — use Stop
         posterUrl: null,
         onStop: () => { try { this.closePopup?.(deviceId); } catch {} },
-      };
-
-      const rewire = () => {
-        if (popupData.mediaSessionCleanup) popupData.mediaSessionCleanup();
-        popupData.mediaSessionCleanup = wireMediaSession(videoEl, opts);
-      };
-      rewire();
-
-      // Build a JPEG data URL from the current camera frame. The tricky
-      // part is WHEP: Chrome Android hardware-decodes WebRTC video into
-      // an overlay that neither canvas2D drawImage nor ImageCapture can
-      // read reliably — both produce a uniform (brown) frame. The
-      // modern fix is MediaStreamTrackProcessor, which exposes raw
-      // VideoFrame objects from the track and bypasses the overlay.
-      // HLS streams go through the video-element path as usual.
-      const W = 512;
-      const bitmapToDataUrl = (bmp) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = W;
-        canvas.height = Math.round(W * bmp.height / bmp.width) || W;
-        canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL('image/jpeg', 0.75);
-      };
-
-      const grabFromTrack = async () => {
-        const stream = videoEl.srcObject;
-        const track = stream?.getVideoTracks?.()[0];
-        if (!track || track.readyState !== 'live') return null;
-
-        // Modern path — MediaStreamTrackProcessor + VideoFrame.
-        if ('MediaStreamTrackProcessor' in window) {
-          let reader;
-          try {
-            const processor = new MediaStreamTrackProcessor({ track });
-            reader = processor.readable.getReader();
-            const { value: frame, done } = await reader.read();
-            if (done || !frame) return null;
-            const bitmap = await createImageBitmap(frame);
-            frame.close();
-            try { await reader.cancel(); } catch {}
-            const url = bitmapToDataUrl(bitmap);
-            bitmap.close?.();
-            return url;
-          } catch {
-            try { await reader?.cancel(); } catch {}
-            // fall through
-          }
-        }
-
-        // Legacy path — ImageCapture. Often rejected on remote tracks,
-        // but worth a shot.
-        if ('ImageCapture' in window) {
-          try {
-            const bmp = await new ImageCapture(track).grabFrame();
-            const url = bitmapToDataUrl(bmp);
-            bmp.close?.();
-            return url;
-          } catch { /* ignore */ }
-        }
-        return null;
-      };
-
-      const grabFromVideoEl = async () => {
-        if (!videoEl.videoWidth || !videoEl.videoHeight) return null;
-        try {
-          // createImageBitmap on the video element can succeed where
-          // canvas.drawImage(video) fails on HW-accelerated playback.
-          const bmp = await createImageBitmap(videoEl);
-          const url = bitmapToDataUrl(bmp);
-          bmp.close?.();
-          return url;
-        } catch { /* fall through */ }
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = W;
-          canvas.height = Math.round(W * videoEl.videoHeight / videoEl.videoWidth) || W;
-          canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-          return canvas.toDataURL('image/jpeg', 0.75);
-        } catch { return null; }
-      };
-
-      const snapshot = async () => {
-        try {
-          const dataUrl = (await grabFromTrack()) || (await grabFromVideoEl());
-          if (!dataUrl || dataUrl.length < 3000) return false;
-          opts.posterUrl = dataUrl;
-          rewire();
-          return true;
-        } catch {
-          return false;
-        }
-      };
-
-      // `requestVideoFrameCallback` fires once a frame has been decoded
-      // and is ready to paint — exactly what we need so the capture
-      // isn't an empty buffer. Fall back to load events on older UAs.
-      if (typeof videoEl.requestVideoFrameCallback === 'function') {
-        videoEl.requestVideoFrameCallback(() => snapshot());
-      } else {
-        videoEl.addEventListener('loadeddata', async () => {
-          if (!(await snapshot())) {
-            videoEl.addEventListener('playing', () => snapshot(), { once: true });
-          }
-        }, { once: true });
-      }
+      });
     }).catch(() => {});
   },
 
