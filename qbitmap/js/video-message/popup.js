@@ -975,91 +975,18 @@ const PopupMixin = {
     }
   },
 
-  _wireMediaSession(videoEl, ctx) {
-    if (!videoEl || typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
-
-    const ms = navigator.mediaSession;
+  async _wireMediaSession(videoEl, ctx) {
+    if (!videoEl) return;
+    const { wireMediaSession } = await import('../../src/pwa/media-session.js');
     const poster = videoEl.getAttribute('poster')
       || `${this.apiBase}/${encodeURIComponent(ctx.messageId)}/thumbnail?size=preview`;
-
-    const applyMetadata = () => {
-      try {
-        ms.metadata = new MediaMetadata({
-          title: ctx.description || 'Video Mesaj',
-          artist: ctx.senderName || 'QBitmap',
-          album: 'QBitmap',
-          // Single poster URL — the OS scales it for lock screen, tray,
-          // and CarPlay at whatever size it needs.
-          artwork: [
-            { src: poster, sizes: '512x512', type: 'image/jpeg' },
-            { src: poster, sizes: '384x384', type: 'image/jpeg' },
-            { src: poster, sizes: '256x256', type: 'image/jpeg' },
-            { src: poster, sizes: '192x192', type: 'image/jpeg' },
-          ],
-        });
-      } catch (err) {
-        console.warn('[media-session] metadata failed', err);
-      }
-    };
-
-    const setHandler = (action, fn) => {
-      try { ms.setActionHandler(action, fn); } catch { /* not supported */ }
-    };
-
-    setHandler('play', () => videoEl.play().catch(() => {}));
-    setHandler('pause', () => videoEl.pause());
-    setHandler('seekbackward', (d) => {
-      videoEl.currentTime = Math.max(0, videoEl.currentTime - (d?.seekOffset || 10));
+    this._mediaSessionCleanup = wireMediaSession(videoEl, {
+      title: ctx.description || 'Video Mesaj',
+      artist: ctx.senderName || 'QBitmap',
+      album: 'QBitmap',
+      posterUrl: poster,
+      live: false,
     });
-    setHandler('seekforward', (d) => {
-      const dur = videoEl.duration || Number.POSITIVE_INFINITY;
-      videoEl.currentTime = Math.min(dur, videoEl.currentTime + (d?.seekOffset || 10));
-    });
-    setHandler('seekto', (d) => {
-      if (!d || typeof d.seekTime !== 'number') return;
-      if (d.fastSeek && typeof videoEl.fastSeek === 'function') {
-        videoEl.fastSeek(d.seekTime);
-      } else {
-        videoEl.currentTime = d.seekTime;
-      }
-    });
-    setHandler('stop', () => {
-      videoEl.pause();
-      ms.playbackState = 'paused';
-    });
-
-    const onPlay = () => {
-      applyMetadata();
-      ms.playbackState = 'playing';
-    };
-    const onPause = () => { ms.playbackState = 'paused'; };
-    const onTimeUpdate = () => {
-      if (!videoEl.duration || !isFinite(videoEl.duration)) return;
-      if (typeof ms.setPositionState !== 'function') return;
-      try {
-        ms.setPositionState({
-          duration: videoEl.duration,
-          playbackRate: videoEl.playbackRate || 1,
-          position: Math.min(videoEl.currentTime, videoEl.duration),
-        });
-      } catch { /* spec allows throws on bad state — ignore */ }
-    };
-
-    videoEl.addEventListener('play', onPlay);
-    videoEl.addEventListener('pause', onPause);
-    videoEl.addEventListener('timeupdate', onTimeUpdate);
-
-    // Remember cleanup so closeMessagePopup can release handlers.
-    this._mediaSessionCleanup = () => {
-      videoEl.removeEventListener('play', onPlay);
-      videoEl.removeEventListener('pause', onPause);
-      videoEl.removeEventListener('timeupdate', onTimeUpdate);
-      ['play', 'pause', 'seekbackward', 'seekforward', 'seekto', 'stop']
-        .forEach((a) => { try { ms.setActionHandler(a, null); } catch {} });
-      try { ms.metadata = null; } catch {}
-      ms.playbackState = 'none';
-      this._mediaSessionCleanup = null;
-    };
   },
 
   async _collectShareFiles(ctx) {

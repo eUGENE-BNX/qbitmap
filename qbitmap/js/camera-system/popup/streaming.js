@@ -1,8 +1,33 @@
 import { QBitmapConfig } from "../../config.js";
 import { Logger } from "../../utils.js";
 import { Analytics } from "../../analytics.js";
+import { wireMediaSession } from "../../../src/pwa/media-session.js";
 
 const StreamingMixin = {
+  // [PWA] Lock-screen / tray controls while a camera streams. Safe to call
+  // twice (e.g. fallback from WHEP to HLS) — prior session is released
+  // before a new one is wired.
+  _attachMediaSession(popupData, videoEl, deviceId) {
+    if (!popupData || !videoEl) return;
+    if (popupData.mediaSessionCleanup) {
+      popupData.mediaSessionCleanup();
+      popupData.mediaSessionCleanup = null;
+    }
+    const camera = popupData.camera || {};
+    const title = camera.name || camera.camera_name || 'Canlı Kamera';
+    const location = camera.location_name || camera.address || '';
+    popupData.mediaSessionCleanup = wireMediaSession(videoEl, {
+      title,
+      artist: location || 'Canlı',
+      album: 'QBitmap Canlı Yayın',
+      live: true,
+      posterUrl: videoEl.getAttribute('poster') || null,
+      onStop: () => {
+        try { this.closePopup?.(deviceId); } catch { /* popup already gone */ }
+      },
+    });
+  },
+
   async startWhepStream(deviceId, whepUrl) {
     const popupData = this.popups.get(deviceId);
     if (!popupData) return;
@@ -45,6 +70,10 @@ const StreamingMixin = {
               window.dispatchEvent(new CustomEvent('qbitmap:first-camera-connected'));
             }
           } catch { /* localStorage blocked — skip */ }
+
+          // [PWA] Media Session — show camera name + poster on lock screen.
+          // Live stream: no seek bar, stop action tears the popup down.
+          this._attachMediaSession(popupData, videoEl, deviceId);
 
           // Start stats polling for viewer count and bandwidth
           const bandwidthSpan = popupEl.querySelector('.camera-bandwidth');
@@ -285,6 +314,9 @@ const StreamingMixin = {
         frameContainer.classList.remove('loading', 'error');
         frameContainer.classList.add('loaded');
 
+        // [PWA] Media Session — city + HLS fallback paths both land here.
+        this._attachMediaSession(popupData, videoEl, deviceId);
+
         // Start metrics polling
         const bandwidthSpan = popupEl.querySelector('.camera-bandwidth');
         const viewerCountSpan = popupEl.querySelector('.viewer-count');
@@ -361,6 +393,10 @@ const StreamingMixin = {
     frameContainer.classList.add('loading');
 
     // Cleanup current stream
+    if (popupData.mediaSessionCleanup) {
+      popupData.mediaSessionCleanup();
+      popupData.mediaSessionCleanup = null;
+    }
     if (popupData.hlsInstance) {
       popupData.hlsInstance.destroy();
       popupData.hlsInstance = null;

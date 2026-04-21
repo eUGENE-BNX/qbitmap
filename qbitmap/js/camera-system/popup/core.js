@@ -468,6 +468,13 @@ const PopupCoreMixin = {
       document.removeEventListener('visibilitychange', popupData._visHandler);
     }
 
+    // Release Media Session handlers before the underlying <video>
+    // element is torn down so no stale "Now Playing" chip lingers.
+    if (popupData.mediaSessionCleanup) {
+      popupData.mediaSessionCleanup();
+      popupData.mediaSessionCleanup = null;
+    }
+
     // Cleanup HLS instance
     if (popupData.hlsInstance) {
       popupData.hlsInstance.destroy();
