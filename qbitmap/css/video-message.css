@@ -76,7 +76,7 @@
 .video-msg-video-container {
   position: relative;
   width: 100%;
-  max-width: min(640px, calc((100vh - 120px) * 16 / 9));
+  max-width: min(640px, calc((100dvh - 120px) * 16 / 9));
   aspect-ratio: 16 / 9;
   background: #000;
   border-radius: 12px;
@@ -85,7 +85,7 @@
 
 /* Portrait video (mobile dikey çekim) */
 .video-msg-video-container.vmsg-portrait {
-  max-width: min(252px, calc((100vh - 120px) * 9 / 16));
+  max-width: min(252px, calc((100dvh - 120px) * 9 / 16));
   aspect-ratio: 9 / 16;
 }
 
@@ -942,8 +942,8 @@
     align-items: center;
     padding: 4px 8px;
     max-width: 100%;
-    height: 100vh;
-    max-height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
     overflow: hidden;
   }
 
@@ -951,7 +951,7 @@
     max-width: none;
     width: auto;
     height: 100%;
-    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
     border-radius: 8px;
   }
 
@@ -970,8 +970,8 @@
     grid-template-areas: "media form";
     gap: 8px;
     width: 100%;
-    height: 100vh;
-    max-height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
     padding: 4px 8px;
     box-sizing: border-box;
     align-items: center;
@@ -984,7 +984,7 @@
     width: auto;
     max-width: 100%;
     height: 100%;
-    max-height: calc(100vh - 8px);
+    max-height: calc(100dvh - 8px);
     align-self: center;
     justify-self: center;
     margin: 0;
@@ -995,7 +995,7 @@
     grid-area: form;
     width: 100%;
     max-width: none;
-    max-height: calc(100vh - 8px);
+    max-height: calc(100dvh - 8px);
     margin: 0;
     padding: 8px 10px;
     overflow-y: auto;
@@ -1612,7 +1612,7 @@
   top: 52px;
   left: 8px;
   width: 340px;
-  max-height: calc(100vh - 70px);
+  max-height: calc(100dvh - 70px);
   background: white;
   border-radius: 10px;
   z-index: 1100;
@@ -1624,7 +1624,7 @@
 
 .vmsg-search-results {
   overflow-y: auto;
-  max-height: calc(100vh - 80px);
+  max-height: calc(100dvh - 80px);
   padding: 4px;
 }
 
@@ -1878,7 +1878,7 @@
 .photo-preview-container {
   position: relative;
   width: 100%;
-  max-width: min(640px, calc((100vh - 120px) * 16 / 9));
+  max-width: min(640px, calc((100dvh - 120px) * 16 / 9));
   background: #000;
   border-radius: 12px;
   overflow: hidden;
@@ -1890,7 +1890,7 @@
 .photo-preview-container img {
   width: 100%;
   height: auto;
-  max-height: calc(100vh - 300px);
+  max-height: calc(100dvh - 300px);
   object-fit: contain;
   display: block;
 }
@@ -1949,7 +1949,7 @@
       "strip settings controls";
     gap: 4px;
     width: 100%;
-    height: 100vh;
+    height: 100dvh;
     padding: 4px;
     align-items: stretch;
     flex-wrap: initial;
@@ -1961,7 +1961,7 @@
     max-width: 100%;
     height: 100%;
     /* Altta bilgi bar için yer: strip thumb (50) + padding/gap + remove-btn overlay */
-    max-height: calc(100vh - 130px);
+    max-height: calc(100dvh - 130px);
     align-self: center;
     justify-self: center;
     margin: 0;

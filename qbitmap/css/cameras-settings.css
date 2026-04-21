@@ -756,7 +756,7 @@
 /* Zoom level 2 max constraints */
 .camera-frame-container.zoom-2 {
   max-width: calc(100vw - 40px);
-  max-height: calc(100vh - 120px);
+  max-height: calc(100dvh - 120px);
   aspect-ratio: 16 / 9;
   height: auto;
 }
@@ -764,7 +764,7 @@
 /* Resolution-based max constraints with aspect-ratio preservation */
 .camera-frame-container.res-1080.zoom-2 {
   max-width: calc(100vw - 40px);
-  max-height: calc(100vh - 120px);
+  max-height: calc(100dvh - 120px);
   aspect-ratio: 16 / 9;
   height: auto;
 }
@@ -772,7 +772,7 @@
 .camera-frame-container.res-1440.zoom-2,
 .camera-frame-container.res-2160.zoom-2 {
   max-width: calc(100vw - 40px);
-  max-height: calc(100vh - 120px);
+  max-height: calc(100dvh - 120px);
   aspect-ratio: 16 / 9;
   height: auto;
 }
@@ -2081,3 +2081,109 @@
   margin-top: 6px;
   resize: vertical;
 }
+
+/* ========================================
+   PTZ Overlay (pan/tilt/zoom controls)
+   Absolutely positioned over the live video so it doesn't reflow the popup.
+   Shown only when the camera's ONVIF link reports ptz=true.
+   ======================================== */
+.camera-ptz-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* children re-enable; the overlay itself shouldn't block dblclick zoom */
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 8px;
+  z-index: 3;
+}
+
+.camera-ptz-overlay .ptz-pad {
+  pointer-events: auto;
+  position: relative;
+  width: 96px;
+  height: 96px;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.camera-frame-container:hover .camera-ptz-overlay .ptz-pad,
+.camera-ptz-overlay .ptz-pad:hover,
+.camera-ptz-overlay .ptz-pad:focus-within {
+  opacity: 1;
+}
+
+.camera-ptz-overlay .ptz-zoom {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.camera-frame-container:hover .camera-ptz-overlay .ptz-zoom,
+.camera-ptz-overlay .ptz-zoom:hover,
+.camera-ptz-overlay .ptz-zoom:focus-within {
+  opacity: 1;
+}
+
+.camera-ptz-overlay .ptz-btn {
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none; /* allow pointer events without page scrolling */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, transform 0.05s;
+}
+.camera-ptz-overlay .ptz-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+.camera-ptz-overlay .ptz-btn.active,
+.camera-ptz-overlay .ptz-btn:active {
+  background: #2196f3;
+  border-color: #fff;
+  transform: scale(0.94);
+}
+
+/* Pan/tilt pad — 4 directional buttons arranged in a cross */
+.camera-ptz-overlay .ptz-up,
+.camera-ptz-overlay .ptz-down,
+.camera-ptz-overlay .ptz-left,
+.camera-ptz-overlay .ptz-right {
+  position: absolute;
+}
+.camera-ptz-overlay .ptz-up    { top: 0;    left: 50%; transform: translateX(-50%); }
+.camera-ptz-overlay .ptz-down  { bottom: 0; left: 50%; transform: translateX(-50%); }
+.camera-ptz-overlay .ptz-left  { left: 0;  top: 50%; transform: translateY(-50%); }
+.camera-ptz-overlay .ptz-right { right: 0; top: 50%; transform: translateY(-50%); }
+.camera-ptz-overlay .ptz-up.active    { transform: translateX(-50%) scale(0.94); }
+.camera-ptz-overlay .ptz-down.active  { transform: translateX(-50%) scale(0.94); }
+.camera-ptz-overlay .ptz-left.active  { transform: translateY(-50%) scale(0.94); }
+.camera-ptz-overlay .ptz-right.active { transform: translateY(-50%) scale(0.94); }
+
+/* Home button sits in the middle of the pad cross — small glyph, doesn't
+   steal clicks from the direction arrows (which use absolute positioning). */
+.camera-ptz-overlay .ptz-home {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  line-height: 1;
+}
+.camera-ptz-overlay .ptz-home.active {
+  transform: translate(-50%, -50%) scale(0.9);
+}
+

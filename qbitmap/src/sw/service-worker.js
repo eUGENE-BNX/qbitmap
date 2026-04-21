@@ -225,6 +225,12 @@ self.addEventListener('push', (event) => {
     image,
   } = data;
 
+  // Action buttons appear on Android; iOS ignores them (safe).
+  // 'view' is the default click path, 'dismiss' closes without navigating.
+  const actions = urgency === 'high'
+    ? [{ action: 'view', title: 'Aç' }, { action: 'dismiss', title: 'Kapat' }]
+    : undefined;
+
   event.waitUntil(
     (async () => {
       await self.registration.showNotification(title, {
@@ -233,6 +239,7 @@ self.addEventListener('push', (event) => {
         badge,
         tag,
         image,
+        actions,
         renotify: urgency === 'high',
         requireInteraction: urgency === 'high',
         data: { navigate, receivedAt: Date.now() },
@@ -249,6 +256,18 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  // 'dismiss' action: swipe-away equivalent. Just close + badge refresh;
+  // no window focus / navigation.
+  if (event.action === 'dismiss') {
+    event.waitUntil((async () => {
+      try {
+        const existing = await self.registration.getNotifications();
+        await navigator.setAppBadge?.(existing.length);
+      } catch { /* noop */ }
+    })());
+    return;
+  }
+
   const target = event.notification.data?.navigate || '/';
   event.waitUntil(
     (async () => {

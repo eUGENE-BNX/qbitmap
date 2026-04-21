@@ -151,7 +151,9 @@ const WebSocketMixin = {
         break;
 
       case 'video_message_unread_count':
+        this._unreadVideoMessages = Number(payload.count) || 0;
         getVideoMessage().then(VM => VM.updateBadgeCount(payload.count));
+        this._syncAppBadge();
         break;
 
       case 'video_message_tags_updated':
@@ -234,12 +236,32 @@ const WebSocketMixin = {
 
     // Restore unread video message count (lazy-load VideoMessage only if needed)
     if (payload.unreadVideoMessages !== undefined) {
+      this._unreadVideoMessages = Number(payload.unreadVideoMessages) || 0;
       const VideoMessage = await getVideoMessage();
       VideoMessage.updateBadgeCount(payload.unreadVideoMessages);
     }
 
     // Update map icons
     this.updateAllCameraIcons();
+
+    // [PWA] Sync OS-level app badge (Android launcher, Chrome/Edge
+    // taskbar, iPadOS dock) with active alarm + unread message count.
+    this._syncAppBadge();
+  },
+
+  // [PWA] Bridge alarm / unread-message counts to `navigator.setAppBadge`.
+  // Silent no-op where the API is unsupported (Firefox, older Safari).
+  // Cleared by register-sw.js on `visibilitychange` when the user comes
+  // back to the tab.
+  _syncAppBadge() {
+    if (typeof navigator === 'undefined' || typeof navigator.setAppBadge !== 'function') return;
+    const unread = this._unreadVideoMessages || 0;
+    const alarms = this.activeAlarms?.size || 0;
+    const total = unread + alarms;
+    try {
+      if (total > 0) navigator.setAppBadge(total).catch(() => {});
+      else navigator.clearAppBadge?.().catch(() => {});
+    } catch { /* noop */ }
   },
 
   /**
@@ -308,6 +330,8 @@ const WebSocketMixin = {
 
     // Maybe auto-open camera popup
     this.maybeAutoOpenCamera(deviceId);
+
+    this._syncAppBadge();
   },
 
   /**
@@ -325,6 +349,8 @@ const WebSocketMixin = {
 
     // Update camera icon on map
     this.updateCameraIcon(deviceId);
+
+    this._syncAppBadge();
   },
 
   /**
