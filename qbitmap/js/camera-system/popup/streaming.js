@@ -33,43 +33,83 @@ const StreamingMixin = {
       };
       rewire();
 
-      // Build a JPEG data URL from the current camera frame. Tries
-      // ImageCapture first (WebRTC tracks — reliable even when Chrome
-      // Android hardware-decodes the video into an overlay that canvas2D
-      // can't read). Falls back to drawing the <video> element directly,
-      // which works for HLS where there's no MediaStreamTrack.
+      // Build a JPEG data URL from the current camera frame. The tricky
+      // part is WHEP: Chrome Android hardware-decodes WebRTC video into
+      // an overlay that neither canvas2D drawImage nor ImageCapture can
+      // read reliably — both produce a uniform (brown) frame. The
+      // modern fix is MediaStreamTrackProcessor, which exposes raw
+      // VideoFrame objects from the track and bypasses the overlay.
+      // HLS streams go through the video-element path as usual.
+      const W = 512;
+      const bitmapToDataUrl = (bmp) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = Math.round(W * bmp.height / bmp.width) || W;
+        canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL('image/jpeg', 0.75);
+      };
+
+      const grabFromTrack = async () => {
+        const stream = videoEl.srcObject;
+        const track = stream?.getVideoTracks?.()[0];
+        if (!track || track.readyState !== 'live') return null;
+
+        // Modern path — MediaStreamTrackProcessor + VideoFrame.
+        if ('MediaStreamTrackProcessor' in window) {
+          let reader;
+          try {
+            const processor = new MediaStreamTrackProcessor({ track });
+            reader = processor.readable.getReader();
+            const { value: frame, done } = await reader.read();
+            if (done || !frame) return null;
+            const bitmap = await createImageBitmap(frame);
+            frame.close();
+            try { await reader.cancel(); } catch {}
+            const url = bitmapToDataUrl(bitmap);
+            bitmap.close?.();
+            return url;
+          } catch {
+            try { await reader?.cancel(); } catch {}
+            // fall through
+          }
+        }
+
+        // Legacy path — ImageCapture. Often rejected on remote tracks,
+        // but worth a shot.
+        if ('ImageCapture' in window) {
+          try {
+            const bmp = await new ImageCapture(track).grabFrame();
+            const url = bitmapToDataUrl(bmp);
+            bmp.close?.();
+            return url;
+          } catch { /* ignore */ }
+        }
+        return null;
+      };
+
+      const grabFromVideoEl = async () => {
+        if (!videoEl.videoWidth || !videoEl.videoHeight) return null;
+        try {
+          // createImageBitmap on the video element can succeed where
+          // canvas.drawImage(video) fails on HW-accelerated playback.
+          const bmp = await createImageBitmap(videoEl);
+          const url = bitmapToDataUrl(bmp);
+          bmp.close?.();
+          return url;
+        } catch { /* fall through */ }
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = W;
+          canvas.height = Math.round(W * videoEl.videoHeight / videoEl.videoWidth) || W;
+          canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+          return canvas.toDataURL('image/jpeg', 0.75);
+        } catch { return null; }
+      };
+
       const snapshot = async () => {
         try {
-          const stream = videoEl.srcObject;
-          let dataUrl = null;
-
-          if (stream && typeof stream.getVideoTracks === 'function' && 'ImageCapture' in window) {
-            const track = stream.getVideoTracks()[0];
-            if (track && track.readyState === 'live') {
-              try {
-                const bitmap = await new ImageCapture(track).grabFrame();
-                const canvas = document.createElement('canvas');
-                const W = 512;
-                const ratio = bitmap.height && bitmap.width ? bitmap.height / bitmap.width : 9 / 16;
-                canvas.width = W;
-                canvas.height = Math.round(W * ratio) || W;
-                canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-                bitmap.close?.();
-                dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-              } catch { /* fall through to video draw */ }
-            }
-          }
-
-          if (!dataUrl && videoEl.videoWidth && videoEl.videoHeight) {
-            const canvas = document.createElement('canvas');
-            const W = 512;
-            canvas.width = W;
-            canvas.height = Math.round(W * videoEl.videoHeight / videoEl.videoWidth) || W;
-            canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-            dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-          }
-
-          if (!dataUrl || dataUrl.length < 3000) return false; // blank / tainted
+          const dataUrl = (await grabFromTrack()) || (await grabFromVideoEl());
+          if (!dataUrl || dataUrl.length < 3000) return false;
           opts.posterUrl = dataUrl;
           rewire();
           return true;
