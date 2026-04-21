@@ -623,6 +623,8 @@ const FormUploadMixin = {
       const mediaType = this.isPhotoMode ? 'photo' : 'video';
       Analytics.event('video_message_create', { type: mediaType, has_location: !!this.selectedLocation, is_private: !!this.isPrivate });
       AuthSystem.showNotification(mediaType === 'photo' ? 'Foto mesaj gönderildi' : 'Video mesaj gönderildi', 'success');
+      // [PWA] sending a message is a strong engagement signal.
+      window.dispatchEvent(new CustomEvent('qbitmap:video-message-opened'));
       this.cleanupAndClose();
 
       // Fly to location

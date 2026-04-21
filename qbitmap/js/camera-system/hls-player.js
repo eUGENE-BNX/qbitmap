@@ -79,6 +79,13 @@ const HlsPlayerMixin = {
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         videoElement.play().catch(() => {});
         Analytics.timing('stream_load_time', _hlsStartTime);
+        // [PWA] treat a successful HLS city-camera playback as engagement.
+        try {
+          if (!localStorage.getItem('qbitmap_first_cam_emitted')) {
+            localStorage.setItem('qbitmap_first_cam_emitted', '1');
+            window.dispatchEvent(new CustomEvent('qbitmap:first-camera-connected'));
+          }
+        } catch { /* noop */ }
         onReady?.();
       });
 

@@ -192,6 +192,9 @@ const PopupMixin = {
 
     this.currentPopup = popup;
 
+    // [PWA] Signal "meaningful engagement" so the install prompt can fire.
+    window.dispatchEvent(new CustomEvent('qbitmap:video-message-opened'));
+
     // Wire up after DOM insertion
     setTimeout(() => {
       const popupEl = popup.getElement();

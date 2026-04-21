@@ -6,8 +6,19 @@
 //                     walking through Share → "Add to Home Screen".
 
 const DISMISS_KEY = 'qbitmap_pwa_install_dismissed_at';
-const FIRST_CAM_KEY = 'qbitmap_first_cam_emitted';
+const ENGAGED_KEY = 'qbitmap_first_cam_emitted'; // kept for back-compat
 const COOLDOWN_DAYS = 7;
+
+// Any of these user actions counts as "engaged enough to nudge an install".
+// Tune here rather than sprinkling dispatchEvent calls across features.
+const ENGAGEMENT_EVENTS = [
+  'qbitmap:first-camera-connected',
+  'qbitmap:video-message-opened',
+  'qbitmap:broadcast-opened',
+];
+// Time-based fallback so someone who just browses the map (never opening a
+// camera or message) still sees the prompt on the first visit.
+const IDLE_FALLBACK_MS = 30000;
 
 const ua = navigator.userAgent || '';
 const isIOS = /iPad|iPhone|iPod/.test(ua) && !('MSStream' in window);
@@ -32,26 +43,37 @@ export function initInstallPrompt() {
   });
 
   if (isIOS) {
-    waitForFirstCamera(showIOSInstructionsModal);
+    waitForEngagement(showIOSInstructionsModal);
     return;
   }
 
-  // Chromium: stash the event, render a custom button on first-cam.
+  // Chromium: stash the event, render a custom button after engagement.
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    waitForFirstCamera(showInstallButton);
+    waitForEngagement(showInstallButton);
   });
 }
 
-function waitForFirstCamera(cb) {
-  if (localStorage.getItem(FIRST_CAM_KEY) === '1') {
-    // Already seen on a previous session — defer 5 s so we don't fire
-    // during app cold start.
+function waitForEngagement(cb) {
+  if (localStorage.getItem(ENGAGED_KEY) === '1') {
+    // Seen on a previous session — short defer so the prompt doesn't
+    // race app cold start.
     setTimeout(cb, 5000);
     return;
   }
-  window.addEventListener('qbitmap:first-camera-connected', cb, { once: true });
+
+  let fired = false;
+  const fire = () => {
+    if (fired) return;
+    fired = true;
+    ENGAGEMENT_EVENTS.forEach((e) => window.removeEventListener(e, fire));
+    clearTimeout(fallback);
+    try { localStorage.setItem(ENGAGED_KEY, '1'); } catch { /* noop */ }
+    cb();
+  };
+  ENGAGEMENT_EVENTS.forEach((e) => window.addEventListener(e, fire, { once: true }));
+  const fallback = setTimeout(fire, IDLE_FALLBACK_MS);
 }
 
 function recentlyDismissed() {
