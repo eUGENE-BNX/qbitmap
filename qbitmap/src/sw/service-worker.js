@@ -6,6 +6,7 @@ import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 
 import { parseRangeHeader } from './range-utils.js';
+import { shareInboxPut } from '../pwa/idb-share-inbox.js';
 
 // [PWA-02] Speed up cold starts — parallelize the first network request
 // with service-worker boot.
@@ -23,6 +24,42 @@ self.addEventListener('activate', (event) => {
 // Skip-waiting message from register-sw.js (used by the refresh toast).
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// ── Web Share Target ─────────────────────────────────────────────────────
+// The PWA manifest declares share_target.action = "/share-inbox" with
+// method=POST. When the OS share sheet routes a payload to us we need to
+// persist it somewhere the main thread can read, because POST responses
+// can't hand FormData back to the window context. Strategy: stash the
+// files + metadata in IndexedDB under a freshly minted id and 303 the
+// browser to a friendly GET URL that the main thread reacts to.
+//
+// Register BEFORE workbox route dispatch so this path wins unambiguously.
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'POST') return;
+  let url;
+  try { url = new URL(req.url); } catch { return; }
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname !== '/share-inbox') return;
+
+  event.respondWith((async () => {
+    try {
+      const formData = await req.formData();
+      const id = crypto.randomUUID();
+      const files = formData.getAll('files').filter((f) => f && typeof f === 'object' && 'type' in f);
+      await shareInboxPut(id, {
+        files,
+        title: String(formData.get('title') || ''),
+        text: String(formData.get('text') || ''),
+        url: String(formData.get('url') || ''),
+        at: Date.now(),
+      });
+      return Response.redirect('/?share=pending&id=' + encodeURIComponent(id), 303);
+    } catch (err) {
+      return new Response('share ingest failed', { status: 500 });
+    }
+  })());
 });
 
 cleanupOutdatedCaches();

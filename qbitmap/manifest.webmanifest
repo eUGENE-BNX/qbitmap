@@ -19,5 +19,48 @@
     { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "launch_handler": { "client_mode": "navigate-existing" },
-  "categories": ["utilities", "security", "navigation"]
+  "categories": ["utilities", "security", "navigation"],
+  "share_target": {
+    "action": "/share-inbox",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        { "name": "files", "accept": ["image/*", "video/*"] }
+      ]
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "Kameralarım",
+      "short_name": "Kameralar",
+      "description": "Kameralarım panelini aç",
+      "url": "/?sc=cams",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Video mesaj",
+      "short_name": "Video",
+      "description": "Yeni video mesaj kaydet",
+      "url": "/?sc=vmsg",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Fotoğraf mesaj",
+      "short_name": "Foto",
+      "description": "Yeni fotoğraf mesaj gönder",
+      "url": "/?sc=photo",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Canlı yayın",
+      "short_name": "Yayın",
+      "description": "Canlı yayın başlat",
+      "url": "/?sc=broadcast",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
 }

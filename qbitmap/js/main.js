@@ -48,6 +48,12 @@ import('../src/pwa/offline-ui.js')
 import('../src/pwa/wake-lock.js')
   .then((m) => m.initWakeLock?.())
   .catch(() => {});
+import('../src/pwa/shortcuts.js')
+  .then((m) => m.initShortcuts?.())
+  .catch(() => {});
+import('../src/pwa/share-inbox.js')
+  .then((m) => m.initShareInbox?.())
+  .catch(() => {});
 
 // Start camera system after all modules are loaded
 document.addEventListener('DOMContentLoaded', () => {

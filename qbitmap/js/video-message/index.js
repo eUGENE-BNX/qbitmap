@@ -268,6 +268,86 @@ const VideoMessage = {
     input.click();
   },
 
+  // ==================== WEB SHARE TARGET INGEST ====================
+
+  // Receives files handed off by the OS share sheet (see
+  // src/pwa/share-inbox.js). Picks photo vs video from the first file's
+  // MIME type, reuses the existing gallery / recorded-blob preview flow
+  // so the upload form looks identical to a normal capture.
+  async ingestSharedFiles(files, meta = {}) {
+    if (!AuthSystem?.isLoggedIn?.()) {
+      AuthSystem?.showNotification?.('Paylaşım için giriş yapın', 'error');
+      return;
+    }
+    if (this._modalEl) return; // don't stomp an in-progress flow
+    if (!files || !files.length) return;
+
+    const MAX_SIZE = 20 * 1024 * 1024;
+    const first = files[0];
+    const isVideo = (first?.type || '').startsWith('video/');
+
+    if (isVideo) {
+      if (first.size > MAX_SIZE * 5) { // videos allowed up to 100MB
+        AuthSystem.showNotification('Video 100MB\'dan küçük olmalı', 'error');
+        return;
+      }
+      this.isPhotoMode = false;
+      this.recordedBlob = first;
+      this._sharedDescription = meta.text || meta.title || '';
+      const modal = document.createElement('div');
+      modal.className = 'video-msg-modal';
+      document.body.appendChild(modal);
+      this._modalEl = modal;
+      // showPreview is defined on the preview mixin — same exit point
+      // the camera flow uses once recording stops.
+      if (typeof this.showPreview === 'function') {
+        this.showPreview();
+      }
+      return;
+    }
+
+    // Photo path — filter images, dedupe, honor MAX_PHOTOS_PER_MESSAGE.
+    const photoFiles = files
+      .filter((f) => (f?.type || '').startsWith('image/'))
+      .slice(0, this.MAX_PHOTOS_PER_MESSAGE || 5);
+    if (!photoFiles.length) {
+      AuthSystem.showNotification('Paylaşılan dosya türü desteklenmiyor', 'error');
+      return;
+    }
+    for (const f of photoFiles) {
+      if (f.size > MAX_SIZE) {
+        AuthSystem.showNotification(`Fotoğraf 20MB'dan küçük olmalı (${f.name})`, 'error');
+        return;
+      }
+    }
+
+    this.isPhotoMode = true;
+    this._isGalleryMode = true;
+    this._sharedDescription = meta.text || meta.title || '';
+
+    this._capturedPhotos = await Promise.all(photoFiles.map(async (file) => {
+      const objectUrl = URL.createObjectURL(file);
+      const dims = await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => resolve({ width: 0, height: 0 });
+        img.src = objectUrl;
+      });
+      return { blob: file, width: dims.width, height: dims.height, objectUrl };
+    }));
+
+    this.capturedPhotoBlob = this._capturedPhotos[0].blob;
+    this._capturedWidth = this._capturedPhotos[0].width;
+    this._capturedHeight = this._capturedPhotos[0].height;
+
+    const modal = document.createElement('div');
+    modal.className = 'video-msg-modal';
+    document.body.appendChild(modal);
+    this._modalEl = modal;
+
+    this.showPhotoPreview();
+  },
+
   // ==================== MAIN FLOW ====================
 
   async startFlow() {
