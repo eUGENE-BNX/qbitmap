@@ -298,8 +298,22 @@ const RecordingsModalMixin = {
         resetOnEnd: true
       });
 
-      // Media Session wiring reverted — broke playback on some devices.
-      // Will return once a reproducible test harness exists.
+      // [PWA] Media Session — defer-until-playing pattern keeps Chrome
+      // Android's native <video> play path intact.
+      import('../../src/pwa/media-session.js').then(({ wireMediaSession }) => {
+        const cam = this.cameras?.find((c) => c.device_id === deviceId);
+        const cameraName = cam?.name || cam?.device_id || 'Kayıt';
+        const when = new Date(start);
+        const fmt = isNaN(when) ? '' : when.toLocaleString('tr-TR', {
+          dateStyle: 'medium', timeStyle: 'short',
+        });
+        this._mediaSessionCleanup = wireMediaSession(videoEl, {
+          title: cameraName,
+          artist: fmt,
+          album: 'QBitmap Kayıt',
+          live: false,
+        });
+      }).catch(() => {});
 
       // Play
       videoEl.play().catch(() => {});
