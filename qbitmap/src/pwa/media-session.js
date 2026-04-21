@@ -50,7 +50,9 @@ export function wireMediaSession(videoEl, opts) {
   };
 
   setHandler('play', () => videoEl.play().catch(() => {}));
-  setHandler('pause', () => videoEl.pause());
+  if (!opts.skipPause) {
+    setHandler('pause', () => videoEl.pause());
+  }
   setHandler('stop', () => {
     videoEl.pause();
     ms.playbackState = 'paused';

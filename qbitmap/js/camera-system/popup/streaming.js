@@ -22,6 +22,7 @@ const StreamingMixin = {
         artist: location || 'Canlı',
         album: 'QBitmap Canlı Yayın',
         live: true,
+        skipPause: true, // pause on a live feed is misleading — use Stop
         posterUrl: null,
         onStop: () => { try { this.closePopup?.(deviceId); } catch {} },
       };
@@ -32,34 +33,59 @@ const StreamingMixin = {
       };
       rewire();
 
-      const snapshot = () => {
+      // Build a JPEG data URL from the current camera frame. Tries
+      // ImageCapture first (WebRTC tracks — reliable even when Chrome
+      // Android hardware-decodes the video into an overlay that canvas2D
+      // can't read). Falls back to drawing the <video> element directly,
+      // which works for HLS where there's no MediaStreamTrack.
+      const snapshot = async () => {
         try {
-          if (!videoEl.videoWidth || !videoEl.videoHeight) return false;
-          const canvas = document.createElement('canvas');
-          const W = 512;
-          canvas.width = W;
-          canvas.height = Math.round(W * videoEl.videoHeight / videoEl.videoWidth) || W;
-          canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-          const url = canvas.toDataURL('image/jpeg', 0.75);
-          if (!url || url.length < 3000) return false; // empty/uniform frame
-          opts.posterUrl = url;
+          const stream = videoEl.srcObject;
+          let dataUrl = null;
+
+          if (stream && typeof stream.getVideoTracks === 'function' && 'ImageCapture' in window) {
+            const track = stream.getVideoTracks()[0];
+            if (track && track.readyState === 'live') {
+              try {
+                const bitmap = await new ImageCapture(track).grabFrame();
+                const canvas = document.createElement('canvas');
+                const W = 512;
+                const ratio = bitmap.height && bitmap.width ? bitmap.height / bitmap.width : 9 / 16;
+                canvas.width = W;
+                canvas.height = Math.round(W * ratio) || W;
+                canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                bitmap.close?.();
+                dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+              } catch { /* fall through to video draw */ }
+            }
+          }
+
+          if (!dataUrl && videoEl.videoWidth && videoEl.videoHeight) {
+            const canvas = document.createElement('canvas');
+            const W = 512;
+            canvas.width = W;
+            canvas.height = Math.round(W * videoEl.videoHeight / videoEl.videoWidth) || W;
+            canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+            dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          }
+
+          if (!dataUrl || dataUrl.length < 3000) return false; // blank / tainted
+          opts.posterUrl = dataUrl;
           rewire();
           return true;
         } catch {
-          return false; // canvas tainted — keep fallback
+          return false;
         }
       };
 
-      // `requestVideoFrameCallback` fires ONLY once a frame has been
-      // decoded and is ready to be painted — exactly what we need so
-      // `drawImage` captures a real picture instead of a blank canvas.
-      // Chrome Android ≥ 83 and Safari 16+ support it.
+      // `requestVideoFrameCallback` fires once a frame has been decoded
+      // and is ready to paint — exactly what we need so the capture
+      // isn't an empty buffer. Fall back to load events on older UAs.
       if (typeof videoEl.requestVideoFrameCallback === 'function') {
         videoEl.requestVideoFrameCallback(() => snapshot());
       } else {
-        // Fallback: try at loadeddata, retry at playing if blank.
-        videoEl.addEventListener('loadeddata', () => {
-          if (!snapshot()) {
+        videoEl.addEventListener('loadeddata', async () => {
+          if (!(await snapshot())) {
             videoEl.addEventListener('playing', () => snapshot(), { once: true });
           }
         }, { once: true });
