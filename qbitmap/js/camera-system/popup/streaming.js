@@ -3,9 +3,10 @@ import { Logger } from "../../utils.js";
 import { Analytics } from "../../analytics.js";
 
 const StreamingMixin = {
-  // [PWA] Media Session attachment for camera popups. Defer-until-
-  // playing pattern in src/pwa/media-session.js protects Chrome
-  // Android's native <video> play path — see that file's header.
+  // [PWA] Media Session for camera popups. Snapshots the current video
+  // frame once decoded so the lock-screen artwork shows the live camera
+  // view instead of the default PWA logo. WebRTC / HLS streams are
+  // same-origin so the canvas isn't tainted.
   _attachCameraMediaSession(popupData, videoEl, deviceId) {
     if (!popupData || !videoEl) return;
     if (popupData.mediaSessionCleanup) {
@@ -16,14 +17,41 @@ const StreamingMixin = {
       const camera = popupData.camera || {};
       const title = camera.name || camera.camera_name || 'Canlı Kamera';
       const location = camera.location_name || camera.address || '';
-      popupData.mediaSessionCleanup = wireMediaSession(videoEl, {
+      const opts = {
         title,
         artist: location || 'Canlı',
         album: 'QBitmap Canlı Yayın',
         live: true,
-        posterUrl: videoEl.getAttribute('poster') || null,
+        posterUrl: null,
         onStop: () => { try { this.closePopup?.(deviceId); } catch {} },
-      });
+      };
+
+      const rewire = () => {
+        if (popupData.mediaSessionCleanup) popupData.mediaSessionCleanup();
+        popupData.mediaSessionCleanup = wireMediaSession(videoEl, opts);
+      };
+      rewire();
+
+      const snapshot = () => {
+        try {
+          if (!videoEl.videoWidth || !videoEl.videoHeight) return;
+          const canvas = document.createElement('canvas');
+          const W = 512;
+          canvas.width = W;
+          canvas.height = Math.round(W * videoEl.videoHeight / videoEl.videoWidth) || W;
+          canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+          const url = canvas.toDataURL('image/jpeg', 0.75);
+          if (!url || url.length < 1000) return; // tainted → tiny stub
+          opts.posterUrl = url;
+          rewire();
+        } catch { /* canvas tainted or element not ready — keep fallback */ }
+      };
+
+      if (videoEl.videoWidth && videoEl.videoHeight) {
+        snapshot();
+      } else {
+        videoEl.addEventListener('loadeddata', snapshot, { once: true });
+      }
     }).catch(() => {});
   },
 
