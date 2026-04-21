@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>QBitmap | Çevrimdışı</title>
+  <meta name="theme-color" content="#0b1220">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #0b1220;
+      color: #e6edf5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .logo {
+      width: 96px;
+      height: 96px;
+      margin-bottom: 24px;
+      opacity: 0.92;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    p {
+      margin: 0 0 24px;
+      max-width: 420px;
+      line-height: 1.5;
+      color: #9fb0c4;
+      font-size: 15px;
+    }
+    button {
+      appearance: none;
+      border: 1px solid #2a3a55;
+      background: #152238;
+      color: #e6edf5;
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    button:hover { background: #1c2a45; border-color: #3a4e72; }
+    button:active { background: #111a2c; }
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #e53935;
+      margin-right: 8px;
+      vertical-align: middle;
+      box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.6);
+      animation: pulse 1.8s ease-out infinite;
+    }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0   rgba(229, 57, 53, 0.6); }
+      70%  { box-shadow: 0 0 0 12px rgba(229, 57, 53, 0); }
+      100% { box-shadow: 0 0 0 0   rgba(229, 57, 53, 0); }
+    }
+    .status {
+      margin-top: 18px;
+      font-size: 13px;
+      color: #7a8aa0;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="logo" src="/logo.png" alt="QBitmap">
+    <h1><span class="dot"></span>Bağlantı yok</h1>
+    <p>İnternet bağlantınız kesildi. Bağlantı geri geldiğinde haritanız ve kameralarınız otomatik olarak yeniden bağlanır.</p>
+    <button type="button" onclick="location.reload()">Yeniden dene</button>
+    <div class="status" id="status"></div>
+  </div>
+  <script>
+    (function () {
+      var status = document.getElementById('status');
+      function update() {
+        if (navigator.onLine) {
+          status.textContent = 'Bağlantı geri geldi — yenileyin.';
+        } else {
+          status.textContent = 'Çevrimdışı';
+        }
+      }
+      window.addEventListener('online', function () {
+        update();
+        location.reload();
+      });
+      window.addEventListener('offline', update);
+      update();
+    })();
+  </script>
+</body>
+</html>

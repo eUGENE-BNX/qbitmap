@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   root: '.',
@@ -43,6 +44,33 @@ export default defineConfig({
   },
 
   plugins: [
+    // [PWA-01] Service worker via vite-plugin-pwa (injectManifest mode).
+    // Custom SW source lives at src/sw/service-worker.js — generateSW
+    // wouldn't let us wire push, notificationclick or the PMTiles range
+    // handler.
+    VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src/sw',
+      filename: 'service-worker.js',
+      injectRegister: false,  // register-sw.js handles it (needs custom toast)
+      manifest: false,         // manifest.webmanifest is served as a static file
+      injectManifest: {
+        globPatterns: [
+          'assets/**/*.{js,css,woff2}',
+          'vendor/maplibre-gl.{js,css}',
+          'vendor/basemaps.js',
+          'icons/*.png',
+          'offline.html',
+          'logo.png',
+          'logo.svg',
+          'favicon.ico',
+          'manifest.webmanifest',
+        ],
+        globIgnores: ['**/*.map', '**/3d/**', '**/maps/**', '**/videos/**'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      },
+      devOptions: { enabled: false },  // dev uses Vite HMR, SW off
+    }),
     // Copy non-processed static assets to dist during build
     {
       name: 'copy-static-assets',
@@ -51,7 +79,7 @@ export default defineConfig({
         const outDir = options.dir || resolve(__dirname, 'dist');
 
         // Large dirs (3d, model, videos) are deployed separately via rsync
-        const staticDirs = ['vendor', 'modely', 'model3', 'models', 'modelx', 'assets'];
+        const staticDirs = ['vendor', 'modely', 'model3', 'models', 'modelx', 'assets', 'icons'];
         for (const dir of staticDirs) {
           const src = resolve(__dirname, dir);
           if (existsSync(src)) {
@@ -61,9 +89,10 @@ export default defineConfig({
 
         // Copy individual static files
         const staticFiles = [
-          'favicon.ico', 'logo.png', 'bus.png', 'bus1.png', 'bus2.png',
+          'favicon.ico', 'logo.png', 'logo.svg', 'bus.png', 'bus1.png', 'bus2.png',
           'car.png', 'car1.png', 'car2.png', 'car3.png', 'car4.png', 'car5.png',
-          'kamyon.png', 'pellegrino.png', 'Caddyfile'
+          'kamyon.png', 'pellegrino.png', 'Caddyfile',
+          'manifest.webmanifest', 'offline.html'
         ];
         for (const file of staticFiles) {
           const src = resolve(__dirname, file);

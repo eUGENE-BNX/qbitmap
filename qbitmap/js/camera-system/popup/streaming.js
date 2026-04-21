@@ -37,6 +37,15 @@ const StreamingMixin = {
           frameContainer.classList.remove('loading', 'error');
           frameContainer.classList.add('loaded');
 
+          // [PWA-03] One-shot signal for install-prompt. Fires the
+          // first time any camera connects; persists via localStorage.
+          try {
+            if (!localStorage.getItem('qbitmap_first_cam_emitted')) {
+              localStorage.setItem('qbitmap_first_cam_emitted', '1');
+              window.dispatchEvent(new CustomEvent('qbitmap:first-camera-connected'));
+            }
+          } catch { /* localStorage blocked — skip */ }
+
           // Start stats polling for viewer count and bandwidth
           const bandwidthSpan = popupEl.querySelector('.camera-bandwidth');
           const viewerCountSpan = popupEl.querySelector('.viewer-count');

@@ -1,0 +1,286 @@
+/* PWA UI — update toast, offline badge, install button, iOS install modal */
+
+.pwa-update-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #0f1a30;
+  color: #e6edf5;
+  border: 1px solid #2a3a55;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  font: 500 14px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  max-width: calc(100vw - 32px);
+}
+.pwa-update-text { margin-right: 6px; }
+.pwa-update-toast button {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.pwa-update-toast .pwa-update-refresh {
+  background: #2b5cff;
+  color: #fff;
+}
+.pwa-update-toast .pwa-update-refresh:hover { background: #3a6bff; }
+.pwa-update-toast .pwa-update-dismiss { color: #9fb0c4; }
+.pwa-update-toast .pwa-update-dismiss:hover {
+  background: #1c2a45;
+  color: #e6edf5;
+}
+
+/* Offline badge — sticky red chip, top-right */
+.pwa-offline-badge {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 9998;
+  background: #8e1d1a;
+  color: #fff;
+  font: 600 12px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial,
+    sans-serif;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #b02a27;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  letter-spacing: 0.2px;
+  pointer-events: none;
+}
+@media (display-mode: standalone) {
+  /* Nudge the badge below the iOS status bar area */
+  .pwa-offline-badge { top: calc(env(safe-area-inset-top, 0px) + 10px); }
+}
+
+/* Camera popup offline hint — placed by streaming mixin */
+.camera-frame-container.offline::after {
+  content: 'Çevrimdışı';
+  position: absolute;
+  inset: auto 0 12px 0;
+  text-align: center;
+  color: #fff;
+  font: 600 12px/1 -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  background: rgba(142, 29, 26, 0.85);
+  padding: 6px 10px;
+  width: fit-content;
+  margin: 0 auto;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+/* Install button (Chromium / Edge / Samsung Internet) */
+.pwa-install-btn {
+  position: fixed;
+  right: 14px;
+  bottom: 72px;
+  z-index: 9997;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 10px 12px;
+  background: #2b5cff;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font: 600 14px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial,
+    sans-serif;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(43, 92, 255, 0.45);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.pwa-install-btn:hover { background: #3a6bff; transform: translateY(-1px); }
+.pwa-install-btn svg { flex: 0 0 18px; }
+.pwa-install-btn .pwa-install-close {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 16px;
+  line-height: 18px;
+  opacity: 0.8;
+}
+.pwa-install-btn .pwa-install-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  opacity: 1;
+}
+
+/* iOS install instructions modal */
+.pwa-ios-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.pwa-ios-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 10, 20, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.pwa-ios-modal-card {
+  position: relative;
+  max-width: 360px;
+  width: 100%;
+  background: #0f1a30;
+  color: #e6edf5;
+  border: 1px solid #2a3a55;
+  border-radius: 16px;
+  padding: 22px 22px 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  text-align: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial,
+    sans-serif;
+}
+.pwa-ios-modal-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  margin: 0 auto 12px;
+  display: block;
+}
+.pwa-ios-modal-card h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 600;
+}
+.pwa-ios-modal-sub {
+  margin: 0 0 14px;
+  color: #9fb0c4;
+  font-size: 13px;
+}
+.pwa-ios-modal-steps {
+  text-align: left;
+  padding-left: 20px;
+  margin: 0 0 16px;
+  line-height: 1.5;
+  font-size: 14px;
+}
+.pwa-ios-modal-steps li { margin: 4px 0; }
+.pwa-ios-modal-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: #9fb0c4;
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.pwa-ios-modal-close:hover { background: #1c2a45; color: #e6edf5; }
+.pwa-ios-modal-ok {
+  appearance: none;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #2b5cff;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pwa-ios-modal-ok:hover { background: #3a6bff; }
+
+/* Profile panel: push-notification toggle */
+.profile-push-section {
+  margin: 12px 16px 4px;
+  padding: 14px 16px;
+  background: #0f1a30;
+  border: 1px solid #1e2b45;
+  border-radius: 12px;
+}
+.profile-section-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  color: #7a8aa0;
+  margin-bottom: 10px;
+}
+.profile-push-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.profile-push-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf5;
+  margin-bottom: 2px;
+}
+.profile-push-desc {
+  font-size: 12px;
+  color: #9fb0c4;
+  line-height: 1.4;
+}
+.profile-push-toggle {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+.profile-push-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.profile-push-slider {
+  position: absolute;
+  inset: 0;
+  background: #2a3a55;
+  border-radius: 999px;
+  transition: background 0.18s ease;
+  cursor: pointer;
+}
+.profile-push-slider::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.18s ease;
+}
+.profile-push-toggle input:checked + .profile-push-slider {
+  background: #2b5cff;
+}
+.profile-push-toggle input:checked + .profile-push-slider::before {
+  transform: translateX(18px);
+}
+.profile-push-toggle input:disabled + .profile-push-slider { opacity: 0.5; cursor: not-allowed; }
+.profile-push-test {
+  margin-top: 10px;
+  appearance: none;
+  border: 1px solid #2a3a55;
+  background: transparent;
+  color: #9fb0c4;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.profile-push-test:hover { background: #1c2a45; color: #e6edf5; }
+.profile-push-test:disabled { opacity: 0.5; cursor: wait; }

@@ -62,6 +62,29 @@ qbitmap.com {
 		Cache-Control "public, max-age=86400, stale-while-revalidate=3600"
 	}
 
+	# PWA manifest — never cache; browsers poll this to pick up icon / name
+	# changes on the next visit.
+	@manifest path /manifest.webmanifest
+	header @manifest {
+		Content-Type "application/manifest+json"
+		Cache-Control "no-cache, must-revalidate"
+	}
+
+	# Service worker — MUST NOT be cached. Browser stores SW bytes locally,
+	# but an immutable Cache-Control would prevent update detection across
+	# deploys.
+	@sw path /service-worker.js /workbox-*.js /registerSW.js
+	header @sw {
+		Cache-Control "no-cache, must-revalidate"
+		Service-Worker-Allowed "/"
+	}
+
+	# PWA icon set (manifest + apple-touch-icon + notification payloads).
+	# Not hash-named, so keep cache short enough that swapping the logo
+	# takes effect on next deploy.
+	@icons path /icons/*
+	header @icons Cache-Control "public, max-age=86400"
+
 	@gltf path *.gltf
 	header @gltf Content-Type "model/gltf+json"
 
