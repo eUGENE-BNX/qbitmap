@@ -442,6 +442,28 @@ async function videoMessageRoutes(fastify, options) {
           type: 'video_message_unread_count',
           payload: { count: unreadCount }
         });
+
+        // [PWA] Web Push — fires in parallel with the WS broadcast so
+        // recipients whose PWA tab is closed still see the message in
+        // their notification tray (with the thumbnail as the big image).
+        try {
+          const pushService = require('../services/push');
+          const senderLabel = message.sender_name || 'Biri';
+          const kind = (message.media_type === 'photo') ? 'fotoğraf' : 'video';
+          const thumbUrl = `https://stream.qbitmap.com/api/video-messages/${encodeURIComponent(message.message_id)}/thumbnail?size=preview`;
+          await pushService.sendToUser(recipientId, {
+            title: `${senderLabel} sana bir ${kind} mesajı gönderdi`,
+            body: message.place_name || message.description || '',
+            tag: `vmsg-${message.message_id}`,
+            topic: `vmsg-${message.message_id}`,
+            urgency: 'normal',
+            image: thumbUrl,
+            icon: thumbUrl,
+            navigate: `/?vmsg=${encodeURIComponent(message.message_id)}`,
+          });
+        } catch (err) {
+          logger.warn({ err: err.message, messageId: realMessageId }, 'video-message push dispatch failed (non-fatal)');
+        }
       } else {
         wsService.broadcast(wsPayload);
       }
