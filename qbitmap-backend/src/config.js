@@ -98,5 +98,15 @@ module.exports = {
       voiceApiUrl: process.env.ENTANGLE_API_URL || `http://${voiceHost}:8000`,
       aiServiceUrl,
     };
-  })()
+  })(),
+  // [PWA-01] Web Push (VAPID). Keys generated once via
+  //   npx web-push generate-vapid-keys
+  // and stored in /etc/qbitmap/secrets.env alongside JWT_SECRET.
+  // The public key is non-secret and exposed to the browser via
+  // GET /api/push/vapid-public-key.
+  vapid: {
+    publicKey: process.env.VAPID_PUBLIC_KEY || '',
+    privateKey: process.env.VAPID_PRIVATE_KEY || '',
+    subject: process.env.VAPID_SUBJECT || 'mailto:alp@qbitwise.com',
+  }
 };

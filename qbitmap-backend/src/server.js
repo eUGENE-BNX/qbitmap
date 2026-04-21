@@ -317,6 +317,9 @@ async function buildServer() {
   await fastify.register(require('./routes/face-detection'), { prefix: '/api/face-detection' });
   await fastify.register(require('./routes/face-absence'), { prefix: '/api/face-absence' });
 
+  // Register Web Push subscription routes (PWA notifications)
+  await fastify.register(require('./routes/push'), { prefix: '/api/push' });
+
   // Register video message routes
   await fastify.register(require('./routes/video-messages'), { prefix: '/api/video-messages' });
 

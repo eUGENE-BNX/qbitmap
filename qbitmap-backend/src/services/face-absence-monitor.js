@@ -98,6 +98,25 @@ async function processTick() {
         });
       }
 
+      // [PWA-01] Fire a Web Push in parallel with the WS broadcast so
+      // users whose tab is closed still get the alarm. Topic keys on the
+      // rule id so the browser coalesces duplicates if multiple cameras
+      // trigger the same rule back-to-back.
+      try {
+        const pushService = require('./push');
+        await pushService.sendToUser(rule.user_id, {
+          title: `${faceName} kamerada görünmedi`,
+          body: `${rule.start_time}-${rule.end_time} aralığında hareket yok`,
+          tag: `absence-${rule.id}`,
+          topic: `absence-${rule.id}`,
+          urgency: 'high',
+          navigate: '/',
+          image: faceImageUrl,
+        });
+      } catch (err) {
+        logger.warn({ err: err.message, ruleId: rule.id }, 'push dispatch failed (non-fatal)');
+      }
+
       if (rule.voice_call_enabled && voiceCallService) {
         setImmediate(async () => {
           try {

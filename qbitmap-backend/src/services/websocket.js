@@ -612,6 +612,31 @@ class WebSocketService {
         timestamp: new Date().toISOString()
       }
     });
+
+    // [PWA-01] Web Push fanout to every user with access to this camera.
+    // WS reaches open tabs; push catches closed tabs / locked phones.
+    // Fire-and-forget: never block the WS broadcast on gateway latency.
+    (async () => {
+      try {
+        const pushService = require('./push');
+        const authorizedUserIds = await db.getUsersWithCameraAccess(deviceId);
+        const label = alarmData?.sample_type || alarmData?.type || 'Alarm';
+        await Promise.allSettled(
+          authorizedUserIds.map((userId) =>
+            pushService.sendToUser(userId, {
+              title: `${cameraName} — ${label}`,
+              body: alarmData?.message || 'Kamera alarmı tetiklendi',
+              tag: `alarm-${deviceId}`,
+              topic: `alarm-${deviceId}`,
+              urgency: 'high',
+              navigate: '/',
+            })
+          )
+        );
+      } catch (err) {
+        logger.warn({ err: err.message, deviceId }, 'alarm push dispatch failed');
+      }
+    })();
   }
 
   /**
