@@ -881,6 +881,11 @@
   transform: scale(1.03);
 }
 
+.video-msg-share-btn.native {
+  background: #3b82f6;
+  color: #fff;
+}
+
 .video-msg-share-btn.whatsapp {
   background: #25D366;
   color: #fff;
@@ -889,6 +894,12 @@
 .video-msg-share-btn.twitter {
   background: #000;
   color: #fff;
+}
+
+.video-msg-share-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  transform: none;
 }
 
 /* ============================================
