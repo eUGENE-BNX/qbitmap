@@ -34,23 +34,35 @@ const StreamingMixin = {
 
       const snapshot = () => {
         try {
-          if (!videoEl.videoWidth || !videoEl.videoHeight) return;
+          if (!videoEl.videoWidth || !videoEl.videoHeight) return false;
           const canvas = document.createElement('canvas');
           const W = 512;
           canvas.width = W;
           canvas.height = Math.round(W * videoEl.videoHeight / videoEl.videoWidth) || W;
           canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
           const url = canvas.toDataURL('image/jpeg', 0.75);
-          if (!url || url.length < 1000) return; // tainted → tiny stub
+          if (!url || url.length < 3000) return false; // empty/uniform frame
           opts.posterUrl = url;
           rewire();
-        } catch { /* canvas tainted or element not ready — keep fallback */ }
+          return true;
+        } catch {
+          return false; // canvas tainted — keep fallback
+        }
       };
 
-      if (videoEl.videoWidth && videoEl.videoHeight) {
-        snapshot();
+      // `requestVideoFrameCallback` fires ONLY once a frame has been
+      // decoded and is ready to be painted — exactly what we need so
+      // `drawImage` captures a real picture instead of a blank canvas.
+      // Chrome Android ≥ 83 and Safari 16+ support it.
+      if (typeof videoEl.requestVideoFrameCallback === 'function') {
+        videoEl.requestVideoFrameCallback(() => snapshot());
       } else {
-        videoEl.addEventListener('loadeddata', snapshot, { once: true });
+        // Fallback: try at loadeddata, retry at playing if blank.
+        videoEl.addEventListener('loadeddata', () => {
+          if (!snapshot()) {
+            videoEl.addEventListener('playing', () => snapshot(), { once: true });
+          }
+        }, { once: true });
       }
     }).catch(() => {});
   },
