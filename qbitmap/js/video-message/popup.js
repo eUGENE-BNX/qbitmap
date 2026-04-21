@@ -208,15 +208,10 @@ const PopupMixin = {
       const closeBtn = popupEl.querySelector('.video-msg-popup-close');
       if (closeBtn) closeBtn.onclick = () => this.closeMessagePopup();
 
-      // [PWA] Media Session API — shows sender / title / poster on the
-      // lock screen, notification tray, and CarPlay/Android Auto while the
-      // user plays a video message. Only meaningful for video messages.
-      if (!isPhoto) {
-        this._wireMediaSession(popupEl.querySelector('video.video-msg-popup-video')
-          || popupEl.querySelector('video'), {
-          messageId, senderName, description,
-        });
-      }
+      // Media Session wiring was reverted — see `_wireMediaSession` stub
+      // below. The async dynamic import + setActionHandler combination
+      // broke playback on some devices; restore a working baseline first,
+      // then reintroduce with a reproducible test harness.
 
       // Delete button
       const deleteBtn = popupEl.querySelector('[data-action="delete-message"]');
@@ -975,19 +970,10 @@ const PopupMixin = {
     }
   },
 
-  async _wireMediaSession(videoEl, ctx) {
-    if (!videoEl) return;
-    const { wireMediaSession } = await import('../../src/pwa/media-session.js');
-    const poster = videoEl.getAttribute('poster')
-      || `${this.apiBase}/${encodeURIComponent(ctx.messageId)}/thumbnail?size=preview`;
-    this._mediaSessionCleanup = wireMediaSession(videoEl, {
-      title: ctx.description || 'Video Mesaj',
-      artist: ctx.senderName || 'QBitmap',
-      album: 'QBitmap',
-      posterUrl: poster,
-      live: false,
-    });
-  },
+  // Kept as a no-op so any stale caller / cleanup path stays safe.
+  // Will be reintroduced once the WHEP + video-message playback regression
+  // is fully understood.
+  _wireMediaSession() { /* disabled */ },
 
   async _collectShareFiles(ctx) {
     const fetchBlob = async (u) => {

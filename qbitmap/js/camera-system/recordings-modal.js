@@ -298,22 +298,8 @@ const RecordingsModalMixin = {
         resetOnEnd: true
       });
 
-      // [PWA] Media Session — lock-screen metadata + play/pause/seek for
-      // the recorded clip. Not live, so seek bar + position state stay on.
-      import('../../src/pwa/media-session.js').then(({ wireMediaSession }) => {
-        const cam = this.cameras?.find((c) => c.device_id === deviceId);
-        const cameraName = cam?.name || cam?.device_id || 'Kayıt';
-        const when = new Date(start);
-        const fmt = isNaN(when) ? '' : when.toLocaleString('tr-TR', {
-          dateStyle: 'medium', timeStyle: 'short',
-        });
-        this._mediaSessionCleanup = wireMediaSession(videoEl, {
-          title: cameraName,
-          artist: fmt,
-          album: 'QBitmap Kayıt',
-          live: false,
-        });
-      }).catch(() => {});
+      // Media Session wiring reverted — broke playback on some devices.
+      // Will return once a reproducible test harness exists.
 
       // Play
       videoEl.play().catch(() => {});

@@ -248,18 +248,8 @@ const PopupMixin = {
           videoEl.addEventListener('loadedmetadata', updateOrientation);
           videoEl.addEventListener('resize', updateOrientation);
 
-          // [PWA] Media Session — broadcaster name + "Canlı Yayın" on the
-          // lock screen. Live stream: no seek, Stop closes the popup.
-          import('../../src/pwa/media-session.js').then(({ wireMediaSession }) => {
-            if (this._broadcastMediaSessionCleanup) this._broadcastMediaSessionCleanup();
-            this._broadcastMediaSessionCleanup = wireMediaSession(videoEl, {
-              title: opts.displayName || 'Canlı Yayın',
-              artist: 'Canlı',
-              album: 'QBitmap Canlı Yayın',
-              live: true,
-              onStop: () => { try { this.closeBroadcastPopupElement?.(); } catch {} },
-            });
-          }).catch(() => {});
+          // Media Session wiring reverted — broke playback on some
+          // devices. Will return once a reproducible test harness exists.
         }
       };
 
