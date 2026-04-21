@@ -101,9 +101,13 @@ export function wireMediaSession(videoEl, opts) {
   videoEl.addEventListener('pause', onPause);
   videoEl.addEventListener('timeupdate', onTimeUpdate);
 
-  // If the video is already playing when wired (HLS MANIFEST_PARSED auto-
-  // plays), push metadata immediately.
-  if (!videoEl.paused) onPlay();
+  // Push metadata once if the video is already producing frames. Gated on
+  // readyState >= 2 so we don't touch MediaSession before the decoder has
+  // latched onto the source — earlier attempts could confuse WebRTC on
+  // some devices and leave the popup stuck on the loading state.
+  if (!videoEl.paused && videoEl.readyState >= 2) {
+    try { onPlay(); } catch { /* ignore */ }
+  }
 
   return () => {
     videoEl.removeEventListener('play', onPlay);

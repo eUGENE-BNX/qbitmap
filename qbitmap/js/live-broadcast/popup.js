@@ -214,7 +214,7 @@ const PopupMixin = {
       }
 
       if (whepUrl) {
-        this.startWhepPlayback(popupEl, whepUrl);
+        this.startWhepPlayback(popupEl, whepUrl, { displayName });
       }
     }, 0);
   },
@@ -222,7 +222,7 @@ const PopupMixin = {
   /**
    * Start WHEP playback in a broadcast popup
    */
-  async startWhepPlayback(popupEl, whepUrl) {
+  async startWhepPlayback(popupEl, whepUrl, opts = {}) {
     const frameContainer = popupEl.querySelector('.camera-frame-container');
     const videoEl = popupEl.querySelector('.camera-video');
     if (!frameContainer || !videoEl || !whepUrl) return;
@@ -247,6 +247,19 @@ const PopupMixin = {
           };
           videoEl.addEventListener('loadedmetadata', updateOrientation);
           videoEl.addEventListener('resize', updateOrientation);
+
+          // [PWA] Media Session — broadcaster name + "Canlı Yayın" on the
+          // lock screen. Live stream: no seek, Stop closes the popup.
+          import('../../src/pwa/media-session.js').then(({ wireMediaSession }) => {
+            if (this._broadcastMediaSessionCleanup) this._broadcastMediaSessionCleanup();
+            this._broadcastMediaSessionCleanup = wireMediaSession(videoEl, {
+              title: opts.displayName || 'Canlı Yayın',
+              artist: 'Canlı',
+              album: 'QBitmap Canlı Yayın',
+              live: true,
+              onStop: () => { try { this.closeBroadcastPopupElement?.(); } catch {} },
+            });
+          }).catch(() => {});
         }
       };
 
@@ -336,6 +349,10 @@ const PopupMixin = {
     if (this.viewerPeerConnection) {
       try { this.viewerPeerConnection.close(); } catch (e) {}
       this.viewerPeerConnection = null;
+    }
+    if (this._broadcastMediaSessionCleanup) {
+      this._broadcastMediaSessionCleanup();
+      this._broadcastMediaSessionCleanup = null;
     }
     if (this.currentPopup) {
       this.currentPopup.remove();

@@ -275,6 +275,11 @@ const RecordingsModalMixin = {
       this.recordingsPlayer.destroy();
       this.recordingsPlayer = null;
     }
+    // Release any prior Media Session from the previous clip.
+    if (this._mediaSessionCleanup) {
+      this._mediaSessionCleanup();
+      this._mediaSessionCleanup = null;
+    }
 
     // Reset video element
     videoEl.pause();
@@ -292,6 +297,23 @@ const RecordingsModalMixin = {
         hideControls: false,
         resetOnEnd: true
       });
+
+      // [PWA] Media Session — lock-screen metadata + play/pause/seek for
+      // the recorded clip. Not live, so seek bar + position state stay on.
+      import('../../src/pwa/media-session.js').then(({ wireMediaSession }) => {
+        const cam = this.cameras?.find((c) => c.device_id === deviceId);
+        const cameraName = cam?.name || cam?.device_id || 'Kayıt';
+        const when = new Date(start);
+        const fmt = isNaN(when) ? '' : when.toLocaleString('tr-TR', {
+          dateStyle: 'medium', timeStyle: 'short',
+        });
+        this._mediaSessionCleanup = wireMediaSession(videoEl, {
+          title: cameraName,
+          artist: fmt,
+          album: 'QBitmap Kayıt',
+          live: false,
+        });
+      }).catch(() => {});
 
       // Play
       videoEl.play().catch(() => {});
@@ -377,6 +399,11 @@ const RecordingsModalMixin = {
     if (this.recordingsPlayer) {
       this.recordingsPlayer.destroy();
       this.recordingsPlayer = null;
+    }
+    // Release the Media Session so no stale "Now Playing" chip remains.
+    if (this._mediaSessionCleanup) {
+      this._mediaSessionCleanup();
+      this._mediaSessionCleanup = null;
     }
 
     // Reset video

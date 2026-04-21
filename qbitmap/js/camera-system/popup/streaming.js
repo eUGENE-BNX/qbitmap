@@ -71,9 +71,19 @@ const StreamingMixin = {
             }
           } catch { /* localStorage blocked — skip */ }
 
-          // [PWA] Media Session — show camera name + poster on lock screen.
-          // Live stream: no seek bar, stop action tears the popup down.
-          this._attachMediaSession(popupData, videoEl, deviceId);
+          // [PWA] Media Session — defer until the video is actually
+          // playing. Attaching listeners synchronously inside pc.ontrack
+          // could race the WebRTC src binding on some devices and leave
+          // the popup stuck on the loading state.
+          const attachWhenPlaying = () => {
+            try { this._attachMediaSession(popupData, videoEl, deviceId); }
+            catch (err) { Logger.warn?.('[MediaSession] attach failed', err); }
+          };
+          if (!videoEl.paused && videoEl.readyState >= 2) {
+            setTimeout(attachWhenPlaying, 0);
+          } else {
+            videoEl.addEventListener('playing', attachWhenPlaying, { once: true });
+          }
 
           // Start stats polling for viewer count and bandwidth
           const bandwidthSpan = popupEl.querySelector('.camera-bandwidth');
@@ -314,8 +324,17 @@ const StreamingMixin = {
         frameContainer.classList.remove('loading', 'error');
         frameContainer.classList.add('loaded');
 
-        // [PWA] Media Session — city + HLS fallback paths both land here.
-        this._attachMediaSession(popupData, videoEl, deviceId);
+        // [PWA] Media Session — defer to `playing` so HLS re-init never
+        // tangles with the buffered video element.
+        const attachWhenPlaying = () => {
+          try { this._attachMediaSession(popupData, videoEl, deviceId); }
+          catch (err) { Logger.warn?.('[MediaSession] attach failed', err); }
+        };
+        if (!videoEl.paused && videoEl.readyState >= 2) {
+          setTimeout(attachWhenPlaying, 0);
+        } else {
+          videoEl.addEventListener('playing', attachWhenPlaying, { once: true });
+        }
 
         // Start metrics polling
         const bandwidthSpan = popupEl.querySelector('.camera-bandwidth');
