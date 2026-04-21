@@ -14,7 +14,12 @@ async function pushRoutes(fastify) {
   fastify.register(async (authScope) => {
     authScope.addHook('preHandler', authHook);
 
-    authScope.post('/subscribe', async (request, reply) => {
+    // Rate-limit config shared across mutation endpoints. Push subscribe
+    // is strictly user-gesture-driven, so 10/min/user is plenty and caps
+    // DB INSERT spam from a misbehaving client loop.
+    const subLimit = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
+
+    authScope.post('/subscribe', subLimit, async (request, reply) => {
       const body = request.body || {};
       const { endpoint, keys } = body;
       if (!endpoint || !keys?.p256dh || !keys?.auth) {
@@ -33,7 +38,7 @@ async function pushRoutes(fastify) {
       return { ok: true };
     });
 
-    authScope.post('/unsubscribe', async (request, reply) => {
+    authScope.post('/unsubscribe', subLimit, async (request, reply) => {
       const { endpoint } = request.body || {};
       if (!endpoint) return reply.code(400).send({ error: 'endpoint required' });
       try {
@@ -47,7 +52,10 @@ async function pushRoutes(fastify) {
 
     // Test endpoint — sends a no-op push to every subscription for the
     // current user. Useful from the UI ("send a test notification").
-    authScope.post('/test', async (request, reply) => {
+    // Tighter limit because each call fans out to every user device.
+    authScope.post('/test', {
+      config: { rateLimit: { max: 5, timeWindow: '1 minute' } }
+    }, async (request, reply) => {
       const result = await push.sendToUser(request.user.userId, {
         title: 'QBitmap test',
         body: 'Bildirimler aktif. Her şey yolunda.',

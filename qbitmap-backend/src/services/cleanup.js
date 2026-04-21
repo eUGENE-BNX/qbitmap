@@ -83,6 +83,20 @@ class CleanupService {
       // on translations handles rows; files are our last drift source.
       await this.cleanupOrphanUploads();
 
+      // Inactive push subscriptions: 404/410 auto-prune only fires when
+      // we actually try to deliver. Users who never receive a push stay
+      // in the table forever — purge rows untouched for 90 days.
+      try {
+        const [result] = await db.pool.query(
+          'DELETE FROM push_subscriptions WHERE last_seen_at < DATE_SUB(NOW(), INTERVAL 90 DAY)'
+        );
+        if (result.affectedRows > 0) {
+          logger.info({ count: result.affectedRows }, 'Inactive push subscriptions reclaimed');
+        }
+      } catch (err) {
+        logger.warn({ err: err.message }, 'push_subscriptions cleanup failed');
+      }
+
     } catch (error) {
       logger.error({ err: error }, 'Maintenance error');
     }

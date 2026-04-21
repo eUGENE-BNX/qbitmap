@@ -50,6 +50,26 @@ const httpRequestDuration = new client.Histogram({
   registers: [registry]
 });
 
+// Web Push dispatch observability. `status` covers per-subscription outcome
+// (sent / failed / expired / timeout), not per-user fan-out totals — that
+// would conflate two different things. `pushSendDuration` measures a single
+// sendNotification() call; caller batches in Promise.allSettled so we never
+// double-count.
+const pushSentTotal = new client.Counter({
+  name: 'push_sent_total',
+  help: 'Web Push send attempts grouped by outcome',
+  labelNames: ['status'],
+  registers: [registry]
+});
+
+const pushSendDuration = new client.Histogram({
+  name: 'push_send_duration_seconds',
+  help: 'Duration of a single sendNotification call',
+  labelNames: ['result'],
+  buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10],
+  registers: [registry]
+});
+
 new client.Gauge({
   name: 'mysql_pool_connections_active',
   help: 'Total open MySQL connections (in-use + idle)',
@@ -170,5 +190,8 @@ module.exports = {
   registry,
   registerHttpHooks,
   startAiQueueSampler,
-  stopAiQueueSampler
+  stopAiQueueSampler,
+  // Push observability — services/push.js imports these directly.
+  pushSentTotal,
+  pushSendDuration
 };
