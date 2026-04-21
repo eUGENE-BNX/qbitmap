@@ -1,32 +1,8 @@
 import { QBitmapConfig } from "../../config.js";
 import { Logger } from "../../utils.js";
 import { Analytics } from "../../analytics.js";
-import { wireMediaSession } from "../../../src/pwa/media-session.js";
 
 const StreamingMixin = {
-  // [PWA] Lock-screen / tray controls while a camera streams. Safe to call
-  // twice (e.g. fallback from WHEP to HLS) — prior session is released
-  // before a new one is wired.
-  _attachMediaSession(popupData, videoEl, deviceId) {
-    if (!popupData || !videoEl) return;
-    if (popupData.mediaSessionCleanup) {
-      popupData.mediaSessionCleanup();
-      popupData.mediaSessionCleanup = null;
-    }
-    const camera = popupData.camera || {};
-    const title = camera.name || camera.camera_name || 'Canlı Kamera';
-    const location = camera.location_name || camera.address || '';
-    popupData.mediaSessionCleanup = wireMediaSession(videoEl, {
-      title,
-      artist: location || 'Canlı',
-      album: 'QBitmap Canlı Yayın',
-      live: true,
-      posterUrl: videoEl.getAttribute('poster') || null,
-      onStop: () => {
-        try { this.closePopup?.(deviceId); } catch { /* popup already gone */ }
-      },
-    });
-  },
 
   async startWhepStream(deviceId, whepUrl) {
     const popupData = this.popups.get(deviceId);
@@ -71,19 +47,6 @@ const StreamingMixin = {
             }
           } catch { /* localStorage blocked — skip */ }
 
-          // [PWA] Media Session — defer until the video is actually
-          // playing. Attaching listeners synchronously inside pc.ontrack
-          // could race the WebRTC src binding on some devices and leave
-          // the popup stuck on the loading state.
-          const attachWhenPlaying = () => {
-            try { this._attachMediaSession(popupData, videoEl, deviceId); }
-            catch (err) { Logger.warn?.('[MediaSession] attach failed', err); }
-          };
-          if (!videoEl.paused && videoEl.readyState >= 2) {
-            setTimeout(attachWhenPlaying, 0);
-          } else {
-            videoEl.addEventListener('playing', attachWhenPlaying, { once: true });
-          }
 
           // Start stats polling for viewer count and bandwidth
           const bandwidthSpan = popupEl.querySelector('.camera-bandwidth');
@@ -324,17 +287,6 @@ const StreamingMixin = {
         frameContainer.classList.remove('loading', 'error');
         frameContainer.classList.add('loaded');
 
-        // [PWA] Media Session — defer to `playing` so HLS re-init never
-        // tangles with the buffered video element.
-        const attachWhenPlaying = () => {
-          try { this._attachMediaSession(popupData, videoEl, deviceId); }
-          catch (err) { Logger.warn?.('[MediaSession] attach failed', err); }
-        };
-        if (!videoEl.paused && videoEl.readyState >= 2) {
-          setTimeout(attachWhenPlaying, 0);
-        } else {
-          videoEl.addEventListener('playing', attachWhenPlaying, { once: true });
-        }
 
         // Start metrics polling
         const bandwidthSpan = popupEl.querySelector('.camera-bandwidth');
