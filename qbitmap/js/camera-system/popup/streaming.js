@@ -3,6 +3,30 @@ import { Logger } from "../../utils.js";
 import { Analytics } from "../../analytics.js";
 
 const StreamingMixin = {
+  // [PWA] Media Session attachment for camera popups. Defer-until-
+  // playing pattern in src/pwa/media-session.js protects Chrome
+  // Android's native <video> play path — see that file's header.
+  _attachCameraMediaSession(popupData, videoEl, deviceId) {
+    if (!popupData || !videoEl) return;
+    if (popupData.mediaSessionCleanup) {
+      popupData.mediaSessionCleanup();
+      popupData.mediaSessionCleanup = null;
+    }
+    import('../../../src/pwa/media-session.js').then(({ wireMediaSession }) => {
+      const camera = popupData.camera || {};
+      const title = camera.name || camera.camera_name || 'Canlı Kamera';
+      const location = camera.location_name || camera.address || '';
+      popupData.mediaSessionCleanup = wireMediaSession(videoEl, {
+        title,
+        artist: location || 'Canlı',
+        album: 'QBitmap Canlı Yayın',
+        live: true,
+        posterUrl: videoEl.getAttribute('poster') || null,
+        onStop: () => { try { this.closePopup?.(deviceId); } catch {} },
+      });
+    }).catch(() => {});
+  },
+
 
   async startWhepStream(deviceId, whepUrl) {
     const popupData = this.popups.get(deviceId);
@@ -46,6 +70,11 @@ const StreamingMixin = {
               window.dispatchEvent(new CustomEvent('qbitmap:first-camera-connected'));
             }
           } catch { /* localStorage blocked — skip */ }
+
+          // [PWA] Media Session — defer-until-playing helper is safe
+          // to call here; it wires listeners but registers handlers
+          // only after the `playing` event fires.
+          this._attachCameraMediaSession(popupData, videoEl, deviceId);
 
 
           // Start stats polling for viewer count and bandwidth
@@ -286,6 +315,9 @@ const StreamingMixin = {
       onReady: () => {
         frameContainer.classList.remove('loading', 'error');
         frameContainer.classList.add('loaded');
+
+        // [PWA] Media Session — same defer-until-playing helper.
+        this._attachCameraMediaSession(popupData, videoEl, deviceId);
 
 
         // Start metrics polling
