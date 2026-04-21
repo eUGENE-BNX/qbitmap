@@ -8,12 +8,19 @@ html, body {
     height: 100%;
     width: 100%;
     font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-    background: #f6f7fb;
+    /* Match manifest theme_color so Android PWA gesture-nav safe-area and
+       splash-to-app handoff don't flash white. Map covers the viewport on
+       top; this only shows through where safe-area insets exist. */
+    background: #0b1220;
 }
 
 #map {
     position: absolute;
     inset: 0;
+    /* dvh tracks the Android URL bar / gesture-nav area dynamically.
+       Fallback remains `inset: 0` when dvh isn't supported. */
+    height: 100dvh;
+    background: #f6f7fb;
 }
 
 /* MapLibre Controls - Center right controls vertically */
