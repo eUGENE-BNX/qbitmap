@@ -1,3 +1,9 @@
 dist/
 node_modules/
 *.local
+
+# Local test videos / Tesla dashcam exports — never deploy or commit.
+# Previously a symlink to /home/eugene/Documents/CODES/teslacam that
+# shipped to prod as a dangling link.
+teslacam
+teslacam/
