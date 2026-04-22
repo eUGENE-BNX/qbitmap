@@ -121,6 +121,97 @@ async function createServer() {
     }
   });
 
+  // ==================== PTZ ROUTES ====================
+
+  // Report whether the camera supports PTZ at all. Frontend uses this to
+  // decide whether to render the joystick overlay — no point showing controls
+  // on a C100 that can only rotate the image digitally.
+  fastify.get('/cameras/:id/ptz/capabilities', async (request, reply) => {
+    const { id } = request.params;
+    const caps = cameraManager.capabilities(id);
+    if (!caps) return reply.code(404).send({ error: 'Camera not found' });
+    return caps;
+  });
+
+  // Start a continuous move. Bursty — buttons are held down and fired every
+  // frame, so a per-route limit of 600/min matches typical interaction (one
+  // move per ~100ms) without running into the global 300/min cap.
+  fastify.post('/cameras/:id/ptz/move', {
+    config: { rateLimit: { max: 600, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
+    const { id } = request.params;
+    const { x = 0, y = 0, zoom = 0, timeoutMs = 2000 } = request.body || {};
+
+    for (const [k, v] of Object.entries({ x, y, zoom })) {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < -1 || n > 1) {
+        return reply.code(400).send({ error: `${k} must be a number in [-1, 1]` });
+      }
+    }
+    const t = parseInt(timeoutMs, 10);
+    if (!Number.isFinite(t) || t < 100 || t > 10000) {
+      return reply.code(400).send({ error: 'timeoutMs must be 100..10000' });
+    }
+
+    try {
+      await cameraManager.move(id, { x, y, zoom }, t);
+      return { status: 'ok' };
+    } catch (error) {
+      return reply.code(400).send({ error: error.message });
+    }
+  });
+
+  // Relative-step move: each call rotates the camera by a fixed translation
+  // and the camera self-terminates when done. Preferred over continuousMove
+  // for click-based UIs since there's no race between move and stop.
+  fastify.post('/cameras/:id/ptz/step', {
+    config: { rateLimit: { max: 300, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
+    const { id } = request.params;
+    const { x = 0, y = 0 } = request.body || {};
+
+    for (const [k, v] of Object.entries({ x, y })) {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < -1 || n > 1) {
+        return reply.code(400).send({ error: `${k} must be a number in [-1, 1]` });
+      }
+    }
+
+    try {
+      await cameraManager.step(id, { x, y });
+      return { status: 'ok' };
+    } catch (error) {
+      return reply.code(400).send({ error: error.message });
+    }
+  });
+
+  // Re-center the camera to (0,0) — our "home / reset" action since Tapo
+  // firmwares don't implement GotoHomePosition.
+  fastify.post('/cameras/:id/ptz/home', {
+    config: { rateLimit: { max: 60, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
+    const { id } = request.params;
+    try {
+      await cameraManager.home(id);
+      return { status: 'ok' };
+    } catch (error) {
+      return reply.code(400).send({ error: error.message });
+    }
+  });
+
+  // Stop all PTZ motion. Idempotent — safe to spam on button-release.
+  fastify.post('/cameras/:id/ptz/stop', {
+    config: { rateLimit: { max: 600, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
+    const { id } = request.params;
+    try {
+      await cameraManager.stop(id);
+      return { status: 'ok' };
+    } catch (error) {
+      return reply.code(400).send({ error: error.message });
+    }
+  });
+
   // ==================== EVENT ROUTES ====================
 
   // Get all events from all cameras

@@ -21,9 +21,31 @@ if (!process.env.CAMERAS_CONFIG_PATH) {
 }
 const EVENT_DEBOUNCE_MS = 3000; // 3 seconds debounce per event type per camera
 
+function clamp(v, lo, hi) {
+  const n = Number(v);
+  if (Number.isNaN(n)) return 0;
+  if (n < lo) return lo;
+  if (n > hi) return hi;
+  return n;
+}
+
+// Exponential backoff for reconnect. Caps at 60s so a long-dead camera does
+// not stampede retries forever but still eventually comes back online on its
+// own when the network recovers. Previously `eventsError` left the cam object
+// wedged — events stopped flowing until the service was manually restarted.
+const RECONNECT_BACKOFF_MS = [1000, 2000, 5000, 15000, 60000];
+
+// Upper bound on how long a single continuousMove can run without an explicit
+// stop. ONVIF `Timeout` + JS-side dead-man timer both enforce this so a stuck
+// client or dropped WebSocket cannot leave the motor moving indefinitely.
+const PTZ_MAX_MOVE_MS = 10000;
+const PTZ_DEFAULT_MOVE_MS = 2000;
+
 class CameraManager {
   constructor() {
-    // Map<cameraId, { config, cam, connected }>
+    // Map<cameraId, { config, cam, connected, connecting, ptzProfileToken,
+    //                 ptzSupported, reconnectAttempt, reconnectTimer,
+    //                 ptzStopTimer, destroyed }>
     this.cameras = new Map();
     // Map<"cameraId:eventType", lastEventTime> for debouncing
     this.lastEventTimes = new Map();
@@ -60,7 +82,13 @@ class CameraManager {
               config: { id: cam.id, name: cam.name, host: cam.host, port: cam.port, username: cam.username, password: plainPassword },
               cam: null,
               connected: false,
-              connecting: false
+              connecting: false,
+              ptzSupported: false,
+              ptzProfileToken: null,
+              reconnectAttempt: 0,
+              reconnectTimer: null,
+              ptzStopTimer: null,
+              destroyed: false
             });
 
             if (cam.username && plainPassword) {
@@ -125,7 +153,13 @@ class CameraManager {
       config: { id, name, host, port, username, password },
       cam: null,
       connected: false,
-      connecting: false
+      connecting: false,
+      ptzSupported: false,
+      ptzProfileToken: null,
+      reconnectAttempt: 0,
+      reconnectTimer: null,
+      ptzStopTimer: null,
+      destroyed: false
     };
 
     this.cameras.set(id, camera);
@@ -160,6 +194,20 @@ class CameraManager {
     }
 
     camera.connecting = true;
+    // If reconnect was pending (retry path), swallow the timer: we're handling
+    // the reconnect right now.
+    this._clearReconnectTimer(camera);
+
+    // Dispose old cam object (listeners + any pending pullpoints) before
+    // replacing it. Otherwise an `eventsError` from the stale socket could fire
+    // after a fresh connect and tear the new one down too.
+    if (camera.cam) {
+      try {
+        camera.cam.removeAllListeners('event');
+        camera.cam.removeAllListeners('eventsError');
+      } catch (_) { /* ignore */ }
+      camera.cam = null;
+    }
 
     const connectPromise = new Promise((resolve, reject) => {
       console.log(`[ONVIF] Connecting to ${cameraId} at ${host}:${port}...`);
@@ -182,6 +230,11 @@ class CameraManager {
         camera.cam = cam;
         camera.connected = true;
 
+        // Detect PTZ: any profile with a PTZConfiguration means the camera
+        // advertises pan/tilt/zoom. Fallback to defaultProfile.token so the
+        // agsh/onvif client can resolve the profile implicitly.
+        this._detectPtz(cameraId);
+
         // Subscribe to events
         this.subscribeToEvents(cameraId);
 
@@ -195,12 +248,59 @@ class CameraManager {
 
     try {
       await Promise.race([connectPromise, timeoutPromise]);
+      camera.reconnectAttempt = 0;
     } catch (err) {
       console.error(`[ONVIF] Failed to connect to ${cameraId}:`, err.message);
       camera.connected = false;
       throw err;
     } finally {
       camera.connecting = false;
+    }
+  }
+
+  /**
+   * Inspect the freshly-connected Cam instance for PTZ capability.
+   * agsh/onvif populates `cam.profiles` and `cam.defaultProfile` inside the
+   * constructor init chain, so by the time the connect callback fires they are
+   * available synchronously.
+   */
+  _detectPtz(cameraId) {
+    const camera = this.cameras.get(cameraId);
+    if (!camera || !camera.cam) return;
+    const cam = camera.cam;
+
+    let token = null;
+    try {
+      const profiles = Array.isArray(cam.profiles) ? cam.profiles : [];
+      const ptzProfile = profiles.find(p => p && p.PTZConfiguration) || cam.defaultProfile;
+      if (ptzProfile) {
+        token = ptzProfile.$ && ptzProfile.$.token
+          ? ptzProfile.$.token
+          : ptzProfile.token || null;
+      }
+    } catch (e) {
+      console.warn(`[ONVIF] PTZ detect failed for ${cameraId}:`, e.message);
+    }
+
+    // Tapo firmwares advertise top-level PTZ=false in capabilities yet still
+    // accept continuousMove/stop as long as a profile has a PTZConfiguration.
+    // Trust the profile marker; the capability field alone is too strict.
+    const profiles = Array.isArray(cam.profiles) ? cam.profiles : [];
+    const ptzProfile = profiles.find(p => p && p.PTZConfiguration) || null;
+    camera.ptzProfileToken = token;
+    camera.ptzSupported = !!token && !!ptzProfile;
+    // Optical zoom detection: C236 style pan-tilt cameras advertise
+    // panTiltLimits but no zoomLimits / no defaultContinuousZoomVelocitySpace.
+    // Sending zoom commands to such a camera is a no-op at best, so let the
+    // frontend know to hide the zoom buttons entirely.
+    const ptzConfig = ptzProfile ? ptzProfile.PTZConfiguration : null;
+    camera.ptzZoomSupported = !!(ptzConfig && (
+      ptzConfig.zoomLimits ||
+      ptzConfig.ZoomLimits ||
+      ptzConfig.defaultContinuousZoomVelocitySpace
+    ));
+    if (camera.ptzSupported) {
+      console.log(`[ONVIF] ${cameraId} PTZ: profile=${token} zoom=${camera.ptzZoomSupported}`);
     }
   }
 
@@ -218,15 +318,224 @@ class CameraManager {
 
     const cam = camera.cam;
 
+    // Tapo cameras lie about capabilities — C236 reports capabilities.events
+    // = null yet advertises the Events WSDL via getServices and actually
+    // delivers motion/person/line-cross/tamper/TPSmartEvent topics via
+    // PullPoint. So we don't gate on capabilities.events anymore. Instead we
+    // treat eventsError as benign (the Tapo keep-alive drops the PullMessages
+    // socket every ~10s) and let agsh/onvif re-subscribe without tearing
+    // down the whole camera connection — otherwise PTZ commands race-fail
+    // with "not connected" during the reconnect window.
     console.log(`[ONVIF] Subscribing to events for ${cameraId}...`);
 
-    cam.on('event', (event) => {
-      this.handleEvent(cameraId, event);
+    const eventHandler = (event) => this.handleEvent(cameraId, event);
+
+    const attachListeners = () => {
+      // Attach 'event' FIRST so agsh/onvif's newListener hook opens a fresh
+      // PullPoint subscription (it checks `listenerCount('event') === 0`).
+      cam.on('event', eventHandler);
+      cam.on('eventsError', errorHandler);
+    };
+
+    const reopen = () => {
+      if (camera.destroyed) return;
+      if (camera._reopenTimer) return; // one in flight
+      camera._reopenTimer = setTimeout(() => {
+        camera._reopenTimer = null;
+        if (camera.destroyed || !camera.cam) return;
+        try {
+          cam.removeListener('event', eventHandler);
+          cam.removeListener('eventsError', errorHandler);
+        } catch (_) { /* ignore */ }
+        attachListeners();
+      }, 1000);
+    };
+
+    const errorHandler = (err) => {
+      // Benign on Tapo: 'socket hang up' fires whenever PullMessages long-
+      // polls with no events. agsh/onvif doesn't auto-retry after this, so
+      // we tear down the listeners and re-attach — the newListener hook
+      // kicks off a fresh subscription. Don't touch camera.connected here;
+      // PTZ stays live during the re-subscribe window.
+      if (err && err.message === 'socket hang up') {
+        const now = Date.now();
+        const key = `hangup:${cameraId}`;
+        const last = this.lastEventTimes.get(key) || 0;
+        if (now - last > 60000) {
+          this.lastEventTimes.set(key, now);
+          console.log(`[ONVIF] ${cameraId} event keep-alive cycle (Tapo quirk) — re-subscribing`);
+        }
+        reopen();
+        return;
+      }
+      console.error(`[ONVIF] Event error for ${cameraId}:`, err.message);
+      reopen();
+    };
+
+    attachListeners();
+  }
+
+  /**
+   * Schedule a reconnect with exponential backoff. Safe to call repeatedly —
+   * only one timer is ever armed per camera.
+   */
+  scheduleReconnect(cameraId, reason) {
+    const camera = this.cameras.get(cameraId);
+    if (!camera || camera.destroyed) return;
+    if (camera.reconnectTimer || camera.connecting) return;
+
+    const idx = Math.min(camera.reconnectAttempt, RECONNECT_BACKOFF_MS.length - 1);
+    const delay = RECONNECT_BACKOFF_MS[idx];
+    camera.reconnectAttempt += 1;
+    camera.connected = false;
+
+    console.log(`[ONVIF] Scheduling reconnect for ${cameraId} in ${delay}ms (attempt ${camera.reconnectAttempt}, reason: ${reason})`);
+
+    camera.reconnectTimer = setTimeout(() => {
+      camera.reconnectTimer = null;
+      if (camera.destroyed) return;
+      this.connect(cameraId).catch(err => {
+        console.warn(`[ONVIF] Reconnect failed for ${cameraId}: ${err.message}`);
+        // Chain the next backoff step. Caps at 60s so we don't stampede.
+        this.scheduleReconnect(cameraId, 'retry-failed');
+      });
+    }, delay);
+  }
+
+  _clearReconnectTimer(camera) {
+    if (camera && camera.reconnectTimer) {
+      clearTimeout(camera.reconnectTimer);
+      camera.reconnectTimer = null;
+    }
+  }
+
+  /**
+   * Start a continuous PTZ move. x/y/zoom are velocities in [-1, 1]. Schedules
+   * a dead-man stop after `timeoutMs` so a dropped client or locked UI cannot
+   * leave the motor running indefinitely.
+   */
+  async move(cameraId, { x = 0, y = 0, zoom = 0 } = {}, timeoutMs = PTZ_DEFAULT_MOVE_MS) {
+    const camera = this.cameras.get(cameraId);
+    if (!camera) throw new Error(`Camera ${cameraId} not found`);
+    if (!camera.connected || !camera.cam) throw new Error(`Camera ${cameraId} is not connected`);
+    if (!camera.ptzSupported) throw new Error(`Camera ${cameraId} does not support PTZ`);
+
+    const clampedTimeout = Math.min(Math.max(parseInt(timeoutMs) || PTZ_DEFAULT_MOVE_MS, 100), PTZ_MAX_MOVE_MS);
+    const options = {
+      x: clamp(x, -1, 1),
+      y: clamp(y, -1, 1),
+      zoom: clamp(zoom, -1, 1),
+      // ONVIF-side auto-stop, formatted as ISO-8601 duration (PT<seconds>S).
+      onvifTimeout: `PT${Math.ceil(clampedTimeout / 1000)}S`
+    };
+    if (camera.ptzProfileToken) options.profileToken = camera.ptzProfileToken;
+
+    await new Promise((resolve, reject) => {
+      camera.cam.continuousMove(options, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
     });
 
-    cam.on('eventsError', (err) => {
-      console.error(`[ONVIF] Event error for ${cameraId}:`, err.message);
+    // JS-side dead-man timer — belt-and-braces over ONVIF Timeout, since some
+    // firmwares ignore the protocol-level timeout.
+    if (camera.ptzStopTimer) clearTimeout(camera.ptzStopTimer);
+    camera.ptzStopTimer = setTimeout(() => {
+      camera.ptzStopTimer = null;
+      this.stop(cameraId).catch(() => { /* already logged */ });
+    }, clampedTimeout);
+  }
+
+  /**
+   * Relative pan/tilt step: move by a fixed translation in the profile's
+   * default TranslationGenericSpace (where 1.0 ≈ full range of the axis).
+   * On Tapo C236 this is the practical control method — each press jumps a
+   * fixed angle rather than running continuously. Does not take a timeout
+   * because the camera self-terminates when the relative target is reached.
+   */
+  async step(cameraId, { x = 0, y = 0 } = {}) {
+    const camera = this.cameras.get(cameraId);
+    if (!camera) throw new Error(`Camera ${cameraId} not found`);
+    if (!camera.connected || !camera.cam) throw new Error(`Camera ${cameraId} is not connected`);
+    if (!camera.ptzSupported) throw new Error(`Camera ${cameraId} does not support PTZ`);
+
+    const options = {
+      x: clamp(x, -1, 1),
+      y: clamp(y, -1, 1),
+      zoom: 0
+    };
+    if (camera.ptzProfileToken) options.profileToken = camera.ptzProfileToken;
+
+    await new Promise((resolve, reject) => {
+      camera.cam.relativeMove(options, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
     });
+  }
+
+  /**
+   * Re-center the camera. Uses AbsoluteMove to (0, 0) in generic space
+   * rather than GotoHomePosition, because Tapo firmwares return
+   * ActionNotSupported on GotoHomePosition and don't ship a settable home.
+   * (0, 0) is the geometric center of panTiltLimits so it's the natural
+   * "reset" target.
+   */
+  async home(cameraId) {
+    const camera = this.cameras.get(cameraId);
+    if (!camera) throw new Error(`Camera ${cameraId} not found`);
+    if (!camera.connected || !camera.cam) throw new Error(`Camera ${cameraId} is not connected`);
+    if (!camera.ptzSupported) throw new Error(`Camera ${cameraId} does not support PTZ`);
+
+    const options = { x: 0, y: 0, zoom: 0 };
+    if (camera.ptzProfileToken) options.profileToken = camera.ptzProfileToken;
+
+    await new Promise((resolve, reject) => {
+      camera.cam.absoluteMove(options, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Stop any active PTZ motion (pan/tilt AND zoom).
+   */
+  async stop(cameraId) {
+    const camera = this.cameras.get(cameraId);
+    if (!camera) throw new Error(`Camera ${cameraId} not found`);
+    if (!camera.connected || !camera.cam) throw new Error(`Camera ${cameraId} is not connected`);
+    if (!camera.ptzSupported) return; // no-op: nothing to stop
+
+    if (camera.ptzStopTimer) {
+      clearTimeout(camera.ptzStopTimer);
+      camera.ptzStopTimer = null;
+    }
+
+    const options = { panTilt: true, zoom: true };
+    if (camera.ptzProfileToken) options.profileToken = camera.ptzProfileToken;
+
+    await new Promise((resolve, reject) => {
+      camera.cam.stop(options, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Report PTZ capability for a camera — used by the popup to decide whether
+   * to render the control overlay at all.
+   */
+  capabilities(cameraId) {
+    const camera = this.cameras.get(cameraId);
+    if (!camera) return null;
+    return {
+      connected: !!camera.connected,
+      ptz: !!camera.ptzSupported,
+      ptzZoom: !!camera.ptzZoomSupported,
+      profileToken: camera.ptzProfileToken || null
+    };
   }
 
   /**
@@ -244,18 +553,35 @@ class CameraManager {
       // Check topic for event type
       const topicStr = typeof topic === 'string' ? topic : JSON.stringify(topic);
 
-      if (topicStr.includes('Motion') || topicStr.includes('motion')) {
+      // Tapo topic map (from getEventProperties on C236):
+      //   ruleEngine/cellMotionDetector/motion   → motion
+      //   ruleEngine/peopleDetector/people       → human/person
+      //   ruleEngine/lineCrossDetector/lineCross → line_crossing
+      //   ruleEngine/tamperDetector/tamper       → tamper
+      //   ruleEngine/TPSmartEventDetector/TPSmartEvent → unified smart event
+      //     (contains pet/vehicle/baby-cry as runtime payload — we log the
+      //      full data on the first occurrence so the user can tell us what
+      //      a real pet/vehicle/baby-cry event looks like)
+      if (topicStr.includes('cellMotionDetector') || topicStr.includes('Motion') || topicStr.includes('motion')) {
         eventType = 'motion';
-      } else if (topicStr.includes('Human') || topicStr.includes('human') || topicStr.includes('Person') || topicStr.includes('People') || topicStr.includes('PeopleDetector')) {
+      } else if (topicStr.includes('peopleDetector') || topicStr.includes('Human') || topicStr.includes('human') || topicStr.includes('Person') || topicStr.includes('People')) {
         eventType = 'human';
       } else if (topicStr.includes('Pet') || topicStr.includes('pet') || topicStr.includes('Animal')) {
         eventType = 'pet';
       } else if (topicStr.includes('Vehicle') || topicStr.includes('vehicle') || topicStr.includes('Car')) {
         eventType = 'vehicle';
-      } else if (topicStr.includes('LineDetector') || topicStr.includes('Crossing')) {
+      } else if (topicStr.includes('lineCrossDetector') || topicStr.includes('LineDetector') || topicStr.includes('Crossing')) {
         eventType = 'line_crossing';
-      } else if (topicStr.includes('Tamper') || topicStr.includes('tamper')) {
+      } else if (topicStr.includes('tamperDetector') || topicStr.includes('Tamper') || topicStr.includes('tamper')) {
         eventType = 'tamper';
+      } else if (topicStr.includes('TPSmartEventDetector') || topicStr.includes('TPSmartEvent')) {
+        eventType = 'smart';
+        // Dump the full payload once per camera so we can decode pet /
+        // vehicle / baby-cry sub-types when they actually fire. Remove this
+        // block once we know the mapping.
+        try {
+          console.log(`[TAPO_SMART] ${cameraId} raw event payload:`, JSON.stringify(event, null, 2));
+        } catch (_) { /* event may contain circular refs from onvif lib */ }
       }
 
       // Try to extract state (true/false for motion on/off)
@@ -357,6 +683,19 @@ class CameraManager {
       throw new Error(`Camera ${cameraId} not found`);
     }
 
+    // Mark destroyed so any in-flight reconnect timer exits cleanly rather
+    // than trying to reconnect a camera we just deleted.
+    camera.destroyed = true;
+    this._clearReconnectTimer(camera);
+    if (camera.ptzStopTimer) {
+      clearTimeout(camera.ptzStopTimer);
+      camera.ptzStopTimer = null;
+    }
+    if (camera._reopenTimer) {
+      clearTimeout(camera._reopenTimer);
+      camera._reopenTimer = null;
+    }
+
     // Disconnect
     if (camera.cam) {
       try {
@@ -393,7 +732,8 @@ class CameraManager {
       name: camera.config.name,
       host: camera.config.host,
       port: camera.config.port,
-      connected: camera.connected
+      connected: camera.connected,
+      ptz: !!camera.ptzSupported
     };
   }
 
@@ -408,7 +748,8 @@ class CameraManager {
         name: camera.config.name,
         host: camera.config.host,
         port: camera.config.port,
-        connected: camera.connected
+        connected: camera.connected,
+        ptz: !!camera.ptzSupported
       });
     }
     return result;
