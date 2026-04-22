@@ -354,21 +354,17 @@ const H3Grid = {
         autoHighlight: true,
         highlightColor: [140, 145, 150, 40],
 
-        onHover: (info) => {
-          if (info.object && this._currentResolution >= 13) {
-            this._showFogTooltip(info.x, info.y, info.object.h3Index);
-          } else {
-            this._tooltip.style.display = 'none';
-          }
-        },
-
+        // Paneller tıklama ile açılıyor; autoHighlight hover'da hücreyi vurguluyor.
         onClick: (info) => {
-          if (info.object && this._currentResolution < 13) {
+          if (!info.object) return;
+          if (this._currentResolution < 13) {
             const center = h3.cellToLatLng(info.object.h3Index);
             this._map.easeTo({
               center: [center[1], center[0]],
               zoom: this._map.getZoom() + 2
             });
+          } else {
+            this._showFogTooltip(info.x, info.y, info.object.h3Index);
           }
         }
       });
@@ -397,21 +393,17 @@ const H3Grid = {
         autoHighlight: true,
         highlightColor: [200, 200, 200, 130],
 
-        onHover: (info) => {
-          if (info.object) {
-            this._showOwnerTooltipTimed(info.x, info.y, info.object.h3Index, info.object);
-          } else {
-            this._tooltip.style.display = 'none';
-          }
-        },
-
+        // Paneller tıklama ile açılıyor; autoHighlight hover'da hücreyi vurguluyor.
         onClick: (info) => {
-          if (info.object && this._currentResolution < 13) {
+          if (!info.object) return;
+          if (this._currentResolution < 13) {
             const center = h3.cellToLatLng(info.object.h3Index);
             this._map.easeTo({
               center: [center[1], center[0]],
               zoom: this._map.getZoom() + 2
             });
+          } else {
+            this._showOwnerTooltipTimed(info.x, info.y, info.object.h3Index, info.object);
           }
         }
       });
