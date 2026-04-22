@@ -60,6 +60,10 @@ export default defineConfig({
           'vendor/maplibre-gl.{js,css}',
           'vendor/basemaps.js',
           'icons/*.png',
+          // index.html MUST be precached — the NavigationRoute in the SW
+          // calls createHandlerBoundToURL('/index.html') and throws a
+          // non-precached-url error at activate time without it.
+          'index.html',
           'offline.html',
           'logo.png',
           'logo.svg',
