@@ -18,6 +18,22 @@
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
+  "screenshots": [
+    {
+      "src": "/icons/screenshot-mobile.png",
+      "sizes": "720x1440",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Harita ve kamera popup'ı — mobil görünüm"
+    },
+    {
+      "src": "/icons/screenshot-desktop.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Kamera ağı haritası — masaüstü görünüm"
+    }
+  ],
   "launch_handler": { "client_mode": "navigate-existing" },
   "categories": ["utilities", "security", "navigation"],
   "share_target": {

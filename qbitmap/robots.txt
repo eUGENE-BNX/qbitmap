@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /status
+Disallow: /api/
+Disallow: /auth/
+Disallow: /uploads/
+Disallow: /capture/
+Disallow: /frame/
+Disallow: /whep-proxy
+Disallow: /share-inbox
+
+Sitemap: https://qbitmap.com/sitemap.xml
