@@ -6,7 +6,8 @@ DatabaseService.prototype.seedOnvifTemplates = async function() {
   const templates = [
     { model_name: 'Tapo C100', manufacturer: 'TP-Link', onvif_port: 2020, supported_events: JSON.stringify(['motion', 'human']) },
     { model_name: 'Tapo C200', manufacturer: 'TP-Link', onvif_port: 2020, supported_events: JSON.stringify(['motion', 'human', 'pet']) },
-    { model_name: 'Tapo C210', manufacturer: 'TP-Link', onvif_port: 2020, supported_events: JSON.stringify(['motion', 'human', 'pet']) }
+    { model_name: 'Tapo C210', manufacturer: 'TP-Link', onvif_port: 2020, supported_events: JSON.stringify(['motion', 'human', 'pet']) },
+    { model_name: 'Tapo C236', manufacturer: 'TP-Link', onvif_port: 2020, supported_events: JSON.stringify(['motion', 'human', 'pet', 'vehicle', 'line_crossing', 'tamper', 'baby_cry']) }
   ];
 
   for (const t of templates) {

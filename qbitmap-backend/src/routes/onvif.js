@@ -326,6 +326,213 @@ async function onvifRoutes(fastify, options) {
     }
   });
 
+  // ==================== ONVIF PTZ ROUTES ====================
+
+  // Shared lookup: qbitmap camera id → { onvifCameraId } after ownership check.
+  // Returns Fastify reply on error (so caller can just `return` it) or the
+  // resolved onvifCameraId string on success.
+  async function resolveOwnedOnvifCameraId(request, reply) {
+    const cameraId = parseId(request.params.cameraId);
+    if (cameraId === null) return reply.code(400).send({ error: 'Invalid cameraId' });
+
+    const camera = await db.getCameraById(cameraId);
+    if (!camera) return reply.code(404).send({ error: 'Camera not found' });
+    // Owner-only: PTZ physically moves the hardware, so shared viewers must
+    // not be able to swing it around.
+    if (camera.user_id !== request.user.userId) {
+      return reply.code(403).send({ error: 'Not authorized to control this camera' });
+    }
+    const link = await db.getOnvifLinkByOnvifId
+      ? await db.getOnvifLink(cameraId)
+      : null;
+    if (!link || !link.onvif_camera_id) {
+      return reply.code(404).send({ error: 'Camera has no ONVIF link' });
+    }
+    return link.onvif_camera_id;
+  }
+
+  /**
+   * GET /api/onvif/ptz/:cameraId/capabilities
+   * Returns { connected, ptz, profileToken } proxied from the ONVIF service.
+   * Frontend calls this once on popup open to decide whether to render the
+   * joystick overlay at all.
+   */
+  fastify.get('/ptz/:cameraId/capabilities', async (request, reply) => {
+    const onvifCameraId = await resolveOwnedOnvifCameraId(request, reply);
+    if (reply.sent) return;
+
+    try {
+      const onvifServiceUrl = services.onvifServiceUrl;
+      const response = await fetchWithTimeout(
+        `${onvifServiceUrl}/cameras/${encodeURIComponent(onvifCameraId)}/ptz/capabilities`,
+        {},
+        TIMEOUTS.ONVIF_DEFAULT
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        return reply.code(response.status).send(body);
+      }
+      return await response.json();
+    } catch (error) {
+      logger.error({ err: error, onvifCameraId }, 'PTZ capabilities fetch failed');
+      // Treat upstream failure as "no PTZ available" rather than 500 so the
+      // popup just hides the overlay instead of showing an error state.
+      return { connected: false, ptz: false, profileToken: null };
+    }
+  });
+
+  /**
+   * POST /api/onvif/ptz/:cameraId/move
+   * Body: { x, y, zoom, timeoutMs } — velocities in [-1, 1].
+   */
+  fastify.post('/ptz/:cameraId/move', {
+    config: { rateLimit: { max: 600, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
+    const onvifCameraId = await resolveOwnedOnvifCameraId(request, reply);
+    if (reply.sent) return;
+
+    const { x = 0, y = 0, zoom = 0, timeoutMs = 2000 } = request.body || {};
+    for (const [k, v] of Object.entries({ x, y, zoom })) {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < -1 || n > 1) {
+        return reply.code(400).send({ error: `${k} must be a number in [-1, 1]` });
+      }
+    }
+    const t = parseInt(timeoutMs, 10);
+    if (!Number.isFinite(t) || t < 100 || t > 10000) {
+      return reply.code(400).send({ error: 'timeoutMs must be 100..10000' });
+    }
+
+    try {
+      const onvifServiceUrl = services.onvifServiceUrl;
+      const response = await fetchWithTimeout(
+        `${onvifServiceUrl}/cameras/${encodeURIComponent(onvifCameraId)}/ptz/move`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: Number(x), y: Number(y), zoom: Number(zoom), timeoutMs: t })
+        },
+        TIMEOUTS.ONVIF_DEFAULT
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        return reply.code(response.status).send(body);
+      }
+      return await response.json();
+    } catch (error) {
+      logger.error({ err: error, onvifCameraId }, 'PTZ move failed');
+      return reply.code(502).send({ error: 'ONVIF service unavailable' });
+    }
+  });
+
+  /**
+   * POST /api/onvif/ptz/:cameraId/step
+   * Body: { x, y } — relative translation in [-1, 1], where ≈0.03 is ~10°.
+   * Preferred over continuous move for discrete click-based control.
+   */
+  fastify.post('/ptz/:cameraId/step', {
+    config: { rateLimit: { max: 300, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
+    const onvifCameraId = await resolveOwnedOnvifCameraId(request, reply);
+    if (reply.sent) return;
+
+    const { x = 0, y = 0 } = request.body || {};
+    for (const [k, v] of Object.entries({ x, y })) {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < -1 || n > 1) {
+        return reply.code(400).send({ error: `${k} must be a number in [-1, 1]` });
+      }
+    }
+
+    try {
+      const onvifServiceUrl = services.onvifServiceUrl;
+      const response = await fetchWithTimeout(
+        `${onvifServiceUrl}/cameras/${encodeURIComponent(onvifCameraId)}/ptz/step`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: Number(x), y: Number(y) })
+        },
+        TIMEOUTS.ONVIF_DEFAULT
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        return reply.code(response.status).send(body);
+      }
+      return await response.json();
+    } catch (error) {
+      logger.error({ err: error, onvifCameraId }, 'PTZ step failed');
+      return reply.code(502).send({ error: 'ONVIF service unavailable' });
+    }
+  });
+
+  /**
+   * POST /api/onvif/ptz/:cameraId/home
+   * Re-center the camera. Low rate-limit: this is a "reset" action, not
+   * something the user should mash.
+   */
+  fastify.post('/ptz/:cameraId/home', {
+    config: { rateLimit: { max: 60, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
+    const onvifCameraId = await resolveOwnedOnvifCameraId(request, reply);
+    if (reply.sent) return;
+
+    try {
+      const onvifServiceUrl = services.onvifServiceUrl;
+      const response = await fetchWithTimeout(
+        `${onvifServiceUrl}/cameras/${encodeURIComponent(onvifCameraId)}/ptz/home`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // Fastify's JSON parser rejects empty bodies when content-type is
+          // application/json. Send an empty JSON object so the upstream
+          // service accepts the request.
+          body: '{}'
+        },
+        TIMEOUTS.ONVIF_DEFAULT
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        return reply.code(response.status).send(body);
+      }
+      return await response.json();
+    } catch (error) {
+      logger.error({ err: error, onvifCameraId }, 'PTZ home failed');
+      return reply.code(502).send({ error: 'ONVIF service unavailable' });
+    }
+  });
+
+  /**
+   * POST /api/onvif/ptz/:cameraId/stop
+   */
+  fastify.post('/ptz/:cameraId/stop', {
+    config: { rateLimit: { max: 600, timeWindow: '1 minute' } }
+  }, async (request, reply) => {
+    const onvifCameraId = await resolveOwnedOnvifCameraId(request, reply);
+    if (reply.sent) return;
+
+    try {
+      const onvifServiceUrl = services.onvifServiceUrl;
+      const response = await fetchWithTimeout(
+        `${onvifServiceUrl}/cameras/${encodeURIComponent(onvifCameraId)}/ptz/stop`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}'
+        },
+        TIMEOUTS.ONVIF_DEFAULT
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        return reply.code(response.status).send(body);
+      }
+      return await response.json();
+    } catch (error) {
+      logger.error({ err: error, onvifCameraId }, 'PTZ stop failed');
+      return reply.code(502).send({ error: 'ONVIF service unavailable' });
+    }
+  });
+
   // ==================== ONVIF EVENT ROUTES ====================
 
   /**
