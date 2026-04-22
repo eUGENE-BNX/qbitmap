@@ -558,59 +558,97 @@ const FormUploadMixin = {
     if (progressText) { progressText.style.display = ''; progressText.textContent = 'Yükleniyor...'; }
     if (actions) actions.style.display = 'none';
 
-    try {
+    // Retry on transient network errors. 4xx stays fatal (validation /
+    // auth / payload size), 5xx + offline + timeout + rate-limit get
+    // retried up to twice with 5s and 15s backoffs. XHR instance is
+    // recreated each attempt so upload progress starts fresh.
+    const RETRYABLE_STATUSES = new Set([0, 408, 429, 500, 502, 503, 504]);
+    const BACKOFF_MS = [0, 5000, 15000]; // 1st, 2nd, 3rd attempt
+
+    const doOneUpload = () => new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
       const uploadStartTime = Date.now();
-      const result = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', this.apiBase, true);
-        xhr.withCredentials = true;
+      xhr.open('POST', this.apiBase, true);
+      xhr.withCredentials = true;
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable && progressBar) {
-            const pct = Math.round((e.loaded / e.total) * 100);
-            progressBar.style.width = pct + '%';
-            if (progressText) {
-              const elapsed = (Date.now() - uploadStartTime) / 1000;
-              if (pct > 0 && pct < 100 && elapsed > 1) {
-                const speed = e.loaded / elapsed;
-                const remaining = Math.ceil((e.total - e.loaded) / speed);
-                const eta = remaining < 60 ? `${remaining}s` : `${Math.floor(remaining / 60)}dk ${remaining % 60}s`;
-                progressText.textContent = `Yükleniyor... ${pct}% (${eta} kaldı)`;
-              } else {
-                progressText.textContent = `Yükleniyor... ${pct}%`;
-              }
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && progressBar) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          progressBar.style.width = pct + '%';
+          if (progressText) {
+            const elapsed = (Date.now() - uploadStartTime) / 1000;
+            if (pct > 0 && pct < 100 && elapsed > 1) {
+              const speed = e.loaded / elapsed;
+              const remaining = Math.ceil((e.total - e.loaded) / speed);
+              const eta = remaining < 60 ? `${remaining}s` : `${Math.floor(remaining / 60)}dk ${remaining % 60}s`;
+              progressText.textContent = `Yükleniyor... ${pct}% (${eta} kaldı)`;
+            } else {
+              progressText.textContent = `Yükleniyor... ${pct}%`;
             }
           }
-        };
+        }
+      };
 
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try { resolve(JSON.parse(xhr.responseText)); }
-            catch { resolve({ status: 'ok' }); }
-          } else {
-            // Stringify error robustly: error field may be string, object, or absent
-            let msg = `HTTP ${xhr.status}`;
-            try {
-              const parsed = JSON.parse(xhr.responseText);
-              const candidate = parsed.error ?? parsed.message;
-              if (typeof candidate === 'string' && candidate) {
-                msg = candidate;
-              } else if (candidate) {
-                msg = JSON.stringify(candidate);
-              } else if (xhr.responseText) {
-                msg = `HTTP ${xhr.status}: ${xhr.responseText.slice(0, 200)}`;
-              }
-            } catch {
-              if (xhr.responseText) msg = `HTTP ${xhr.status}: ${xhr.responseText.slice(0, 200)}`;
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { resolve({ status: 'ok' }); }
+        } else {
+          let msg = `HTTP ${xhr.status}`;
+          try {
+            const parsed = JSON.parse(xhr.responseText);
+            const candidate = parsed.error ?? parsed.message;
+            if (typeof candidate === 'string' && candidate) {
+              msg = candidate;
+            } else if (candidate) {
+              msg = JSON.stringify(candidate);
+            } else if (xhr.responseText) {
+              msg = `HTTP ${xhr.status}: ${xhr.responseText.slice(0, 200)}`;
             }
-            Logger.error('[VideoMessage] Upload failed', { status: xhr.status, body: xhr.responseText?.slice(0, 500) });
-            reject(new Error(msg));
+          } catch {
+            if (xhr.responseText) msg = `HTTP ${xhr.status}: ${xhr.responseText.slice(0, 200)}`;
           }
-        };
+          Logger.error('[VideoMessage] Upload failed', { status: xhr.status, body: xhr.responseText?.slice(0, 500) });
+          const err = new Error(msg);
+          err.__retryable = RETRYABLE_STATUSES.has(xhr.status);
+          err.__status = xhr.status;
+          reject(err);
+        }
+      };
 
-        xhr.onerror = () => reject(new Error('Network error'));
-        xhr.send(formData);
-      });
+      xhr.onerror = () => {
+        // navigator.onLine=false or DNS / TCP / TLS flake. Always retryable.
+        const err = new Error(navigator.onLine ? 'Bağlantı hatası' : 'Bağlantı kesildi');
+        err.__retryable = true;
+        err.__status = 0;
+        reject(err);
+      };
+
+      xhr.send(formData);
+    });
+
+    try {
+      let result;
+      let lastErr;
+      for (let attempt = 0; attempt < BACKOFF_MS.length; attempt++) {
+        if (attempt > 0) {
+          if (progressText) {
+            progressText.textContent = `Bağlantı yenileniyor... (${attempt + 1}/${BACKOFF_MS.length})`;
+          }
+          if (progressBar) progressBar.style.width = '0%';
+          await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
+        }
+        try {
+          result = await doOneUpload();
+          lastErr = null;
+          break;
+        } catch (err) {
+          lastErr = err;
+          if (!err.__retryable || attempt === BACKOFF_MS.length - 1) throw err;
+          Logger.warn?.('[VideoMessage] Upload retryable failure, will retry', { status: err.__status, attempt: attempt + 1 });
+        }
+      }
+      if (lastErr) throw lastErr;
 
       // Success
       if (result.message) {
