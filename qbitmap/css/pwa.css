@@ -32,10 +32,10 @@
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 .pwa-update-toast .pwa-update-refresh {
-  background: #2b5cff;
+  background: #00704a;
   color: #fff;
 }
-.pwa-update-toast .pwa-update-refresh:hover { background: #3a6bff; }
+.pwa-update-toast .pwa-update-refresh:hover { background: #008a5b; }
 .pwa-update-toast .pwa-update-dismiss { color: #9fb0c4; }
 .pwa-update-toast .pwa-update-dismiss:hover {
   background: #1c2a45;
@@ -90,17 +90,17 @@
   align-items: center;
   gap: 8px;
   padding: 10px 14px 10px 12px;
-  background: #2b5cff;
+  background: #00704a;
   color: #fff;
   border: none;
   border-radius: 999px;
   font: 600 14px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial,
     sans-serif;
   cursor: pointer;
-  box-shadow: 0 8px 22px rgba(43, 92, 255, 0.45);
+  box-shadow: 0 8px 22px rgba(0, 112, 74, 0.45);
   transition: transform 0.15s ease, background 0.15s ease;
 }
-.pwa-install-btn:hover { background: #3a6bff; transform: translateY(-1px); }
+.pwa-install-btn:hover { background: #008a5b; transform: translateY(-1px); }
 .pwa-install-btn svg { flex: 0 0 18px; }
 .pwa-install-btn .pwa-install-close {
   margin-left: 6px;
@@ -191,13 +191,13 @@
   padding: 10px 14px;
   border: none;
   border-radius: 10px;
-  background: #2b5cff;
+  background: #00704a;
   color: #fff;
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
 }
-.pwa-ios-modal-ok:hover { background: #3a6bff; }
+.pwa-ios-modal-ok:hover { background: #008a5b; }
 
 /* Profile panel: push-notification toggle */
 .profile-push-section {
@@ -264,7 +264,7 @@
   transition: transform 0.18s ease;
 }
 .profile-push-toggle input:checked + .profile-push-slider {
-  background: #2b5cff;
+  background: #00704a;
 }
 .profile-push-toggle input:checked + .profile-push-slider::before {
   transform: translateX(18px);

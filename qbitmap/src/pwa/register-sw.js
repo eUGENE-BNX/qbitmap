@@ -72,8 +72,8 @@ function showUpdateToast() {
   el.setAttribute('role', 'dialog');
   el.setAttribute('aria-live', 'polite');
   el.innerHTML =
-    '<span class="pwa-update-text">Yeni sürüm hazır.</span>' +
-    '<button type="button" class="pwa-update-refresh">Yenile</button>' +
+    '<span class="pwa-update-text">Yeni sürüm hazır!</span>' +
+    '<button type="button" class="pwa-update-refresh">Güncelle</button>' +
     '<button type="button" class="pwa-update-dismiss" aria-label="Kapat">Sonra</button>';
   document.body.appendChild(el);
   el.querySelector('.pwa-update-refresh').addEventListener('click', () => {
