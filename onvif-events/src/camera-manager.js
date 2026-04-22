@@ -328,51 +328,27 @@ class CameraManager {
     // with "not connected" during the reconnect window.
     console.log(`[ONVIF] Subscribing to events for ${cameraId}...`);
 
-    const eventHandler = (event) => this.handleEvent(cameraId, event);
+    cam.on('event', (event) => this.handleEvent(cameraId, event));
 
-    const attachListeners = () => {
-      // Attach 'event' FIRST so agsh/onvif's newListener hook opens a fresh
-      // PullPoint subscription (it checks `listenerCount('event') === 0`).
-      cam.on('event', eventHandler);
-      cam.on('eventsError', errorHandler);
-    };
-
-    const reopen = () => {
-      if (camera.destroyed) return;
-      if (camera._reopenTimer) return; // one in flight
-      camera._reopenTimer = setTimeout(() => {
-        camera._reopenTimer = null;
-        if (camera.destroyed || !camera.cam) return;
-        try {
-          cam.removeListener('event', eventHandler);
-          cam.removeListener('eventsError', errorHandler);
-        } catch (_) { /* ignore */ }
-        attachListeners();
-      }, 1000);
-    };
-
-    const errorHandler = (err) => {
-      // Benign on Tapo: 'socket hang up' fires whenever PullMessages long-
-      // polls with no events. agsh/onvif doesn't auto-retry after this, so
-      // we tear down the listeners and re-attach — the newListener hook
-      // kicks off a fresh subscription. Don't touch camera.connected here;
-      // PTZ stays live during the re-subscribe window.
-      if (err && err.message === 'socket hang up') {
-        const now = Date.now();
-        const key = `hangup:${cameraId}`;
-        const last = this.lastEventTimes.get(key) || 0;
-        if (now - last > 60000) {
-          this.lastEventTimes.set(key, now);
-          console.log(`[ONVIF] ${cameraId} event keep-alive cycle (Tapo quirk) — re-subscribing`);
-        }
-        reopen();
-        return;
+    cam.on('eventsError', (err) => {
+      // agsh/onvif keeps its single PullPoint subscription alive internally
+      // across transient Tapo errors — observed empirically on C236 and
+      // Office 01/02/03, events flow continuously despite 'socket hang up'
+      // and 'ONVIF SOAP Fault: error' emissions every few seconds. Do NOT
+      // try to re-subscribe here: swapping listeners triggers newListener
+      // → _eventRequest() on top of the still-running subscription, which
+      // leaks subscriptions and produces a runaway storm of SOAP faults
+      // (observed: ~180K faults accumulated in 2 hours before this fix).
+      // Just rate-limit the log so the journal doesn't fill up.
+      const msg = (err && err.message) || 'unknown';
+      const now = Date.now();
+      const key = `evterr:${cameraId}:${msg}`;
+      const last = this.lastEventTimes.get(key) || 0;
+      if (now - last > 60000) {
+        this.lastEventTimes.set(key, now);
+        console.log(`[ONVIF] ${cameraId} event error (Tapo quirk, benign): ${msg}`);
       }
-      console.error(`[ONVIF] Event error for ${cameraId}:`, err.message);
-      reopen();
-    };
-
-    attachListeners();
+    });
   }
 
   /**
@@ -703,10 +679,6 @@ class CameraManager {
     if (camera.ptzStopTimer) {
       clearTimeout(camera.ptzStopTimer);
       camera.ptzStopTimer = null;
-    }
-    if (camera._reopenTimer) {
-      clearTimeout(camera._reopenTimer);
-      camera._reopenTimer = null;
     }
 
     // Disconnect
