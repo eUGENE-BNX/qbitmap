@@ -925,6 +925,7 @@
 
   .video-msg-popup {
     min-width: 240px;
+    zoom: 0.8;
   }
 }
 
