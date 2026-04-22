@@ -570,28 +570,41 @@ class CameraManager {
         eventType = 'pet';
       } else if (topicStr.includes('Vehicle') || topicStr.includes('vehicle') || topicStr.includes('Car')) {
         eventType = 'vehicle';
-      } else if (topicStr.includes('lineCrossDetector') || topicStr.includes('LineDetector') || topicStr.includes('Crossing')) {
+      } else if (topicStr.includes('LineCross') || topicStr.includes('lineCross') || topicStr.includes('LineDetector') || topicStr.includes('Crossing')) {
         eventType = 'line_crossing';
       } else if (topicStr.includes('tamperDetector') || topicStr.includes('Tamper') || topicStr.includes('tamper')) {
         eventType = 'tamper';
       } else if (topicStr.includes('TPSmartEventDetector') || topicStr.includes('TPSmartEvent')) {
         eventType = 'smart';
-        // Dump the full payload once per camera so we can decode pet /
-        // vehicle / baby-cry sub-types when they actually fire. Remove this
-        // block once we know the mapping.
         try {
           console.log(`[TAPO_SMART] ${cameraId} raw event payload:`, JSON.stringify(event, null, 2));
         } catch (_) { /* event may contain circular refs from onvif lib */ }
       }
 
-      // Try to extract state (true/false for motion on/off)
+      // Diagnostic: dump the raw event for anything that didn't match above
+      // so we can learn the actual Tapo topic strings for pet / vehicle /
+      // baby-cry / line-crossing etc. Remove once the mapping is complete.
+      if (eventType === 'unknown') {
+        try {
+          console.log(`[TAPO_UNKNOWN] ${cameraId} topic=${topicStr} payload=${JSON.stringify(event)}`);
+        } catch (_) { /* ignore circulars */ }
+      }
+
+      // Try to extract state (true/false for motion on/off). Tapo uses
+      // IsMotion / IsPeople / IsLineCross / IsTamper / IsTPSmartEvent as the
+      // state field name; other ONVIF vendors use plain 'State'. Accept any
+      // boolean-ish simpleItem whose Name starts with "Is" or equals "State".
       if (message && message.message) {
         const data = message.message.data || message.message;
         if (data && data.simpleItem) {
           const items = Array.isArray(data.simpleItem) ? data.simpleItem : [data.simpleItem];
           for (const item of items) {
-            if (item.$ && item.$.Name === 'State') {
-              eventState = item.$.Value === 'true' || item.$.Value === true;
+            const name = item.$ && item.$.Name;
+            if (!name) continue;
+            if (name === 'State' || name.startsWith('Is')) {
+              const val = item.$.Value;
+              eventState = val === 'true' || val === true;
+              break;
             }
           }
         }
