@@ -238,6 +238,12 @@ const PopupCoreMixin = {
     setTimeout(() => {
       this.updatePopupAiButton(deviceId);
     }, 100);
+
+    // Probe for PTZ support and render the control overlay if the camera
+    // advertises it. Non-PTZ cameras get no overlay — cheap 404/200 nop.
+    if (this.initPtzOverlay) {
+      this.initPtzOverlay(deviceId);
+    }
   },
 
 
@@ -450,6 +456,11 @@ const PopupCoreMixin = {
     // Cleanup capture blob URL
     if (popupData.lastCapture?.thumbnailUrl) {
       URL.revokeObjectURL(popupData.lastCapture.thumbnailUrl);
+    }
+
+    // Stop any active PTZ motion and unbind keyboard listeners.
+    if (this.destroyPtzOverlay) {
+      this.destroyPtzOverlay(deviceId);
     }
 
     // Remove popup from map
