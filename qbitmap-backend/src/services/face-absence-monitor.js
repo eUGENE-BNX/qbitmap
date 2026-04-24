@@ -111,7 +111,8 @@ async function processTick() {
           topic: `absence-${rule.id}`,
           urgency: 'high',
           navigate: '/',
-          image: faceImageUrl,
+          icon: faceImageUrl || undefined,
+          image: faceImageUrl || undefined,
         });
       } catch (err) {
         logger.warn({ err: err.message, ruleId: rule.id }, 'push dispatch failed (non-fatal)');

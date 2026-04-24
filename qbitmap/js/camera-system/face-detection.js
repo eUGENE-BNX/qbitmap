@@ -25,6 +25,9 @@ const FaceDetectionMixin = {
       if (res.ok) {
         const data = await res.json();
         this._faceLibrary = data.faces || [];
+        Logger.log(`[FaceDetection] Library reloaded: ${this._faceLibrary.length} face(s)`, this._faceLibrary.map(f => ({ id: f.id, name: f.name, trigger_alarm: f.trigger_alarm })));
+      } else {
+        Logger.warn(`[FaceDetection] /library returned ${res.status}`);
       }
     } catch (e) {
       Logger.warn('[FaceDetection] Failed to reload library:', e);
@@ -36,6 +39,7 @@ const FaceDetectionMixin = {
    * Initialize face detection on startup (loads cameras with detection enabled)
    */
   async initFaceDetection() {
+    Logger.log('[FaceDetection] init() called');
     try {
       // Prime the global library once up-front so per-camera starts skip
       // N identical /library fetches.
@@ -45,12 +49,22 @@ const FaceDetectionMixin = {
         credentials: 'include'
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        for (const camera of (data.cameras || [])) {
-          if (camera.face_detection_enabled) {
-            await this.startFaceDetection(camera.device_id, camera.face_detection_interval || 10);
-          }
+      if (!response.ok) {
+        Logger.warn(`[FaceDetection] /active returned HTTP ${response.status} — no auto-start`);
+        return;
+      }
+
+      const data = await response.json();
+      const cams = data.cameras || [];
+      Logger.log(`[FaceDetection] /active returned ${cams.length} camera(s):`, cams.map(c => ({ device_id: c.device_id, enabled: c.face_detection_enabled, interval: c.face_detection_interval, type: c.camera_type })));
+      if (cams.length === 0) {
+        Logger.warn('[FaceDetection] No cameras have face_detection_enabled=1 — toggle aç.');
+      }
+      for (const camera of cams) {
+        if (camera.face_detection_enabled) {
+          await this.startFaceDetection(camera.device_id, camera.face_detection_interval || 10);
+        } else {
+          Logger.warn(`[FaceDetection] Camera ${camera.device_id} in active list but face_detection_enabled=${camera.face_detection_enabled}, skipping`);
         }
       }
     } catch (error) {
@@ -67,12 +81,18 @@ const FaceDetectionMixin = {
     // Check if already running
     let state = this.faceDetectionState.get(deviceId);
     if (state?.intervalId) {
+      Logger.warn(`[FaceDetection] Already running for ${deviceId}, skipping start`);
       return;
     }
 
     // Find camera to get WHEP URL
     const camera = this.cameras.find(c => c.device_id === deviceId);
-    if (!camera || camera.camera_type !== 'whep') {
+    if (!camera) {
+      Logger.warn(`[FaceDetection] Camera ${deviceId} not found in this.cameras (cameras count: ${this.cameras?.length ?? 0})`);
+      return;
+    }
+    if (camera.camera_type !== 'whep') {
+      Logger.warn(`[FaceDetection] Camera ${deviceId} is not WHEP type (got: "${camera.camera_type}") — face detection only supports WHEP`);
       return;
     }
 
@@ -83,6 +103,7 @@ const FaceDetectionMixin = {
       await this._reloadFaceLibrary();
     }
     if (this._faceLibrary.length === 0) {
+      Logger.warn(`[FaceDetection] Face library is empty — no reference faces to match against. Aborting start for ${deviceId}`);
       return;
     }
 
@@ -100,12 +121,16 @@ const FaceDetectionMixin = {
     // Extract stream ID from WHEP URL
     const streamId = this.extractStreamIdFromWhepUrl(camera.whep_url);
     if (!streamId) {
+      Logger.warn(`[FaceDetection] Could not extract streamId from whep_url: "${camera.whep_url}" for ${deviceId}`);
       return;
     }
+    Logger.log(`[FaceDetection] streamId="${streamId}" for ${deviceId}, threshold=${matchThreshold}`);
 
     // Start capture service
     try {
+      Logger.log(`[FaceDetection] Starting capture service for ${streamId} @ ${intervalSeconds}s`);
       await this.startCaptureService(streamId, intervalSeconds * 1000);
+      Logger.log(`[FaceDetection] Capture service start OK for ${streamId}`);
     } catch (e) {
       Logger.warn('[FaceDetection] Failed to start capture service:', e);
     }
@@ -133,7 +158,7 @@ const FaceDetectionMixin = {
     // Run first detection
     setTimeout(() => this.processFaceDetection(deviceId), 3000);
 
-    Logger.log(`[FaceDetection] Started for ${deviceId} (interval: ${intervalSeconds}s, library: ${this._faceLibrary.length}, threshold: ${matchThreshold})`);
+    Logger.log(`[FaceDetection] Started for ${deviceId} (interval: ${intervalSeconds}s, library: ${this._faceLibrary.length}, threshold: ${matchThreshold}) — first frame in 3s`);
   },
 
   /**
@@ -163,23 +188,34 @@ const FaceDetectionMixin = {
    */
   async processFaceDetection(deviceId) {
     const state = this.faceDetectionState.get(deviceId);
-    if (!state || state.isProcessing) {
+    if (!state) {
+      Logger.warn(`[FaceDetection] process() called for ${deviceId} but no state exists`);
+      return;
+    }
+    if (state.isProcessing) {
+      Logger.log(`[FaceDetection] ${deviceId} still processing previous tick, skipping`);
       return;
     }
 
     state.isProcessing = true;
+    const tickStart = Date.now();
+    Logger.log(`[FaceDetection] [${deviceId}] tick start, streamId=${state.streamId}`);
 
     try {
       const frameUrl = `${this.CAPTURE_SERVICE_URL}/frame/${state.streamId}`;
+      Logger.log(`[FaceDetection] [${deviceId}] GET ${frameUrl}`);
       const frameResponse = await fetch(frameUrl);
       if (!frameResponse.ok) {
+        Logger.warn(`[FaceDetection] [${deviceId}] frame fetch failed: HTTP ${frameResponse.status} ${frameResponse.statusText}`);
         state.isProcessing = false;
         return;
       }
 
       const frameBlob = await frameResponse.blob();
+      Logger.log(`[FaceDetection] [${deviceId}] got frame: ${frameBlob.size} bytes (${frameBlob.type})`);
       const library = this._faceLibrary;
       if (!library || library.length === 0) {
+        Logger.warn(`[FaceDetection] [${deviceId}] library empty at process time — skipping recognize`);
         state.isProcessing = false;
         return;
       }
@@ -187,23 +223,41 @@ const FaceDetectionMixin = {
       const formData = new FormData();
       formData.append('image', frameBlob, 'frame.jpg');
 
-      const recognizeResponse = await fetch(`${QBitmapConfig.api.public.replace('/public', '')}/face-detection/${deviceId}/recognize`, {
+      const recognizeUrl = `${QBitmapConfig.api.public.replace('/public', '')}/face-detection/${deviceId}/recognize`;
+      Logger.log(`[FaceDetection] [${deviceId}] POST ${recognizeUrl}`);
+      const recognizeResponse = await fetch(recognizeUrl, {
         method: 'POST',
         credentials: 'include',
         body: formData
       });
 
       if (!recognizeResponse.ok) {
+        const errText = await recognizeResponse.text().catch(() => '(no body)');
+        Logger.warn(`[FaceDetection] [${deviceId}] recognize failed: HTTP ${recognizeResponse.status} — ${errText.slice(0, 300)}`);
         state.isProcessing = false;
         return;
       }
 
       const result = await recognizeResponse.json();
       const threshold = state.matchThreshold || 70;
+      const elapsedMs = Date.now() - tickStart;
+      Logger.log(`[FaceDetection] [${deviceId}] recognize response (${elapsedMs}ms), threshold=${threshold}:`, result);
+
+      if (!result.success) {
+        Logger.warn(`[FaceDetection] [${deviceId}] recognize returned success=false:`, result);
+      } else if (!Array.isArray(result.result) || result.result.length === 0) {
+        Logger.log(`[FaceDetection] [${deviceId}] no faces detected in frame`);
+      }
 
       if (result.success && Array.isArray(result.result) && result.result.length > 0) {
+        Logger.log(`[FaceDetection] [${deviceId}] ${result.result.length} candidate(s):`, result.result.map(m => ({ name: m.name, score: m.score, isMatchFound: m.isMatchFound })));
         for (const match of result.result) {
-          if (!match.isMatchFound || match.score < threshold) {
+          if (!match.isMatchFound) {
+            Logger.log(`[FaceDetection] [${deviceId}] candidate "${match.name}" score=${match.score} → isMatchFound=false, skip`);
+            continue;
+          }
+          if (match.score < threshold) {
+            Logger.log(`[FaceDetection] [${deviceId}] candidate "${match.name}" score=${match.score} < threshold=${threshold}, skip`);
             continue;
           }
 
@@ -228,7 +282,7 @@ const FaceDetectionMixin = {
 
           const faceName = matchedFace?.name || match.name || 'Bilinmeyen';
 
-          Logger.log(`[FaceDetection] Match: ${faceName} (score: ${match.score})`);
+          Logger.log(`[FaceDetection] [${deviceId}] ✓ MATCH: ${faceName} (score: ${match.score}, trigger_alarm=${matchedFace?.trigger_alarm ?? 'n/a'})`);
 
           try {
             await fetch(`${QBitmapConfig.api.public.replace('/public', '')}/face-detection/${deviceId}/log`, {
@@ -246,12 +300,14 @@ const FaceDetectionMixin = {
           }
 
           if (!matchedFace?.trigger_alarm) {
+            Logger.log(`[FaceDetection] [${deviceId}] "${faceName}" matched but trigger_alarm=OFF → DB'ye yazdı, popup yok`);
             continue;
           }
 
           const now = Date.now();
           const lastKey = `${deviceId}_${faceName}`;
           if (state.lastDetection?.key === lastKey && (now - state.lastDetection.time) < 30000) {
+            Logger.log(`[FaceDetection] [${deviceId}] "${faceName}" dedup window (30s), alarm atlandı`);
             continue;
           }
           state.lastDetection = { key: lastKey, time: now };
@@ -569,6 +625,31 @@ faceDetectionStyles.textContent = `
 .face-absence-window {
   background: #fde0e0 !important;
   color: #7a1515 !important;
+}
+
+/* Mobile: center horizontally, anchor 150px from top. Slide in from above
+   instead of from the right, so it lands visibly in the viewport. */
+@media (max-width: 560px) {
+  .face-detection-alert {
+    top: 150px;
+    right: auto;
+    left: 50%;
+    transform: translate(-50%, -30px);
+    opacity: 0;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease-out;
+  }
+  .face-detection-alert.show {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  .face-absence-alert {
+    top: 240px; /* stacks below the main alert on mobile */
+  }
+  .face-alert-content {
+    min-width: 0;
+    width: calc(100vw - 52px);
+    max-width: calc(100vw - 52px);
+  }
 }
 `;
 document.head.appendChild(faceDetectionStyles);

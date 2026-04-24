@@ -560,7 +560,7 @@ const AIMonitoringMixin = {
       if (interval) {
         body.interval = interval;
       }
-      const response = await fetch(`${CAPTURE_SERVICE_URL}/capture/start`, {
+      const response = await fetch(`${this.CAPTURE_SERVICE_URL}/capture/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -579,7 +579,7 @@ const AIMonitoringMixin = {
    */
   async getFrameFromCapture(streamId) {
     try {
-      const response = await fetch(`${CAPTURE_SERVICE_URL}/frame/${streamId}/base64`);
+      const response = await fetch(`${this.CAPTURE_SERVICE_URL}/frame/${streamId}/base64`);
       if (!response.ok) {
         Logger.warn(`[Capture] No frame available for ${streamId}`);
         return null;
@@ -597,7 +597,7 @@ const AIMonitoringMixin = {
    */
   async stopCaptureService(streamId) {
     try {
-      const response = await fetch(`${CAPTURE_SERVICE_URL}/capture/stop`, {
+      const response = await fetch(`${this.CAPTURE_SERVICE_URL}/capture/stop`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ streamId })

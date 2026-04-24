@@ -681,6 +681,7 @@ if (!document.getElementById('fr-modal-styles')) {
 .fr-detections { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: rgba(0,0,0,0.02); border-radius: 10px; padding: 10px; }
 .fr-detection-item { display: flex; flex-direction: column; gap: 6px; align-items: center; text-align: center; }
 .fr-detection-thumb, .fr-detection-thumb-fallback { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; background: #e8eaed; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.fr-detection-thumb-fallback[hidden], .fr-face-fallback[hidden], .fr-rule-avatar-fallback[hidden] { display: none; }
 .fr-detection-name { font-size: 12px; color: #3c4043; font-weight: 500; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fr-detection-meta { font-size: 10px; color: #80868b; }
 .fr-empty { grid-column: 1 / -1; padding: 20px; text-align: center; color: #9aa0a6; font-size: 12px; }

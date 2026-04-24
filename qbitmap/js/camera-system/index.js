@@ -103,6 +103,13 @@ const CameraSystem = {
       }
     }, 1000);
 
+    // Auto-restart face detection for cameras flagged face_detection_enabled=1
+    // in DB. Non-blocking so it doesn't delay map/camera render. Harmless
+    // 401 if anonymous.
+    if (AuthSystem.isLoggedIn() && typeof this.initFaceDetection === 'function') {
+      this.initFaceDetection();
+    }
+
     Logger.log('[Cameras] System initialized');
   },
 
@@ -281,6 +288,11 @@ const CameraSystem = {
 
       // Refresh the map layer
       this.refreshCameraLayer();
+
+      // User just logged in — auto-restart face detection for DB-enabled cams.
+      if (typeof this.initFaceDetection === 'function') {
+        this.initFaceDetection();
+      }
     } catch (error) {
       Logger.error('[Cameras] Reload error:', error);
     }

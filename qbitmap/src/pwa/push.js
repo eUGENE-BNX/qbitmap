@@ -4,6 +4,12 @@
 // PushManager.subscribe() that isn't tied to a gesture on the tab.
 
 import { showNotification } from '../../js/utils.js';
+import { QBitmapConfig } from '../../js/config.js';
+
+// Backend lives on a different origin in prod (stream.qbitmap.com). Bare
+// `/api/push/*` would hit the frontend origin and 404. Always go through
+// the configured API base.
+const pushUrl = (path) => `${QBitmapConfig.api.base}/api/push${path}`;
 
 const ua = navigator.userAgent || '';
 const isIOS = /iPad|iPhone|iPod/.test(ua) && !('MSStream' in window);
@@ -46,7 +52,7 @@ export async function getPushState() {
 }
 
 async function fetchVapidPublicKey() {
-  const r = await fetch('/api/push/vapid-public-key', {
+  const r = await fetch(pushUrl('/vapid-public-key'), {
     credentials: 'include',
     headers: { Accept: 'application/json' },
   });
@@ -91,7 +97,7 @@ export async function enablePush() {
     }
   }
 
-  const resp = await fetch('/api/push/subscribe', {
+  const resp = await fetch(pushUrl('/subscribe'), {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -113,7 +119,7 @@ export async function disablePush() {
 
   // Best-effort server cleanup (don't fail user action if network is down).
   try {
-    await fetch('/api/push/unsubscribe', {
+    await fetch(pushUrl('/unsubscribe'), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -127,6 +133,6 @@ export async function disablePush() {
 }
 
 export async function sendTestPush() {
-  const r = await fetch('/api/push/test', { method: 'POST', credentials: 'include' });
+  const r = await fetch(pushUrl('/test'), { method: 'POST', credentials: 'include' });
   return r.ok;
 }

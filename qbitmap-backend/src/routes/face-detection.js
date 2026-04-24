@@ -16,6 +16,13 @@ async function getCameraByDeviceId(deviceId, userId) {
   return { error: null, camera };
 }
 
+// Dedup key: `${userId}:${userFaceId}` → last push timestamp (ms).
+// Client-side logs run every ~5s per camera; without this, a person standing
+// in frame would spam 12 push notifications per minute. 60s window is tight
+// enough to re-notify if they leave and come back shortly.
+const _facePushCache = new Map();
+const FACE_PUSH_DEDUP_MS = 60_000;
+
 async function faceDetectionRoutes(fastify, options) {
   fastify.addHook("preHandler", authHook);
 
@@ -356,6 +363,31 @@ async function faceDetectionRoutes(fastify, options) {
 
       // Voice call gates (unchanged): face.trigger_alarm + camera.voice_call_enabled + camera.face_detection_enabled
       if (userFace && userFace.trigger_alarm) {
+        // Web Push — fires independently of voice call gate so users with
+        // push enabled but voice calls disabled still get notified. Deduped
+        // per (user, face) to avoid spamming while subject stays in frame.
+        const pushKey = `${request.user.userId}:${userFace.id}`;
+        const now = Date.now();
+        const lastPush = _facePushCache.get(pushKey) || 0;
+        if (now - lastPush > FACE_PUSH_DEDUP_MS) {
+          _facePushCache.set(pushKey, now);
+          try {
+            const pushService = require('../services/push');
+            await pushService.sendToUser(request.user.userId, {
+              title: `${userFace.name} algılandı`,
+              body: `${camera.name || deviceId} · skor ${Math.round(confidence || 0)}`,
+              tag: `face-${userFace.id}`,
+              topic: `face-${userFace.id}`,
+              urgency: 'high',
+              navigate: '/',
+              icon: userFace.face_image_url || undefined,
+              image: userFace.face_image_url || undefined,
+            });
+          } catch (err) {
+            logger.warn({ err: err.message, deviceId, faceId: userFace.id }, 'face detection push failed (non-fatal)');
+          }
+        }
+
         const voiceCallEnabled = await db.getVoiceCallEnabled(camera.id);
         const faceSettings = await db.getFaceDetectionSettings(camera.id);
 
