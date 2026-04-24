@@ -380,3 +380,143 @@
   opacity: 0.75;
 }
 .geo-denied-help-dismiss:hover { opacity: 1; }
+
+/* Upload outbox — pending badge + inspector modal */
+.qb-outbox-badge {
+  position: fixed;
+  /* Stack below the offline badge so both are visible when queuing
+   * while offline (the common case). */
+  top: 48px;
+  right: 62px;
+  z-index: 9997;
+  background: #1c4a85;
+  color: #fff;
+  border: 1px solid #2a5da0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font: 600 12px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  letter-spacing: 0.2px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.qb-outbox-badge:hover { background: #245ba7; }
+@media (display-mode: standalone) {
+  .qb-outbox-badge { top: calc(env(safe-area-inset-top, 0px) + 46px); }
+}
+
+.qb-outbox-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  padding-top: calc(20px + env(safe-area-inset-top, 0));
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0));
+}
+.qb-outbox-dialog {
+  width: 100%;
+  max-width: 460px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: #0f1a30;
+  color: #e6edf5;
+  border: 1px solid #2a3a55;
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+.qb-outbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #2a3a55;
+}
+.qb-outbox-header h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.qb-outbox-close {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #9fb0c4;
+  font-size: 24px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+}
+.qb-outbox-close:hover { color: #e6edf5; }
+.qb-outbox-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 4px;
+}
+.qb-outbox-empty {
+  margin: 0;
+  padding: 28px 20px;
+  text-align: center;
+  color: #9fb0c4;
+}
+.qb-outbox-list { list-style: none; margin: 0; padding: 0; }
+.qb-outbox-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #1c2a45;
+}
+.qb-outbox-item.qb-outbox-busy { opacity: 0.55; pointer-events: none; }
+.qb-outbox-item-info { flex: 1; min-width: 0; }
+.qb-outbox-item-name {
+  font-weight: 500;
+  color: #e6edf5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qb-outbox-item-meta {
+  font-size: 12px;
+  color: #9fb0c4;
+  margin-top: 2px;
+}
+.qb-outbox-item-actions {
+  display: flex;
+  gap: 6px;
+}
+.qb-outbox-item-actions button {
+  appearance: none;
+  border: 1px solid #2a3a55;
+  background: #152238;
+  color: #e6edf5;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.qb-outbox-item-actions button:hover { background: #1c2a45; border-color: #3a4e72; }
+.qb-outbox-item-actions .qb-outbox-discard:hover { background: #402022; border-color: #7f1d1d; color: #fecaca; }
+.qb-outbox-footer {
+  padding: 12px 18px;
+  border-top: 1px solid #2a3a55;
+  display: flex;
+  justify-content: flex-end;
+}
+.qb-outbox-drain {
+  appearance: none;
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  padding: 9px 18px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+}
+.qb-outbox-drain:hover:not(:disabled) { background: #1d4ed8; }
+.qb-outbox-drain:disabled { background: #1c2a45; color: #6b7c94; cursor: default; }

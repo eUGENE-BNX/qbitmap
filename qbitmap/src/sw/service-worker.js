@@ -293,6 +293,93 @@ async function pmtilesHandler({ request }) {
   });
 }
 
+// ── Upload outbox — Background Sync handler ──────────────────────────────
+// Chromium-only (Android + desktop Chrome/Edge). iOS Safari has no sync
+// event; the client-side 'online' listener picks up the slack there.
+// Keep the IDB schema here in lockstep with js/services/upload-outbox.js.
+self.addEventListener('sync', (event) => {
+  if (event.tag !== 'outbox-flush') return;
+  event.waitUntil(flushOutboxFromSW());
+});
+
+const OUTBOX_DB = 'qbitmap-outbox';
+const OUTBOX_STORE = 'messages';
+const OUTBOX_RETRYABLE = new Set([0, 408, 429, 500, 502, 503, 504]);
+const OUTBOX_MAX_ATTEMPTS = 6;
+
+function outboxOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(OUTBOX_DB, 1);
+    // If the client hasn't opened this DB yet, the schema won't exist.
+    // Don't try to create it here; just bail — there can't be records to drain.
+    req.onupgradeneeded = () => { req.transaction?.abort?.(); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function flushOutboxFromSW() {
+  let db;
+  try { db = await outboxOpen(); } catch { return; }
+  if (!db.objectStoreNames.contains(OUTBOX_STORE)) { db.close(); return; }
+
+  const records = await new Promise((resolve) => {
+    const r = db.transaction(OUTBOX_STORE).objectStore(OUTBOX_STORE).getAll();
+    r.onsuccess = () => resolve(r.result || []);
+    r.onerror = () => resolve([]);
+  });
+
+  for (const record of records) {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(record.fields || {})) fd.append(k, v);
+    for (const f of (record.files || [])) fd.append(f.fieldName, f.blob, f.filename);
+
+    let res;
+    try { res = await fetch(record.endpoint, { method: 'POST', credentials: 'include', body: fd }); }
+    catch {
+      // Network is down mid-drain — let Background Sync back off by rejecting.
+      db.close();
+      throw new Error('sw-outbox-network');
+    }
+
+    if (res.ok) {
+      await idbDelete(db, record.id);
+    } else if (OUTBOX_RETRYABLE.has(res.status)) {
+      await idbUpdateAttempt(db, record, `HTTP ${res.status}`);
+      if ((record.attempts + 1) >= OUTBOX_MAX_ATTEMPTS) {
+        await idbDelete(db, record.id);
+      }
+    } else {
+      // Permanent failure (403/404/413 etc). Drop it.
+      await idbDelete(db, record.id);
+    }
+  }
+  db.close();
+}
+
+function idbDelete(db, id) {
+  return new Promise((resolve) => {
+    const r = db.transaction(OUTBOX_STORE, 'readwrite').objectStore(OUTBOX_STORE).delete(id);
+    r.onsuccess = () => resolve();
+    r.onerror = () => resolve();
+  });
+}
+
+function idbUpdateAttempt(db, record, lastError) {
+  return new Promise((resolve) => {
+    const store = db.transaction(OUTBOX_STORE, 'readwrite').objectStore(OUTBOX_STORE);
+    const updated = {
+      ...record,
+      attempts: (record.attempts || 0) + 1,
+      lastTriedAt: Date.now(),
+      lastError,
+    };
+    const r = store.put(updated);
+    r.onsuccess = () => resolve();
+    r.onerror = () => resolve();
+  });
+}
+
 // ── Offline fallback ─────────────────────────────────────────────────────
 setCatchHandler(async ({ request }) => {
   if (request.destination === 'document') {

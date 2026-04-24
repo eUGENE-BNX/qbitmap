@@ -90,7 +90,54 @@ export async function enqueue({ endpoint, fields, files }) {
     fields: { ...fields },
     files: files.map((f) => ({ fieldName: f.fieldName, filename: f.filename, blob: f.blob })),
   }));
+  _emit('qbitmap:outbox-enqueued', { id });
+  _emit('qbitmap:outbox-updated');
+  // Best-effort Background Sync registration. Chromium/Android only;
+  // on iOS Safari this silently no-ops and we rely on the `online`
+  // listener. Failures here are not fatal — the client-side drain
+  // still runs on the next online event or app boot.
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.sync.register('outbox-flush');
+    } catch { /* sync unavailable or permission denied */ }
+  }
   return id;
+}
+
+function _emit(type, detail) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(type, detail ? { detail } : undefined));
+}
+
+/** Remove a queued record without attempting to send it. */
+export async function discard(id) {
+  await _remove(id);
+  _emit('qbitmap:outbox-dropped', { id, reason: 'user-discard' });
+  _emit('qbitmap:outbox-updated');
+}
+
+/** Attempt to send exactly one queued record out-of-band. */
+export async function retryOne(id) {
+  const store = await _tx('readonly');
+  const record = await _req(store.get(id));
+  if (!record) return { sent: false, reason: 'not-found' };
+  try {
+    const res = await _postOne(record);
+    if (res.ok) {
+      await _remove(id);
+      _emit('qbitmap:outbox-sent', { id });
+      _emit('qbitmap:outbox-updated');
+      return { sent: true };
+    }
+    await _updateAttempt(id, `HTTP ${res.status}`);
+    _emit('qbitmap:outbox-updated');
+    return { sent: false, reason: 'http-' + res.status };
+  } catch (err) {
+    await _updateAttempt(id, err?.message || 'fetch-failed');
+    _emit('qbitmap:outbox-updated');
+    return { sent: false, reason: 'network' };
+  }
 }
 
 export async function count() {
@@ -170,12 +217,13 @@ export async function drain() {
         if (res.ok) {
           await _remove(record.id);
           stats.sent += 1;
-          window.dispatchEvent(new CustomEvent('qbitmap:outbox-sent', { detail: { id: record.id } }));
+          _emit('qbitmap:outbox-sent', { id: record.id });
         } else if (RETRYABLE_STATUSES.has(res.status)) {
           await _updateAttempt(record.id, `HTTP ${res.status}`);
           if ((record.attempts + 1) >= MAX_ATTEMPTS) {
             await _remove(record.id);
             stats.dropped += 1;
+            _emit('qbitmap:outbox-dropped', { id: record.id, reason: 'max-attempts' });
           } else {
             stats.failed += 1;
           }
@@ -183,6 +231,7 @@ export async function drain() {
           // Permanent failure (4xx other than the retryable set, etc.).
           await _remove(record.id);
           stats.dropped += 1;
+          _emit('qbitmap:outbox-dropped', { id: record.id, reason: `http-${res.status}` });
         }
       } catch (err) {
         // Network error — fetch threw. Keep the record, try later.
@@ -192,6 +241,7 @@ export async function drain() {
     }
   } finally {
     _draining = false;
+    _emit('qbitmap:outbox-updated');
     if (_drainQueued) {
       _drainQueued = false;
       // Re-run if another caller asked while we were busy.

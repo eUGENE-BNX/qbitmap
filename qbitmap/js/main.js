@@ -61,6 +61,9 @@ import('../src/pwa/share-inbox.js')
 import('./services/upload-outbox.js')
   .then((m) => m.initOutbox?.())
   .catch(() => {});
+import('./services/upload-outbox-ui.js')
+  .then((m) => m.initOutboxUI?.())
+  .catch(() => {});
 
 // Start camera system after all modules are loaded
 document.addEventListener('DOMContentLoaded', () => {
