@@ -1,21 +1,22 @@
 import '../css/tesla-dashcam.css';
 import { Logger, escapeHtml, showNotification } from './utils.js';
 import * as AppState from './state.js';
-import { loadProtobuf } from './vendor-loader.js';
+import { decodeSei } from './tesla-sei-decoder.js';
 
 /**
  * Tesla Dashcam Module — Standalone & Modular
  * Parses Tesla front camera MP4 SEI metadata (GPS, speed, gear, steering, etc.)
  * and displays vehicle on map with synchronized video + driving dashboard.
  *
- * Dependencies: protobuf.min.js (vendor), MapLibre GL JS (global AppState.map)
+ * SEI decoding is handled by the hand-rolled minimal protobuf reader in
+ * tesla-sei-decoder.js — previously we bundled protobufjs, but its
+ * Function()-based codegen forced CSP 'unsafe-eval'.
  */
 
 const TeslaDashcam = {
 
   // ── State ──────────────────────────────────────────────
   map: null,
-  SeiMetadata: null,
   activeSessions: {},   // sessionId → { metadata[], videoUrl, fileName, coord, bearing }
   activePopups: {},     // sessionId → { popup, syncRAF }
   sessionCounter: 0,
@@ -25,61 +26,9 @@ const TeslaDashcam = {
   // ── Init ───────────────────────────────────────────────
   init: function(map) {
     this.map = map;
-    this._initProtobuf();
     this._addMapLayer();
     // Click handler is set up after layer is created (in _createSourceAndLayer)
     Logger.log('[TeslaDashcam] Module initialized');
-  },
-
-  // ── Protobuf Schema (inline reflection API) ───────────
-  _initProtobuf: async function() {
-    if (this.SeiMetadata) return; // already initialized
-    await loadProtobuf();
-
-    var Root = protobuf.Root;
-    var Type = protobuf.Type;
-    var Field = protobuf.Field;
-    var Enum = protobuf.Enum;
-
-    var root = new Root();
-
-    var GearState = new Enum('GearState', {
-      GEAR_PARK: 0,
-      GEAR_DRIVE: 1,
-      GEAR_REVERSE: 2,
-      GEAR_NEUTRAL: 3
-    });
-
-    var AutopilotState = new Enum('AutopilotState', {
-      AP_NONE: 0,
-      AP_SELF_DRIVING: 1,
-      AP_AUTOSTEER: 2,
-      AP_TACC: 3
-    });
-
-    var SeiMetadata = new Type('SeiMetadata')
-      .add(GearState)
-      .add(AutopilotState)
-      .add(new Field('version', 1, 'uint32'))
-      .add(new Field('gearState', 2, 'GearState'))
-      .add(new Field('frameSeqNo', 3, 'uint64'))
-      .add(new Field('vehicleSpeedMps', 4, 'float'))
-      .add(new Field('acceleratorPedalPosition', 5, 'float'))
-      .add(new Field('steeringWheelAngle', 6, 'float'))
-      .add(new Field('blinkerOnLeft', 7, 'bool'))
-      .add(new Field('blinkerOnRight', 8, 'bool'))
-      .add(new Field('brakeApplied', 9, 'bool'))
-      .add(new Field('autopilotState', 10, 'AutopilotState'))
-      .add(new Field('latitudeDeg', 11, 'double'))
-      .add(new Field('longitudeDeg', 12, 'double'))
-      .add(new Field('headingDeg', 13, 'double'))
-      .add(new Field('linearAccelerationMps2X', 14, 'double'))
-      .add(new Field('linearAccelerationMps2Y', 15, 'double'))
-      .add(new Field('linearAccelerationMps2Z', 16, 'double'));
-
-    root.add(SeiMetadata);
-    this.SeiMetadata = root.lookupType('SeiMetadata');
-    Logger.log('[TeslaDashcam] Protobuf schema ready');
   },
 
   // ══════════════════════════════════════════════════════
@@ -91,9 +40,6 @@ const TeslaDashcam = {
    * Returns: Array of { time (seconds), lat, lng, heading, speed, gear, ... }
    */
   parseMP4: async function(buffer) {
-    // Lazy init protobuf if it wasn't ready during init()
-    if (!this.SeiMetadata) await this._initProtobuf();
-
     var view = new DataView(buffer);
     var self = this;
 
@@ -251,7 +197,7 @@ const TeslaDashcam = {
 
   // ── SEI Decode ─────────────────────────────────────────
   _decodeSEI: function(nal) {
-    if (!this.SeiMetadata || nal.length < 4) return null;
+    if (nal.length < 4) return null;
 
     // Tesla SEI format: after NAL header, payload type 5 (user_data_unregistered)
     // Check for payload type 5 marker
@@ -264,8 +210,7 @@ const TeslaDashcam = {
 
       try {
         var stripped = this._stripEmulationBytes(nal.subarray(i + 1, nal.length - 1));
-        var decoded = this.SeiMetadata.decode(stripped);
-        return this.SeiMetadata.toObject(decoded, { longs: Number, defaults: true });
+        return decodeSei(stripped);
       } catch (e) {
         return null;
       }

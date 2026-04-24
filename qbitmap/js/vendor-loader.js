@@ -28,7 +28,3 @@ export async function loadDeckAndH3() {
   if (typeof deck === 'undefined') await loadScript('/vendor/deck.gl.min.js?v=9.3.1');
 }
 
-export async function loadProtobuf() {
-  if (typeof protobuf !== 'undefined') return;
-  await loadScript('/vendor/protobuf.min.js');
-}
