@@ -520,3 +520,48 @@
 }
 .qb-outbox-drain:hover:not(:disabled) { background: #1d4ed8; }
 .qb-outbox-drain:disabled { background: #1c2a45; color: #6b7c94; cursor: default; }
+
+/* Analytics consent banner — slides up from the bottom until dismissed */
+.qb-consent-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0));
+  z-index: 9995;
+  max-width: 520px;
+  margin: 0 auto;
+  background: #0f1a30;
+  color: #e6edf5;
+  border: 1px solid #2a3a55;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.qb-consent-text { margin: 0; color: #cbd5e1; font-size: 13px; }
+.qb-consent-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.qb-consent-actions button {
+  appearance: none;
+  border: 1px solid transparent;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 36px;
+}
+.qb-consent-reject {
+  background: transparent;
+  color: #9fb0c4;
+  border-color: #2a3a55;
+}
+.qb-consent-reject:hover { background: #152238; color: #e6edf5; }
+.qb-consent-accept { background: #2563eb; color: #fff; }
+.qb-consent-accept:hover { background: #1d4ed8; }
+@media (min-width: 640px) {
+  .qb-consent-banner { flex-direction: row; align-items: center; }
+  .qb-consent-text { flex: 1; }
+}
