@@ -675,6 +675,34 @@ const FormUploadMixin = {
 
     } catch (error) {
       Logger.error('[VideoMessage] Upload error:', error);
+
+      // If all in-page retries exhausted on a transient (retryable)
+      // failure, hand the payload off to the outbox instead of losing it.
+      // The outbox retries on `online` and on app reload.
+      if (error?.__retryable) {
+        try {
+          const fields = {};
+          for (const [k, v] of formData.entries()) {
+            if (typeof v === 'string') fields[k] = v;
+          }
+          const files = [];
+          for (const [k, v] of formData.entries()) {
+            if (v instanceof Blob) {
+              files.push({ fieldName: k, filename: v.name || (k + '.bin'), blob: v });
+            }
+          }
+          const { enqueue } = await import('../services/upload-outbox.js');
+          await enqueue({ endpoint: this.apiBase, fields, files });
+          AuthSystem.showNotification('Bağlantı yok — mesajınız kuyruğa alındı, bağlantı gelince otomatik gönderilecek', 'info', 6000);
+          _haptic?.('warn');
+          this.cleanupAndClose();
+          return;
+        } catch (enqueueErr) {
+          Logger.error('[VideoMessage] Outbox enqueue failed', enqueueErr);
+          // fall through to normal error path
+        }
+      }
+
       const rawMsg = error?.message ?? error;
       const msg = typeof rawMsg === 'string' ? rawMsg : (() => { try { return JSON.stringify(rawMsg); } catch { return 'Yükleme başarısız'; } })();
       AuthSystem.showNotification(msg || 'Yükleme başarısız', 'error');

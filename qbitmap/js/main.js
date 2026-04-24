@@ -58,6 +58,9 @@ import('../src/pwa/shortcuts.js')
 import('../src/pwa/share-inbox.js')
   .then((m) => m.initShareInbox?.())
   .catch(() => {});
+import('./services/upload-outbox.js')
+  .then((m) => m.initOutbox?.())
+  .catch(() => {});
 
 // Start camera system after all modules are loaded
 document.addEventListener('DOMContentLoaded', () => {
