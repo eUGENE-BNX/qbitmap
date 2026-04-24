@@ -3,6 +3,10 @@
  * Imports all modules in the correct order for the main map page
  */
 
+// Page bootstrap (window.gtag, Plyr CSS swap). Must run before anything
+// else touches those globals — keep it as the first import.
+import './html-bootstrap.js';
+
 // Core stylesheets (always needed)
 import '../vendor/maplibre-gl.css';
 import '../css/base.css';

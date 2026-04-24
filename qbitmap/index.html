@@ -14,17 +14,15 @@
   <meta name="apple-mobile-web-app-title" content="QBitmap">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-  <!-- Google Analytics 4 -->
+  <!-- Google Analytics 4 (bootstrap lives in js/html-bootstrap.js so CSP can drop 'unsafe-inline') -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-5Y929W13D6"></script>
-  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());gtag('config','G-5Y929W13D6',{send_page_view:false});</script>
 
   <!-- Core vendor libraries (maplibre + basemaps required at startup) -->
   <script defer src="/vendor/maplibre-gl.js"></script>
   <script defer src="/vendor/basemaps.js"></script>
   <!-- hls, deck.gl, h3-js, protobuf loaded on demand via vendor-loader.js -->
-  <!-- Plyr Video Player (non-blocking: only needed when user opens video) -->
+  <!-- Plyr Video Player (non-blocking: media="print" until html-bootstrap.js swaps it to "all") -->
   <link rel="stylesheet" href="https://cdn.plyr.io/3.8.4/plyr.css" integrity="sha384-VqqE0KSv00qfHvKpRa8aov+g3xtUu2Rw0NsEmtjTOPGn/JDKVghgd56iw/VObHa7" crossorigin="anonymous" media="print" id="plyr-css">
-  <script>document.getElementById('plyr-css').onload=function(){this.media='all'};</script>
   <script async src="https://cdn.plyr.io/3.8.4/plyr.polyfilled.js" integrity="sha384-ZDYtn77N2Oxc6W8oilE9z73hj1EZqidVlQeqTwsKW19gglwyUYHMn/LzX+ewyFJD" crossorigin="anonymous"></script>
 </head>
 <body>
