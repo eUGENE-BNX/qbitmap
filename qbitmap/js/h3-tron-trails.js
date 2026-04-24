@@ -51,8 +51,10 @@ const H3TronTrails = {
 
     this._resizeCanvas();
 
-    map.on('move', () => this._onMapMove());
-    map.on('resize', () => this._resizeCanvas());
+    // Bound so setEnabled(false) can detach these exact refs.
+    this._boundOnMapMove = () => this._onMapMove();
+    this._boundResizeCanvas = () => this._resizeCanvas();
+    this._listenersActive = false;
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this._stopLoop();
@@ -62,9 +64,24 @@ const H3TronTrails = {
     Logger.log('[TronTrails] Initialized');
   },
 
+  _attachListeners() {
+    if (this._listenersActive || !this._map) return;
+    this._map.on('move', this._boundOnMapMove);
+    this._map.on('resize', this._boundResizeCanvas);
+    this._listenersActive = true;
+  },
+
+  _detachListeners() {
+    if (!this._listenersActive || !this._map) return;
+    this._map.off('move', this._boundOnMapMove);
+    this._map.off('resize', this._boundResizeCanvas);
+    this._listenersActive = false;
+  },
+
   setEnabled(enabled) {
     this._enabled = enabled;
     if (enabled) {
+      this._attachListeners();
       this._canvas.style.display = 'block';
       if (H3Grid._hexagonData.length > 0) {
         this.onHexDataChanged(H3Grid._hexagonData, H3Grid._currentResolution);
@@ -74,6 +91,7 @@ const H3TronTrails = {
       const delay = 10000 + Math.random() * 10000;
       this._adTimer = setTimeout(() => this._showAdPopup(), delay);
     } else {
+      this._detachListeners();
       this._stopLoop();
       this._canvas.style.display = 'none';
       this._runners = [];

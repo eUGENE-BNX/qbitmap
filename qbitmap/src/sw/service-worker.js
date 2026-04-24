@@ -8,6 +8,26 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { parseRangeHeader } from './range-utils.js';
 import { shareInboxPut } from '../pwa/idb-share-inbox.js';
 
+// Runtime cache names. Bump the trailing `-vN` when the shape of what
+// lives inside changes (different URL scheme, different response shape)
+// — NOT for ordinary deploys. The activate handler below deletes any
+// cache that matches our naming pattern but isn't in this set, so old
+// versions are swept on the first SW activation after a bump.
+const CACHES = Object.freeze({
+  VENDOR:       'vendor-v1',
+  MAP_STYLE:    'map-style-v1',
+  MAP_FONTS:    'map-fonts-v1',
+  MAP_SPRITES:  'map-sprites-v1',
+  UPLOADS:      'uploads-v1',
+  AVATAR_PROXY: 'avatar-proxy-v1',
+  API_PUBLIC:   'api-public-v1',
+  PMTILES:      'pmtiles-v1',
+});
+const CACHE_NAMES = new Set(Object.values(CACHES));
+// Match our own cache names only; leaves Workbox precache (`workbox-*`)
+// and anything we don't own alone.
+const OWNED_CACHE_RE = /^(?:vendor|map-style|map-fonts|map-sprites|uploads|avatar-proxy|api-public|pmtiles)-v\d+$/;
+
 // [PWA-02] Speed up cold starts — parallelize the first network request
 // with service-worker boot.
 self.addEventListener('activate', (event) => {
@@ -16,6 +36,14 @@ self.addEventListener('activate', (event) => {
       if (self.registration.navigationPreload) {
         await self.registration.navigationPreload.enable();
       }
+      // Schema cleanup: wipe runtime caches from older CACHES versions.
+      // Precache cleanup is handled by cleanupOutdatedCaches() further down.
+      const names = await caches.keys();
+      await Promise.all(
+        names
+          .filter((n) => OWNED_CACHE_RE.test(n) && !CACHE_NAMES.has(n))
+          .map((n) => caches.delete(n)),
+      );
       await self.clients.claim();
     })(),
   );
@@ -90,7 +118,7 @@ registerRoute(
 registerRoute(
   ({ url }) => url.pathname.startsWith('/vendor/'),
   new CacheFirst({
-    cacheName: 'vendor-v1',
+    cacheName: CACHES.VENDOR,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 365 * 24 * 60 * 60 }),
@@ -104,7 +132,7 @@ registerRoute(
   ({ url }) =>
     url.pathname.startsWith('/tiles/') && url.pathname.endsWith('.json'),
   new StaleWhileRevalidate({
-    cacheName: 'map-style-v1',
+    cacheName: CACHES.MAP_STYLE,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 7 * 24 * 60 * 60 }),
@@ -118,7 +146,7 @@ registerRoute(
     url.origin === 'https://protomaps.github.io' &&
     url.pathname.includes('/fonts/'),
   new CacheFirst({
-    cacheName: 'map-fonts-v1',
+    cacheName: CACHES.MAP_FONTS,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({ maxEntries: 120, maxAgeSeconds: 30 * 24 * 60 * 60 }),
@@ -130,7 +158,7 @@ registerRoute(
     url.origin === 'https://protomaps.github.io' &&
     url.pathname.includes('/sprites/'),
   new CacheFirst({
-    cacheName: 'map-sprites-v1',
+    cacheName: CACHES.MAP_SPRITES,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 30 * 24 * 60 * 60 }),
@@ -143,7 +171,7 @@ registerRoute(
 registerRoute(
   ({ url }) => url.pathname.startsWith('/uploads/'),
   new StaleWhileRevalidate({
-    cacheName: 'uploads-v1',
+    cacheName: CACHES.UPLOADS,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({ maxEntries: 300, maxAgeSeconds: 7 * 24 * 60 * 60 }),
@@ -151,12 +179,31 @@ registerRoute(
   }),
 );
 
-// Public config/data GETs — dashboards feel instant, revalidate quietly.
+// Image proxy (Google avatars etc.) — long-lived per-URL, must not evict
+// small public-JSON entries. One entry per proxied image URL; 500 slots
+// is roughly "most of your network's avatars".
 registerRoute(
   ({ url, request }) =>
-    request.method === 'GET' && url.pathname.startsWith('/api/public/'),
+    request.method === 'GET' && url.pathname === '/api/public/image-proxy',
+  new CacheFirst({
+    cacheName: CACHES.AVATAR_PROXY,
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      new ExpirationPlugin({ maxEntries: 500, maxAgeSeconds: 7 * 24 * 60 * 60 }),
+    ],
+  }),
+);
+
+// Public config/data GETs — dashboards feel instant, revalidate quietly.
+// image-proxy handled separately above so avatar churn doesn't evict
+// actual JSON responses.
+registerRoute(
+  ({ url, request }) =>
+    request.method === 'GET' &&
+    url.pathname.startsWith('/api/public/') &&
+    url.pathname !== '/api/public/image-proxy',
   new StaleWhileRevalidate({
-    cacheName: 'api-public-v1',
+    cacheName: CACHES.API_PUBLIC,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 5 * 60 }),
@@ -191,8 +238,13 @@ registerRoute(
   pmtilesHandler,
 );
 
+// Max .pmtiles files kept simultaneously. TR + Ataşehir + Sincan typically
+// uses 3; one slot of headroom. FIFO eviction by cache insertion order —
+// not true LRU, but enough for this small working set.
+const PMTILES_MAX_ENTRIES = 4;
+
 async function pmtilesHandler({ request }) {
-  const cache = await caches.open('pmtiles-v1');
+  const cache = await caches.open(CACHES.PMTILES);
   const cacheKey = new Request(request.url, { method: 'GET' });
   let full = await cache.match(cacheKey);
 
@@ -209,6 +261,12 @@ async function pmtilesHandler({ request }) {
       if (est && est.quota && est.usage + contentLen > est.quota * 0.85) {
         // Skip caching to avoid quota eviction thrash.
         return resp;
+      }
+      // FIFO cap: drop oldest entries before growing beyond the limit.
+      const existing = await cache.keys();
+      const evictCount = existing.length - (PMTILES_MAX_ENTRIES - 1);
+      if (evictCount > 0) {
+        await Promise.all(existing.slice(0, evictCount).map((k) => cache.delete(k)));
       }
       await cache.put(cacheKey, resp.clone());
       full = resp;

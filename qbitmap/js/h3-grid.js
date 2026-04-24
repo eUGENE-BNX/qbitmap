@@ -142,19 +142,36 @@ const H3Grid = {
 
     map.addControl(this._overlay);
 
-    map.on('moveend', () => this._onViewportChange());
-    map.on('zoomend', () => this._onViewportChange());
+    // Bound so setEnabled(false) can remove these exact references.
+    this._boundOnViewportChange = () => this._onViewportChange();
+    this._listenersActive = false;
 
     Logger.log('[H3Grid] Initialized');
+  },
+
+  _attachListeners() {
+    if (this._listenersActive || !this._map) return;
+    this._map.on('moveend', this._boundOnViewportChange);
+    this._map.on('zoomend', this._boundOnViewportChange);
+    this._listenersActive = true;
+  },
+
+  _detachListeners() {
+    if (!this._listenersActive || !this._map) return;
+    this._map.off('moveend', this._boundOnViewportChange);
+    this._map.off('zoomend', this._boundOnViewportChange);
+    this._listenersActive = false;
   },
 
   setEnabled(enabled) {
     this._enabled = enabled;
     Analytics.event('h3_grid_toggle', { enabled });
     if (enabled) {
+      this._attachListeners();
       this._onViewportChange();
       this._showLeaderboardBtn(true);
     } else {
+      this._detachListeners();
       if (this._overlay) this._overlay.setProps({ layers: [] });
       this._hexagonData = [];
       this._ownershipData = [];
