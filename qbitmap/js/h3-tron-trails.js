@@ -2,6 +2,7 @@ import { QBitmapConfig } from './config.js';
 import { Logger } from './utils.js';
 import { Analytics } from './analytics.js';
 import { H3Grid } from './h3-grid.js';
+import { loadDeckAndH3 } from './vendor-loader.js';
 // [PERF-01] VideoMessage is only touched inside the ad-click handler below.
 // Loaded dynamically to keep the ~90KB video-message chunk off the main
 // static graph on every page load.
@@ -78,9 +79,13 @@ const H3TronTrails = {
     this._listenersActive = false;
   },
 
-  setEnabled(enabled) {
+  async setEnabled(enabled) {
     this._enabled = enabled;
     if (enabled) {
+      // h3-js is needed for cellToLatLng / gridPathCells; it usually
+      // comes along via H3Grid, but a trails-only toggle is still legal.
+      await loadDeckAndH3();
+      if (!this._enabled) return; // state flipped during await
       this._attachListeners();
       this._canvas.style.display = 'block';
       if (H3Grid._hexagonData.length > 0) {

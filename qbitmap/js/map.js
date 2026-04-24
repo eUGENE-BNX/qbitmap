@@ -292,12 +292,15 @@ class LayersDropdownControl {
                 layers.h3GridVisible = !layers.h3GridVisible;
                 localStorage.setItem('qbitmap_h3grid', layers.h3GridVisible);
                 toggle.classList.toggle('active', layers.h3GridVisible);
-                H3Grid.setEnabled(layers.h3GridVisible);
+                // First toggle-on loads deck.gl + h3-js (~1.76 MB).
+                H3Grid.setEnabled(layers.h3GridVisible)
+                    .catch((err) => Logger.warn('[Map] H3 grid toggle failed', err));
                 break;
             case 'h3-trails':
                 layers.h3TrailsVisible = !layers.h3TrailsVisible;
                 toggle.classList.toggle('active', layers.h3TrailsVisible);
-                H3TronTrails.setEnabled(layers.h3TrailsVisible);
+                H3TronTrails.setEnabled(layers.h3TrailsVisible)
+                    .catch((err) => Logger.warn('[Map] H3 trails toggle failed', err));
                 break;
             case 'vehicles':
                 layers.vehiclesVisible = !layers.vehiclesVisible;
@@ -550,13 +553,15 @@ map.on("load", async () => {
     };
     map.on('move', constrainLat);
 
-    // Initialize H3 Grid layer
-    await H3Grid.init(map);
+    // Initialize H3 Grid layer (deck.gl + h3-js load lazily on setEnabled)
+    H3Grid.init(map);
     H3TronTrails.init(map);
 
-    // Restore persisted layer states
+    // Restore persisted layer states. setEnabled is now async because it
+    // pulls deck.gl + h3-js off the wire on first toggle; we don't await
+    // here — the UI toggle state is independent of the vendor fetch.
     if (layers.h3GridVisible) {
-        H3Grid.setEnabled(true);
+        H3Grid.setEnabled(true).catch((err) => Logger.warn('[Map] H3 grid enable failed', err));
         if (layersControl) layersControl.syncToggleState('h3-grid', true);
     }
     if (layers.teslaVehiclesVisible) {

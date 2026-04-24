@@ -125,10 +125,21 @@ const H3Grid = {
     { minZoom: 0,  resolution: 1 }
   ],
 
-  async init(map) {
-    await loadDeckAndH3();
+  // Lightweight init — just store the map reference and keep a stable
+  // bound handler. The 1.5 MB deck.gl + 256 KB h3-js bundles and the
+  // overlay / tooltip DOM don't materialize until setEnabled(true),
+  // which matters for users who never toggle the grid on.
+  init(map) {
     this._map = map;
+    this._ready = false;
+    this._boundOnViewportChange = () => this._onViewportChange();
+    this._listenersActive = false;
+    Logger.log('[H3Grid] Init (lazy deps)');
+  },
 
+  async _ensureReady() {
+    if (this._ready) return;
+    await loadDeckAndH3();
     // Rich tooltip for ownership + H3 index
     const tip = document.createElement('div');
     tip.style.cssText = 'position:fixed;display:none;pointer-events:none;z-index:9999;background:rgba(18,20,28,0.80);color:#fff;padding:14px 16px;border-radius:12px;font:12px sans-serif;white-space:nowrap;width:180px;border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,0.45);transition:opacity 0.22s ease,transform 0.22s ease;';
@@ -137,16 +148,11 @@ const H3Grid = {
 
     this._overlay = new deck.MapboxOverlay({
       interleaved: true,
-      layers: []
+      layers: [],
     });
-
-    map.addControl(this._overlay);
-
-    // Bound so setEnabled(false) can remove these exact references.
-    this._boundOnViewportChange = () => this._onViewportChange();
-    this._listenersActive = false;
-
-    Logger.log('[H3Grid] Initialized');
+    this._map.addControl(this._overlay);
+    this._ready = true;
+    Logger.log('[H3Grid] deck.gl ready');
   },
 
   _attachListeners() {
@@ -163,10 +169,15 @@ const H3Grid = {
     this._listenersActive = false;
   },
 
-  setEnabled(enabled) {
+  async setEnabled(enabled) {
     this._enabled = enabled;
     Analytics.event('h3_grid_toggle', { enabled });
     if (enabled) {
+      // First toggle-on pulls deck.gl + h3-js off the wire. Subsequent
+      // toggles are free (idempotent).
+      await this._ensureReady();
+      // Permission state may have flipped during the await.
+      if (!this._enabled) return;
       this._attachListeners();
       this._onViewportChange();
       this._showLeaderboardBtn(true);
