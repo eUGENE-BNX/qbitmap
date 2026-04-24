@@ -260,6 +260,7 @@ self.addEventListener('push', (event) => {
     navigate,
     urgency,
     image,
+    suppressIfVisible = false,
   } = data;
 
   // Action buttons appear on Android; iOS ignores them (safe).
@@ -270,6 +271,21 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil(
     (async () => {
+      // Suppress OS notification if the user already has the app focused —
+      // the in-page popup handles the same alert, so the OS notification
+      // would be redundant noise. Test pushes and other always-show events
+      // omit this flag so they still surface.
+      if (suppressIfVisible) {
+        const clients = await self.clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true,
+        });
+        const anyVisible = clients.some((c) => c.visibilityState === 'visible');
+        if (anyVisible) {
+          return;
+        }
+      }
+
       await self.registration.showNotification(title, {
         body,
         icon,

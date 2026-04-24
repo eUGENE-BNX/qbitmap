@@ -647,8 +647,8 @@ faceDetectionStyles.textContent = `
   }
   .face-alert-content {
     min-width: 0;
-    width: calc(100vw - 52px);
-    max-width: calc(100vw - 52px);
+    width: calc(100vw - 92px);
+    max-width: calc(100vw - 92px);
   }
 }
 `;

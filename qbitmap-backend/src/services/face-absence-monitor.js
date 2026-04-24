@@ -104,6 +104,12 @@ async function processTick() {
       // trigger the same rule back-to-back.
       try {
         const pushService = require('./push');
+        const config = require('../config');
+        const absFaceUrl = faceImageUrl
+          ? (/^https?:\/\//i.test(faceImageUrl)
+              ? faceImageUrl
+              : `${config.frontend.url}${faceImageUrl.startsWith('/') ? '' : '/'}${faceImageUrl}`)
+          : undefined;
         await pushService.sendToUser(rule.user_id, {
           title: `${faceName} kamerada görünmedi`,
           body: `${rule.start_time}-${rule.end_time} aralığında hareket yok`,
@@ -111,8 +117,9 @@ async function processTick() {
           topic: `absence-${rule.id}`,
           urgency: 'high',
           navigate: '/',
-          icon: faceImageUrl || undefined,
-          image: faceImageUrl || undefined,
+          icon: absFaceUrl,
+          image: absFaceUrl,
+          suppressIfVisible: true,
         });
       } catch (err) {
         logger.warn({ err: err.message, ruleId: rule.id }, 'push dispatch failed (non-fatal)');

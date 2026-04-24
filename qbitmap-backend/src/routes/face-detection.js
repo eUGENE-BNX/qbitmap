@@ -4,10 +4,20 @@ const voiceCallService = require("../services/voice-call");
 const { authHook } = require("../utils/jwt");
 const { checkFaceLimitMiddleware } = require("../middleware/limits");
 const { validateMagicBytes } = require("../utils/file-validation");
+const config = require("../config");
 const logger = require("../utils/logger").child({ module: "face-detection" });
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
+
+// Android Chrome's notification service fetches `icon`/`image` URLs from
+// outside the SW's fetch context — relative paths resolve against the
+// push server, not qbitmap.com, and silently 404. Always send absolute.
+function absoluteUploadUrl(relPath) {
+  if (!relPath) return undefined;
+  if (/^https?:\/\//i.test(relPath)) return relPath;
+  return `${config.frontend.url}${relPath.startsWith('/') ? '' : '/'}${relPath}`;
+}
 
 async function getCameraByDeviceId(deviceId, userId) {
   const camera = await db.getCameraByDeviceId(deviceId);
@@ -373,6 +383,7 @@ async function faceDetectionRoutes(fastify, options) {
           _facePushCache.set(pushKey, now);
           try {
             const pushService = require('../services/push');
+            const absUrl = absoluteUploadUrl(userFace.face_image_url);
             await pushService.sendToUser(request.user.userId, {
               title: `${userFace.name} algılandı`,
               body: `${camera.name || deviceId} · skor ${Math.round(confidence || 0)}`,
@@ -380,8 +391,9 @@ async function faceDetectionRoutes(fastify, options) {
               topic: `face-${userFace.id}`,
               urgency: 'high',
               navigate: '/',
-              icon: userFace.face_image_url || undefined,
-              image: userFace.face_image_url || undefined,
+              icon: absUrl,
+              image: absUrl,
+              suppressIfVisible: true,
             });
           } catch (err) {
             logger.warn({ err: err.message, deviceId, faceId: userFace.id }, 'face detection push failed (non-fatal)');
