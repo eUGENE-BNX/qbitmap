@@ -57,8 +57,6 @@ export default defineConfig({
       injectManifest: {
         globPatterns: [
           'assets/**/*.{js,css,woff2}',
-          'vendor/maplibre-gl.{js,css}',
-          'vendor/basemaps.js',
           'icons/*.png',
           // index.html MUST be precached — the NavigationRoute in the SW
           // calls createHandlerBoundToURL('/index.html') and throws a
@@ -70,8 +68,16 @@ export default defineConfig({
           'favicon.ico',
           'manifest.webmanifest',
         ],
-        globIgnores: ['**/*.map', '**/3d/**', '**/maps/**', '**/videos/**'],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // [PERF] vendor/** intentionally not precached. MapLibre + basemaps
+        // alone are ~1.4 MB and inflate first-visit download. The SW's
+        // runtime CacheFirst route for /vendor/* (vendor-v1, 1y expiration)
+        // picks them up on first actual use — with the HTML Link preload
+        // header the browser still starts the fetch during page load.
+        globIgnores: [
+          '**/*.map', '**/3d/**', '**/maps/**', '**/videos/**',
+          'vendor/**',
+        ],
+        maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
       },
       devOptions: { enabled: false },  // dev uses Vite HMR, SW off
     }),

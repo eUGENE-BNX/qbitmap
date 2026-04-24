@@ -3,6 +3,10 @@
  * Shared CSS variables used across all pages
  */
 
+html, body {
+  overscroll-behavior-y: contain;
+}
+
 :root {
   /* Colors - Background */
   --color-bg-primary: #f6f7fb;

@@ -2,6 +2,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { showNotification } from '../../js/utils.js';
 
 let updateSW = null;
+let silentUpdateWired = false;
 
 /**
  * Hook up the service worker and wire two prompts:
@@ -18,6 +19,7 @@ export function initServiceWorker() {
       immediate: true,
       onNeedRefresh() {
         showUpdateToast();
+        wireSilentUpdate();
       },
       onOfflineReady() {
         showNotification?.('Çevrimdışı kullanıma hazır', 'info', 3000);
@@ -59,6 +61,21 @@ export function initServiceWorker() {
       navigator.clearAppBadge?.().catch(() => {});
     }
   });
+}
+
+// Apply a pending SW update silently when the tab is hidden AND no live
+// camera stream is active AND no upload is mid-flight. Users often watch
+// live cameras for hours and never click the toast — this lets a new
+// version take effect on the next foreground without disrupting anything.
+function wireSilentUpdate() {
+  if (silentUpdateWired) return;
+  silentUpdateWired = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'hidden') return;
+    if (document.querySelector('.camera-frame-container.loaded')) return;
+    if (window.__qbitmapUploadInFlight) return;
+    updateSW?.(true);
+  }, { passive: true });
 }
 
 function showUpdateToast() {

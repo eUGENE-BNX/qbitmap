@@ -30,12 +30,13 @@ const HlsPlayerMixin = {
       };
       videoElement.addEventListener('ended', videoElement._vodReloadHandler);
       // Also handle pause at end (some browsers pause instead of firing ended)
-      videoElement.addEventListener('pause', () => {
-        if (isVod && videoElement.currentTime >= videoElement.duration - 0.5) {
+      videoElement._vodPauseHandler = () => {
+        if (videoElement.currentTime >= videoElement.duration - 0.5) {
           videoElement.currentTime = 0;
           videoElement.play().catch(() => {});
         }
-      });
+      };
+      videoElement.addEventListener('pause', videoElement._vodPauseHandler);
     }
 
     // Safari native HLS support
@@ -47,6 +48,7 @@ const HlsPlayerMixin = {
       return {
         hls: null,
         destroy() {
+          cleanupVodHandlers(videoElement);
           videoElement.pause();
           videoElement.removeAttribute('src');
           videoElement.load();
@@ -104,6 +106,7 @@ const HlsPlayerMixin = {
       return {
         hls,
         destroy() {
+          cleanupVodHandlers(videoElement);
           hls.destroy();
           videoElement.removeAttribute('src');
           videoElement.load();
@@ -118,9 +121,7 @@ const HlsPlayerMixin = {
     return {
       hls: null,
       destroy() {
-        if (videoElement._vodEndedHandler) {
-          videoElement.removeEventListener('ended', videoElement._vodEndedHandler);
-        }
+        cleanupVodHandlers(videoElement);
         videoElement.pause();
         videoElement.removeAttribute('src');
         videoElement.load();
@@ -128,5 +129,16 @@ const HlsPlayerMixin = {
     };
   }
 };
+
+function cleanupVodHandlers(videoElement) {
+  if (videoElement._vodReloadHandler) {
+    videoElement.removeEventListener('ended', videoElement._vodReloadHandler);
+    delete videoElement._vodReloadHandler;
+  }
+  if (videoElement._vodPauseHandler) {
+    videoElement.removeEventListener('pause', videoElement._vodPauseHandler);
+    delete videoElement._vodPauseHandler;
+  }
+}
 
 export { HlsPlayerMixin };
