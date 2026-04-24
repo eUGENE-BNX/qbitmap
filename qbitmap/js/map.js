@@ -57,6 +57,38 @@ const style = {
     layers: sanitizedLayers
 };
 
+// "Home area" is persisted across sessions so the logo-click and the
+// first-visit flyTo feel snappy. We round to 2 decimals (~1.1 km at the
+// equator) so localStorage never holds a street-level coordinate —
+// that's neighborhood granularity, enough for a map center, too coarse
+// to identify a specific address if the device is shared.
+const HOME_KEY = 'qbitmap_user_location';
+const HOME_PRECISION_DIGITS = 2;
+
+function saveHomeLocation(lng, lat) {
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+    try {
+        localStorage.setItem(HOME_KEY, JSON.stringify({
+            lng: Number(lng.toFixed(HOME_PRECISION_DIGITS)),
+            lat: Number(lat.toFixed(HOME_PRECISION_DIGITS)),
+        }));
+    } catch { /* quota or privacy mode */ }
+}
+
+function loadHomeLocation() {
+    try {
+        const raw = localStorage.getItem(HOME_KEY);
+        if (!raw) return null;
+        const { lng, lat } = JSON.parse(raw);
+        if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+        return { lng, lat };
+    } catch { return null; }
+}
+
+function hasHomeLocation() {
+    return localStorage.getItem(HOME_KEY) !== null;
+}
+
 // Determine initial center/zoom:
 // If URL has a hash (e.g. #5/41/29) MapLibre restores position from it — use defaults and let hash win.
 // Only use saved geolocation on very first visit (no hash, no prior session).
@@ -64,13 +96,8 @@ function getInitialView() {
     if (location.hash && location.hash.length > 1) {
         return { center: QBitmapConfig.map.defaultCenter, zoom: QBitmapConfig.map.defaultZoom };
     }
-    const saved = localStorage.getItem('qbitmap_user_location');
-    if (saved) {
-        try {
-            const { lng, lat } = JSON.parse(saved);
-            return { center: [lng, lat], zoom: 12 };
-        } catch {}
-    }
+    const home = loadHomeLocation();
+    if (home) return { center: [home.lng, home.lat], zoom: 12 };
     return { center: QBitmapConfig.map.defaultCenter, zoom: QBitmapConfig.map.defaultZoom };
 }
 
@@ -102,10 +129,10 @@ Logger.log("[Map] Map instance created");
 // Request location via unified LocationService (GPS → IP fallback).
 // Async — map opens immediately on cached/default center, flyTo if first visit.
 {
-    const hadLocation = localStorage.getItem('qbitmap_user_location');
+    const hadLocation = hasHomeLocation();
     LocationService.get({ purpose: 'map-init', sampleWindowMs: 6000 })
         .then((loc) => {
-            localStorage.setItem('qbitmap_user_location', JSON.stringify({ lng: loc.lng, lat: loc.lat }));
+            saveHomeLocation(loc.lng, loc.lat);
             if (!hadLocation) {
                 // Coarse IP results land on a wider zoom; precise GPS gets a closer one.
                 const zoom = loc.quality === 'precise' ? 14 : (loc.quality === 'approximate' ? 12 : 10);
@@ -438,12 +465,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logo) {
         logo.style.cursor = 'pointer';
         logo.addEventListener('click', () => {
-            const saved = localStorage.getItem('qbitmap_user_location');
-            if (saved) {
-                try {
-                    const { lng, lat } = JSON.parse(saved);
-                    map.flyTo({ center: [lng, lat], zoom: 12, duration: 1500 });
-                } catch {}
+            const home = loadHomeLocation();
+            if (home) {
+                map.flyTo({ center: [home.lng, home.lat], zoom: 12, duration: 1500 });
             }
         });
     }

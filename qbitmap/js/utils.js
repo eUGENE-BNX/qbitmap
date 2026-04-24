@@ -102,7 +102,7 @@ function showNotification(message, type = 'info', duration = 3000) {
   notification.className = `qb-notification qb-notification-${type}`;
   notification.textContent = message;
   notification.style.cssText = `
-    position: fixed; bottom: 20px; right: 20px; padding: 12px 20px;
+    position: fixed; bottom: 20px; right: 70px; padding: 12px 20px;
     background: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#17a2b8'};
     color: white; border-radius: 8px; z-index: 10000; font-size: 14px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideIn 0.3s ease;

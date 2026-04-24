@@ -7,6 +7,18 @@ html, body {
   overscroll-behavior-y: contain;
 }
 
+/* Touch target minimums — only on coarse-pointer devices (phones, tablets).
+ * Keeps desktop UI dense, mobile tappable. Small-button variants opt out
+ * since they're typically inside dense toolbars where 44px would break
+ * the layout. */
+@media (pointer: coarse) {
+  button:not(.btn-sm):not(.btn-icon):not(.close),
+  [role="button"]:not(.btn-sm):not(.btn-icon):not(.close) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 :root {
   /* Colors - Background */
   --color-bg-primary: #f6f7fb;
