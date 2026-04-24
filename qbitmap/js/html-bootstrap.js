@@ -7,21 +7,16 @@
  * the Plyr stylesheet.
  */
 
-// Google Analytics 4 tag bootstrap. gtag.js is NOT loaded statically any
-// more — loading defers to js/consent-banner.js, which only injects the
-// <script> tag after the user accepts. We set up window.gtag + dataLayer
-// eagerly so js/analytics.js can dispatch events unconditionally: if the
-// user hasn't opted in, events just queue in dataLayer and are dropped.
+// Google Analytics 4 tag bootstrap. The external gtag.js script is loaded
+// via <script async> in index.html; it looks for window.dataLayer and
+// replaces the push impl with the real handler when it arrives. Events
+// pushed before then queue harmlessly. Pageviews are dispatched manually
+// from js/analytics.js, so send_page_view is disabled here.
 window.dataLayer = window.dataLayer || [];
 function gtag() { window.dataLayer.push(arguments); }
 window.gtag = gtag;
 gtag('js', new Date());
 gtag('config', 'G-5Y929W13D6', { send_page_view: false });
-
-// Kick off the consent banner once we're past the critical path.
-import('./consent-banner.js')
-  .then((m) => m.initAnalyticsConsent?.())
-  .catch(() => {});
 
 // Plyr CSS is injected with media="print" so it doesn't block first paint.
 // Now that JS is running, swap to media="all" so the browser applies the
