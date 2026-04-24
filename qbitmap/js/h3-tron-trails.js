@@ -421,12 +421,12 @@ const H3TronTrails = {
     container.className = 'mesh-ad-container';
     container.innerHTML = `
       <button class="mesh-ad-close">&times;</button>
-      <img src="/pellegrino.png" class="mesh-ad-img" alt="S.Pellegrino" />
+      <img src="/swiss-choco-bits.png" class="mesh-ad-img" alt="Swiss Choco Bits" />
       <div class="mesh-ad-text">
         <div class="mesh-ad-label">AI MESH DISCOVERY</div>
         <div class="mesh-ad-title">Firsat Bulundu!</div>
-        <div class="mesh-ad-desc">Pellegrino sodalar Carrefour'da bugun indirimde gozukuyor.</div>
-        <a href="#" class="mesh-ad-link">Carrefour Pellegrino Indirimi</a>
+        <div class="mesh-ad-desc">Swiss Choco Bits bugun indirimde gozukuyor.</div>
+        <a href="#" class="mesh-ad-link">Swiss Choco Bits Indirimi</a>
         <div class="mesh-ad-hint">Mesh agindaki veri akisi analiz edildi</div>
       </div>
       <div class="mesh-ad-scanline"></div>
@@ -441,7 +441,7 @@ const H3TronTrails = {
           position: fixed; z-index: 9999;
           top: 50%; left: 50%;
           transform: translate(-50%, -50%) scale(0.5);
-          display: flex; align-items: center; gap: 0;
+          display: flex; align-items: center; gap: 16px;
           pointer-events: auto;
           opacity: 0;
           transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -544,7 +544,7 @@ const H3TronTrails = {
     container.querySelector('.mesh-ad-link').addEventListener('click', (e) => {
       e.preventDefault();
       this._dismissAdPopup();
-      const coord = [29.124849, 40.993873];
+      const coord = [29.1250429, 40.9940029];
       this._map.flyTo({ center: coord, zoom: 17, duration: 2000 });
       // After flyTo settles, open video message popup via deep link search
       this._map.once('moveend', () => {
@@ -553,7 +553,7 @@ const H3TronTrails = {
             // [PERF-01] Lazy-load video-message chunk on click instead of
             // pulling it into the main bundle on page load.
             const { VideoMessage } = await import('./video-message/index.js');
-            const msgId = 'vmsg_1_mlyzyvxx';
+            const msgId = 'pmsg_1_mnx2pa0y';
             const base = VideoMessage.apiBase || (QBitmapConfig.api.base + '/api/video-messages');
             const resp = await fetch(`${base}/${msgId}`, { credentials: 'include' });
             if (!resp.ok) return;

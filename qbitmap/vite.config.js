@@ -95,7 +95,7 @@ export default defineConfig({
         const staticFiles = [
           'favicon.ico', 'logo.png', 'logo.svg', 'bus.png', 'bus1.png', 'bus2.png',
           'car.png', 'car1.png', 'car2.png', 'car3.png', 'car4.png', 'car5.png',
-          'kamyon.png', 'pellegrino.png', 'Caddyfile',
+          'kamyon.png', 'pellegrino.png', 'swiss-choco-bits.png', 'Caddyfile',
           'manifest.webmanifest', 'offline.html',
           'robots.txt', 'sitemap.xml'
         ];
