@@ -46,23 +46,24 @@
   flex-shrink: 0;
 }
 
-/* QBitmap Logo Control - In header, same height as login button */
+/* QBitmap Logo Control - In header, matches .user-button height (~40px
+ * with 6px+28px+6px vertical stacking) so the left controls line up. */
 .qbitmap-logo-control {
-  height: 36px;
+  height: 40px;
   background: white;
   border-radius: 8px;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 10px 0 6px;
+  padding: 0 12px 0 6px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
   cursor: pointer;
   transition: box-shadow 0.2s, background 0.2s;
 }
 
 .qbitmap-logo-control img {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
 }
 
