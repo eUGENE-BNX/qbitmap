@@ -649,6 +649,14 @@ const UserLocationSystem = {
      */
     async locateMe() {
         const btn = document.getElementById('locate-me-button');
+
+        // Rationale modal before the native prompt — better accept rate and
+        // a cleaner story for already-denied users. Lazy import keeps the
+        // modal + styles off the critical path.
+        const { ensureGeolocationPermission } = await import('./services/location-permission.js');
+        const ok = await ensureGeolocationPermission();
+        if (!ok) return; // user declined, or permission previously denied
+
         if (btn) btn.classList.add('searching');
 
         try {

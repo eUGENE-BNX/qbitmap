@@ -284,3 +284,99 @@
 }
 .profile-push-test:hover { background: #1c2a45; color: #e6edf5; }
 .profile-push-test:disabled { opacity: 0.5; cursor: wait; }
+
+/* Geolocation permission rationale modal — shown before the native prompt */
+.geo-rationale-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  padding-top: calc(20px + env(safe-area-inset-top, 0));
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0));
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.geo-rationale {
+  width: 100%;
+  max-width: 380px;
+  background: #0f1a30;
+  color: #e6edf5;
+  border: 1px solid #2a3a55;
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  padding: 20px 22px;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.geo-rationale-title {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+}
+.geo-rationale-text {
+  margin: 0 0 18px;
+  color: #9fb0c4;
+}
+.geo-rationale-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.geo-rationale-actions button {
+  appearance: none;
+  border: 1px solid transparent;
+  padding: 9px 16px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+}
+.geo-rationale-decline {
+  background: transparent;
+  color: #9fb0c4;
+  border-color: #2a3a55;
+}
+.geo-rationale-decline:hover { background: #152238; color: #e6edf5; }
+.geo-rationale-accept {
+  background: #2563eb;
+  color: #fff;
+}
+.geo-rationale-accept:hover { background: #1d4ed8; }
+
+/* Denied-state help banner */
+.geo-denied-help {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0));
+  transform: translateX(-50%);
+  z-index: 9999;
+  max-width: calc(100vw - 24px);
+  background: #311c1c;
+  color: #fecaca;
+  border: 1px solid #7f1d1d;
+  border-radius: 12px;
+  padding: 11px 12px 11px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  font: 500 13px/1.35 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.geo-denied-help-text { flex: 1; }
+.geo-denied-help-dismiss {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.geo-denied-help-dismiss:hover { opacity: 1; }
