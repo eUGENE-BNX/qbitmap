@@ -58,14 +58,16 @@ const UserProfileSystem = {
     }
     window.dispatchEvent(new CustomEvent('sidemenu:open', { detail: { id: 'profile' } }));
     const panel = document.getElementById('profile-panel-overlay');
-    panel.classList.add('active');
+    const { viewTransition } = await import('./utils.js');
+    viewTransition(() => { panel.classList.add('active'); });
     this.isOpen = true;
     await this.loadProfile();
   },
 
-  close() {
+  async close() {
     const panel = document.getElementById('profile-panel-overlay');
-    panel.classList.remove('active');
+    const { viewTransition } = await import('./utils.js');
+    viewTransition(() => { panel.classList.remove('active'); });
     this.isOpen = false;
   },
 

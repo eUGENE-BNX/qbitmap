@@ -13,6 +13,7 @@
  */
 import { count, list, drain, retryOne, discard } from './upload-outbox.js';
 import { escapeHtml } from '../html-escape.js';
+import { viewTransition } from '../utils.js';
 
 let _badge = null;
 
@@ -81,6 +82,7 @@ async function openInspector() {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-labelledby', 'qb-outbox-title');
+  overlay.style.viewTransitionName = 'qb-outbox-modal';
   overlay.innerHTML =
     '<div class="qb-outbox-dialog">' +
       '<header class="qb-outbox-header">' +
@@ -92,10 +94,10 @@ async function openInspector() {
         `<button type="button" class="qb-outbox-drain"${records.length === 0 ? ' disabled' : ''}>Hepsini dene</button>` +
       '</footer>' +
     '</div>';
-  document.body.appendChild(overlay);
+  viewTransition(() => { document.body.appendChild(overlay); });
 
   const close = () => {
-    overlay.remove();
+    viewTransition(() => { overlay.remove(); });
     document.removeEventListener('keydown', onKey);
   };
   const onKey = (e) => { if (e.key === 'Escape') close(); };

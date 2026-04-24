@@ -1,3 +1,5 @@
+import { viewTransition } from './utils.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     // ================= MODAL FONKSİYONLARI BAŞLANGIÇ =================
 
@@ -12,15 +14,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Bu fonksiyon, dışarıdan çağrılarak modal'ı açmak için kullanılacak.
     // Örneğin, cameras-settings.js dosyasından.
     const openImageModal = function(imageUrl, imageCaption = "Kamera Görüntüsü") {
-        modal.style.display = "block"; // Modalı görünür yap
-        modalImg.src = imageUrl; // Resim kaynağını ayarla
-        captionText.textContent = imageCaption; // Başlık ekle (XSS koruması için textContent)
+        viewTransition(() => {
+            modal.style.display = "block"; // Modalı görünür yap
+            modalImg.src = imageUrl; // Resim kaynağını ayarla
+            captionText.textContent = imageCaption; // Başlık ekle (XSS koruması için textContent)
+        });
     }
 
     // Kapatma fonksiyonu
     const closeModal = function() {
-        modal.style.display = "none";
-        modalImg.src = ""; // Hafızayı boşaltmak için resmi temizle
+        viewTransition(() => {
+            modal.style.display = "none";
+            modalImg.src = ""; // Hafızayı boşaltmak için resmi temizle
+        });
     }
 
     // Kapatma (X) butonuna tıklanınca modalı kapat

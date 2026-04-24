@@ -14,6 +14,7 @@
  *                                    the caller should proceed with GPS.
  */
 import { escapeHtml } from '../html-escape.js';
+import { viewTransition } from '../utils.js';
 
 let _inFlightRationale = null;
 
@@ -40,6 +41,7 @@ export function showGeolocationRationale({
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'geo-rationale-title');
+    overlay.style.viewTransitionName = 'geo-rationale';
     overlay.innerHTML =
       '<div class="geo-rationale">' +
         `<h2 id="geo-rationale-title" class="geo-rationale-title">${escapeHtml(title)}</h2>` +
@@ -49,9 +51,9 @@ export function showGeolocationRationale({
           `<button type="button" class="geo-rationale-accept">${escapeHtml(acceptLabel)}</button>` +
         '</div>' +
       '</div>';
-    document.body.appendChild(overlay);
+    viewTransition(() => { document.body.appendChild(overlay); });
     const finish = (answer) => {
-      overlay.remove();
+      viewTransition(() => { overlay.remove(); });
       _inFlightRationale = null;
       resolve(answer);
     };

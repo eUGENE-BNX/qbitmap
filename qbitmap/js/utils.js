@@ -170,4 +170,26 @@ const TimerManager = {
   }
 };
 
-export { Logger, escapeHtml, escapeHtmlAllowFormat, sanitize, fetchWithTimeout, loadUserCameras, showNotification, TimerManager };
+/**
+ * Run a DOM mutation inside a View Transition so the browser can animate
+ * between before/after states. Falls back to calling `fn` directly when
+ * the API is missing (Firefox today, older Safari, reduced-motion users).
+ *
+ * Usage: viewTransition(() => modal.style.display = 'block')
+ *
+ * For shared-element morphs (avatar → profile modal, marker DOM → popup),
+ * set matching `view-transition-name: foo` on the source and destination
+ * elements' CSS before calling this. The browser ties them together and
+ * crossfades+transforms automatically.
+ */
+function viewTransition(fn) {
+  if (typeof document === 'undefined' ||
+      typeof document.startViewTransition !== 'function' ||
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    // No API or user prefers reduced motion — just mutate synchronously.
+    return { finished: Promise.resolve(fn?.()) };
+  }
+  return document.startViewTransition(fn);
+}
+
+export { Logger, escapeHtml, escapeHtmlAllowFormat, sanitize, fetchWithTimeout, loadUserCameras, showNotification, TimerManager, viewTransition };
