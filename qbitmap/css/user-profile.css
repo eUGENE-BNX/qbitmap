@@ -1315,6 +1315,7 @@
 .profile-tesla-gallery-slot.is-filled {
   border: 1px solid #d0d7de;
   background: #000;
+  cursor: zoom-in;
 }
 .profile-tesla-gallery-slot.is-filled img {
   width: 100%;
@@ -1512,3 +1513,78 @@
 
 .tesla-gallery-modal-content[data-state="error"] .tesla-gallery-error { display: flex; }
 .tesla-gallery-modal-content[data-state="error"] .tesla-gallery-controls-error { display: flex; }
+
+/* ========== Tesla Photo Lightbox ========== */
+.tesla-photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  padding-top: max(24px, env(safe-area-inset-top));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
+  cursor: zoom-out;
+  animation: tesla-lightbox-in 0.18s ease-out;
+}
+.tesla-photo-lightbox.is-closing {
+  animation: tesla-lightbox-out 0.18s ease-in forwards;
+}
+@keyframes tesla-lightbox-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes tesla-lightbox-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.tesla-photo-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  cursor: default;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.tesla-photo-lightbox-close {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tesla-photo-lightbox-close:hover { background: rgba(255, 255, 255, 0.22); }
+.tesla-photo-lightbox-close:active { transform: scale(0.94); }
+
+@media (max-width: 600px) {
+  .tesla-photo-lightbox {
+    padding: 12px;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .tesla-photo-lightbox-close {
+    width: 36px;
+    height: 36px;
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+  }
+}

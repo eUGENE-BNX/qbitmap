@@ -729,7 +729,14 @@ const UserProfileSystem = {
         }
 
         const slotEl = ev.target.closest('.profile-tesla-gallery-slot');
-        if (!slotEl || !slotEl.classList.contains('is-empty')) return;
+        if (!slotEl) return;
+
+        if (slotEl.classList.contains('is-filled')) {
+          const img = slotEl.querySelector('img');
+          if (img?.src) UserProfileSystem.openTeslaPhotoLightbox(img.src);
+          return;
+        }
+        if (!slotEl.classList.contains('is-empty')) return;
 
         const slot = Number(slotEl.dataset.slot);
         try {
@@ -744,6 +751,38 @@ const UserProfileSystem = {
         }
       });
     });
+  },
+
+  openTeslaPhotoLightbox(src) {
+    if (!src) return;
+    if (document.getElementById('tesla-photo-lightbox')) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'tesla-photo-lightbox';
+    overlay.className = 'tesla-photo-lightbox';
+    overlay.innerHTML = `
+      <button class="tesla-photo-lightbox-close" type="button" aria-label="Kapat">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      <img class="tesla-photo-lightbox-img" src="${escapeHtml(src)}" alt="" />
+    `;
+
+    const close = () => {
+      overlay.classList.add('is-closing');
+      document.removeEventListener('keydown', onKey);
+      setTimeout(() => overlay.remove(), 180);
+    };
+    const onKey = (ev) => { if (ev.key === 'Escape') close(); };
+
+    overlay.addEventListener('click', (ev) => {
+      if (ev.target === overlay || ev.target.closest('.tesla-photo-lightbox-close')) close();
+    });
+    document.addEventListener('keydown', onKey);
+
+    document.body.appendChild(overlay);
   },
 
   renderLocationChip(location) {
