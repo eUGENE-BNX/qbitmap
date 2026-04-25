@@ -1,14 +1,12 @@
 import { registerSW } from 'virtual:pwa-register';
-import { showNotification } from '../../js/utils.js';
 
 let updateSW = null;
 let silentUpdateWired = false;
 
 /**
- * Hook up the service worker and wire two prompts:
- *   - "refresh to update" toast on `onNeedRefresh`
- *   - transient "offline ready" toast on `onOfflineReady`
- * Runs lazily — Vite's `virtual:pwa-register` module is a no-op in dev.
+ * Hook up the service worker and wire the "refresh to update" toast on
+ * `onNeedRefresh`. Runs lazily — Vite's `virtual:pwa-register` module is
+ * a no-op in dev.
  */
 export function initServiceWorker() {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
@@ -20,9 +18,6 @@ export function initServiceWorker() {
       onNeedRefresh() {
         showUpdateToast();
         wireSilentUpdate();
-      },
-      onOfflineReady() {
-        showNotification?.('Çevrimdışı kullanıma hazır', 'info', 3000);
       },
       onRegisteredSW(_url, registration) {
         // Hourly update check — users leave tabs open for days.

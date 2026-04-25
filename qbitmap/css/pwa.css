@@ -42,26 +42,95 @@
   color: #e6edf5;
 }
 
-/* Offline badge — sticky red chip, top-right */
+/* Offline badge — sticky chip, top-right. Dark navy to match the update
+   toast; the red dot carries the "offline" semantic. */
+.pwa-offline-badge[hidden] { display: none; }
 .pwa-offline-badge {
   position: fixed;
   top: 12px;
   right: 62px;
   z-index: 9998;
-  background: #8e1d1a;
-  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #0f1a30;
+  color: #e6edf5;
   font: 600 12px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial,
     sans-serif;
-  padding: 6px 10px;
+  padding: 6px 12px 6px 10px;
   border-radius: 999px;
-  border: 1px solid #b02a27;
+  border: 1px solid #2a3a55;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
   letter-spacing: 0.2px;
   pointer-events: none;
 }
+.pwa-offline-badge::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e6533a;
+  box-shadow: 0 0 0 3px rgba(230, 83, 58, 0.22);
+}
 @media (display-mode: standalone) {
   /* Nudge the badge below the iOS status bar area */
   .pwa-offline-badge { top: calc(env(safe-area-inset-top, 0px) + 10px); }
+}
+
+/* Transient toast (showNotification from utils.js).
+   Same visual language as .pwa-update-toast — dark navy chip, light text,
+   subtle border + shadow. The leading dot color encodes the type. */
+.qb-notification {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px 11px 12px;
+  max-width: calc(100vw - 32px);
+  background: #0f1a30;
+  color: #e6edf5;
+  border: 1px solid #2a3a55;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  font: 500 14px/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  animation: qb-notification-in 0.22s ease-out both;
+}
+.qb-notification.qb-notification-leaving {
+  animation: qb-notification-out 0.22s ease-in both;
+}
+.qb-notification-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4a8cff;
+  box-shadow: 0 0 0 3px rgba(74, 140, 255, 0.22);
+}
+.qb-notification-success .qb-notification-dot {
+  background: #00b87a;
+  box-shadow: 0 0 0 3px rgba(0, 184, 122, 0.22);
+}
+.qb-notification-error .qb-notification-dot {
+  background: #e6533a;
+  box-shadow: 0 0 0 3px rgba(230, 83, 58, 0.22);
+}
+.qb-notification-warning .qb-notification-dot {
+  background: #f5a623;
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.22);
+}
+.qb-notification-text { white-space: pre-line; }
+
+@keyframes qb-notification-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes qb-notification-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(8px); }
 }
 
 /* Camera popup offline hint — placed by streaming mixin */
