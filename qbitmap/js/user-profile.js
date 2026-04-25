@@ -140,7 +140,6 @@ const UserProfileSystem = {
 
     content.innerHTML = `
       ${this.renderHeaderCard(user, cameraStats, landStats)}
-      ${this.renderPushSection()}
       ${this.renderRecentMessages(recentMessages)}
       ${this.renderBroadcastRecordings(broadcastRecordings)}
       ${teslaVehicles.length > 0 ? teslaVehicles.map(v => this.renderTeslaSection(v)).join('') : this.renderTeslaConnectCard()}
@@ -187,59 +186,33 @@ const UserProfileSystem = {
     `;
   },
 
-  renderPushSection() {
-    // Placeholder markup — filled in asynchronously once we know whether
-    // the browser supports push and whether the user is already subscribed.
-    // Rendered unconditionally; setupPushListeners hides it on platforms
-    // where push is unsupported.
-    return `
-      <div class="profile-push-section" data-push-section style="display:none">
-        <span class="profile-section-label">BİLDİRİMLER</span>
-        <div class="profile-push-row">
-          <div class="profile-push-copy">
-            <div class="profile-push-title">Anında bildirim</div>
-            <div class="profile-push-desc" data-push-desc>Kamera alarmları ve yüz tanıma uyarıları için push bildirim aç.</div>
-          </div>
-          <label class="profile-push-toggle">
-            <input type="checkbox" data-push-toggle>
-            <span class="profile-push-slider"></span>
-          </label>
-        </div>
-        <button type="button" class="profile-push-test" data-push-test hidden>Test bildirimi gönder</button>
-      </div>
-    `;
-  },
-
   async setupPushListeners(content) {
-    const section = content.querySelector('[data-push-section]');
+    const wrap = content.querySelector('[data-push-wrap]');
+    const label = content.querySelector('[data-push-label]');
     const toggle = content.querySelector('[data-push-toggle]');
-    const desc = content.querySelector('[data-push-desc]');
-    const testBtn = content.querySelector('[data-push-test]');
-    if (!section || !toggle) return;
+    if (!wrap || !toggle) return;
 
     const push = await import('../src/pwa/push.js').catch(() => null);
     if (!push) return;
 
     const state = await push.getPushState();
-    if (!state.supported) {
-      section.style.display = 'none';
-      return;
-    }
-    section.style.display = '';
+    if (!state.supported) return;
+
+    wrap.style.display = '';
+    if (label) label.style.display = '';
 
     if (state.iosStandaloneRequired) {
-      desc.textContent = 'iOS\'ta: Önce Safari\'den "Ana Ekrana Ekle" ile uygulamayı kurun.';
       toggle.disabled = true;
+      wrap.title = 'iOS\'ta önce "Ana Ekrana Ekle" ile uygulamayı kurun.';
       return;
     }
     if (state.permission === 'denied') {
-      desc.textContent = 'Tarayıcı bildirim izni engelledi. Tarayıcı ayarlarından açabilirsiniz.';
       toggle.disabled = true;
+      wrap.title = 'Tarayıcı bildirim izni engelledi. Tarayıcı ayarlarından açabilirsiniz.';
       return;
     }
 
     toggle.checked = state.subscribed;
-    testBtn.hidden = !state.subscribed;
 
     toggle.addEventListener('change', async () => {
       toggle.disabled = true;
@@ -247,19 +220,12 @@ const UserProfileSystem = {
         if (toggle.checked) {
           const r = await push.enablePush();
           if (!r.ok) toggle.checked = false;
-          testBtn.hidden = !toggle.checked;
         } else {
           await push.disablePush();
-          testBtn.hidden = true;
         }
       } finally {
         toggle.disabled = false;
       }
-    });
-
-    testBtn.addEventListener('click', async () => {
-      testBtn.disabled = true;
-      try { await push.sendTestPush(); } finally { testBtn.disabled = false; }
     });
   },
 
@@ -689,11 +655,17 @@ const UserProfileSystem = {
 
     return hasLocation ? `
       <div class="profile-info-chip">
+        <span class="chip-meta" data-push-label style="display:none">Bildirim :</span>
+        <label class="toggle-switch-sm" data-push-wrap style="display:none;margin-right:10px">
+          <input type="checkbox" data-push-toggle>
+          <span class="toggle-slider-sm"></span>
+        </label>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
         </svg>
         <span class="chip-text">${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}</span>
         ${location.accuracy ? `<span class="chip-meta">±${Math.round(location.accuracy)}m</span>` : ''}
+        <span class="chip-meta">Konum :</span>
         <label class="toggle-switch-sm">
           <input type="checkbox" id="location-visibility-toggle" ${showOnMap ? 'checked' : ''}>
           <span class="toggle-slider-sm"></span>
@@ -706,6 +678,11 @@ const UserProfileSystem = {
       </div>
     ` : `
       <div class="profile-info-chip profile-info-chip--empty">
+        <span class="chip-meta" data-push-label style="display:none">Bildirim :</span>
+        <label class="toggle-switch-sm" data-push-wrap style="display:none;margin-right:10px">
+          <input type="checkbox" data-push-toggle>
+          <span class="toggle-slider-sm"></span>
+        </label>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
         </svg>
