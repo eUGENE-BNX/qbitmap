@@ -5,7 +5,7 @@ import { AuthSystem } from '../auth.js';
 import { PhotoCaptureMixin } from './photo-capture.js';
 import { RecordingMixin } from './recording.js';
 import { FormUploadMixin } from './form-upload.js';
-import { MediaMixin, applyAutofocus, getSavedCameraId, saveCameraId } from './media.js';
+import { MediaMixin, initialFocus, getSavedCameraId, saveCameraId } from './media.js';
 import { MapLayerMixin } from './map-layer.js';
 import { PopupMixin } from './popup.js';
 import { SearchInboxMixin } from './search-inbox.js';
@@ -363,8 +363,7 @@ const VideoMessage = {
       const videoConstraints = {
         width: { ideal: this.RESOLUTION.width },
         height: { ideal: this.RESOLUTION.height },
-        frameRate: { ideal: 25, max: 25 },
-        focusMode: { ideal: 'continuous' }
+        frameRate: { ideal: 25, max: 25 }
       };
       if (savedId) {
         videoConstraints.deviceId = { exact: savedId };
@@ -383,7 +382,7 @@ const VideoMessage = {
         } else { throw e; }
       }
       this.mediaStream = this._processAudio(rawStream);
-      applyAutofocus(rawStream);
+      initialFocus(rawStream);
 
       this._selectedCameraId = rawStream.getVideoTracks()[0]?.getSettings()?.deviceId || null;
       saveCameraId(this._selectedCameraId);

@@ -10,16 +10,67 @@ function saveCameraId(deviceId) {
   try { if (deviceId) localStorage.setItem(CAMERA_PREF_KEY, deviceId); } catch {}
 }
 
-function applyAutofocus(stream) {
-  // Try to keep continuous autofocus active so panning to a new scene refocuses
-  // automatically. Tap-to-focus does a single-shot AF at the tap point and then
-  // reverts to continuous (rather than locking to manual) for the same reason.
+function initialFocus(stream) {
+  // One-shot AF at the center when the preview opens. We deliberately avoid
+  // continuous mode — it makes the lens hunt every few seconds which is
+  // visible in the recorded video. After this single fire-and-forget call
+  // the user steers focus via tap-to-focus.
   if (!stream) return;
   const track = stream.getVideoTracks()[0];
   if (!track) return;
   const caps = track.getCapabilities?.();
-  if (caps?.focusMode?.includes('continuous')) {
-    track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+  if (!caps?.focusMode) return;
+
+  const adv = {};
+  if (caps.focusMode.includes('single-shot')) {
+    adv.focusMode = 'single-shot';
+  } else if (caps.focusMode.includes('continuous')) {
+    adv.focusMode = 'continuous';
+  } else {
+    return;
+  }
+  if (caps.pointsOfInterest) adv.pointsOfInterest = [{ x: 0.5, y: 0.5 }];
+  track.applyConstraints({ advanced: [adv] }).catch(() => {});
+}
+
+/**
+ * Lock focus before MediaRecorder starts. Triggers a single-shot AF at center,
+ * waits for the lens to settle, then pins focusDistance via 'manual' mode if
+ * the device supports it. Falls back gracefully on unsupported hardware.
+ */
+async function lockFocusForRecording(stream) {
+  if (!stream) return;
+  const track = stream.getVideoTracks()[0];
+  if (!track) return;
+  const caps = track.getCapabilities?.();
+  if (!caps?.focusMode) return;
+
+  const adv = {};
+  if (caps.focusMode.includes('single-shot')) {
+    adv.focusMode = 'single-shot';
+  } else if (caps.focusMode.includes('continuous')) {
+    adv.focusMode = 'continuous';
+  } else {
+    return;
+  }
+  if (caps.pointsOfInterest) adv.pointsOfInterest = [{ x: 0.5, y: 0.5 }];
+
+  try {
+    await track.applyConstraints({ advanced: [adv] });
+    await new Promise(r => setTimeout(r, 400));
+  } catch {
+    return;
+  }
+
+  // Hard-lock by switching to manual at the distance the AF just settled on.
+  if (caps.focusMode.includes('manual')) {
+    const settings = track.getSettings?.() || {};
+    const dist = settings.focusDistance;
+    if (typeof dist === 'number') {
+      track.applyConstraints({
+        advanced: [{ focusMode: 'manual', focusDistance: dist }]
+      }).catch(() => {});
+    }
   }
 }
 
@@ -56,17 +107,19 @@ async function refocusCenter(stream) {
 }
 
 /**
- * Bind tap-to-focus on a video element.
- * Taps trigger single-shot AF at the tapped point, then reverts to continuous
- * AF so the camera refocuses automatically when panned to a new scene.
+ * Bind tap-to-focus on a video element. Default behavior matches stock
+ * iOS/Android camera apps: tap = single-shot AF at the tap point, then stay
+ * locked there until the next tap. Pass { lockAfterTap: false } to revert
+ * to continuous AF after 1.5s (legacy behavior).
  */
-function bindTapToFocus(videoEl, stream) {
+function bindTapToFocus(videoEl, stream, opts = {}) {
   if (!videoEl || !stream) return;
   const track = stream.getVideoTracks()[0];
   if (!track) return;
   const caps = track.getCapabilities?.();
   if (!caps?.focusMode) return;
 
+  const lockAfterTap = opts.lockAfterTap !== false;
   let revertTimer = null;
 
   videoEl.addEventListener('click', (e) => {
@@ -99,10 +152,8 @@ function bindTapToFocus(videoEl, stream) {
     void dot.offsetWidth;
     dot.classList.add('vmsg-focus-animate');
 
-    // After a single-shot focus settles, return to continuous so panning to
-    // a new scene re-acquires focus instead of locking to the tap distance.
     clearTimeout(revertTimer);
-    if (caps.focusMode.includes('continuous')) {
+    if (!lockAfterTap && caps.focusMode.includes('continuous')) {
       revertTimer = setTimeout(() => {
         track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
       }, 1500);
@@ -188,8 +239,7 @@ const MediaMixin = {
     const videoBase = {
       width: { ideal: this.RESOLUTION.width },
       height: { ideal: this.RESOLUTION.height },
-      frameRate: { ideal: 25, max: 25 },
-      focusMode: { ideal: 'continuous' }
+      frameRate: { ideal: 25, max: 25 }
     };
 
     // Stop old stream first — some devices can't open two cameras at once
@@ -211,7 +261,7 @@ const MediaMixin = {
       }
 
       this.mediaStream = this._processAudio(rawStream);
-      applyAutofocus(rawStream);
+      initialFocus(rawStream);
       this.currentFacingMode = newMode;
       this._selectedCameraId = rawStream.getVideoTracks()[0]?.getSettings()?.deviceId || null;
       saveCameraId(this._selectedCameraId);
@@ -337,8 +387,7 @@ const MediaMixin = {
     const videoBase = {
       width: { ideal: this.RESOLUTION.width },
       height: { ideal: this.RESOLUTION.height },
-      frameRate: { ideal: 25, max: 25 },
-      focusMode: { ideal: 'continuous' }
+      frameRate: { ideal: 25, max: 25 }
     };
 
     // Stop old stream first — some devices can't open two cameras at once
@@ -353,7 +402,7 @@ const MediaMixin = {
       });
 
       this.mediaStream = this._processAudio(rawStream);
-      applyAutofocus(rawStream);
+      initialFocus(rawStream);
       this._selectedCameraId = deviceId;
       saveCameraId(deviceId);
 
@@ -447,4 +496,4 @@ const MediaMixin = {
   },
 };
 
-export { MediaMixin, applyAutofocus, bindTapToFocus, refocusCenter, getSavedCameraId, saveCameraId };
+export { MediaMixin, initialFocus, lockFocusForRecording, bindTapToFocus, refocusCenter, getSavedCameraId, saveCameraId };

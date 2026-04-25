@@ -1,7 +1,7 @@
 import { Logger } from "../utils.js";
 import { AuthSystem } from "../auth.js";
 import { _haptic } from "./photo-capture.js";
-import { bindTapToFocus } from "./media.js";
+import { bindTapToFocus, lockFocusForRecording } from "./media.js";
 
 const RecordingMixin = {
   showRecordingModal() {
@@ -96,8 +96,14 @@ const RecordingMixin = {
 
   // ==================== RECORDING ====================
 
-  startRecording() {
-    if (this.isRecording || !this.mediaStream) return;
+  async startRecording() {
+    if (this.isRecording || this._startingRecording || !this.mediaStream) return;
+    this._startingRecording = true;
+
+    // Lock focus before MediaRecorder spins up so the AF lens settles before
+    // the first frame is encoded. Prevents mid-recording focus hunting.
+    await lockFocusForRecording(this.mediaStream);
+    if (!this.mediaStream) { this._startingRecording = false; return; }
 
     const mimeType = this.getPreferredMimeType();
     const options = mimeType
@@ -126,6 +132,7 @@ const RecordingMixin = {
 
     this.mediaRecorder.start(1000); // Collect data every 1s
     this.isRecording = true;
+    this._startingRecording = false;
     this.recordingStartTime = Date.now();
     _haptic('medium');
 

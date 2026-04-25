@@ -4,7 +4,7 @@ import { Logger, escapeHtml, showNotification } from '../utils.js';
 import { AuthSystem } from '../auth.js';
 import { Analytics } from '../analytics.js';
 import * as AppState from '../state.js';
-import { applyAutofocus, getSavedCameraId, saveCameraId } from '../video-message/media.js';
+import { initialFocus, getSavedCameraId, saveCameraId } from '../video-message/media.js';
 import { LocationService } from '../services/location-service.js';
 
 function _hapticBroadcast(style) {
@@ -144,8 +144,7 @@ const CoreMixin = {
       const videoConstraints = {
         width: { ideal: this.currentResolution.width },
         height: { ideal: this.currentResolution.height },
-        frameRate: { ideal: 24 },
-        focusMode: { ideal: 'continuous' }
+        frameRate: { ideal: 24 }
       };
       if (savedId) {
         videoConstraints.deviceId = { exact: savedId };
@@ -161,7 +160,7 @@ const CoreMixin = {
           this.mediaStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: true });
         } else { throw e; }
       }
-      applyAutofocus(this.mediaStream);
+      initialFocus(this.mediaStream);
       saveCameraId(this.mediaStream.getVideoTracks()[0]?.getSettings()?.deviceId);
 
       // 2. Get geolocation via unified LocationService

@@ -1,6 +1,6 @@
 import { Logger } from "../utils.js";
 import { AuthSystem } from "../auth.js";
-import { applyAutofocus, bindTapToFocus, refocusCenter, getSavedCameraId, saveCameraId } from "./media.js";
+import { initialFocus, bindTapToFocus, refocusCenter, getSavedCameraId, saveCameraId } from "./media.js";
 
 function _haptic(style) {
   if (!navigator.vibrate) return;
@@ -25,8 +25,7 @@ const PhotoCaptureMixin = {
       const savedId = getSavedCameraId();
       const videoConstraints = {
         width: { ideal: res.width },
-        height: { ideal: res.height },
-        focusMode: { ideal: 'continuous' }
+        height: { ideal: res.height }
       };
       if (savedId) {
         videoConstraints.deviceId = { exact: savedId };
@@ -44,7 +43,7 @@ const PhotoCaptureMixin = {
         } else { throw e; }
       }
       this.mediaStream = stream;
-      applyAutofocus(stream);
+      initialFocus(stream);
       this._selectedCameraId = stream.getVideoTracks()[0]?.getSettings()?.deviceId || null;
       saveCameraId(this._selectedCameraId);
       await this._enumerateCameras();
@@ -627,14 +626,13 @@ const PhotoCaptureMixin = {
             deviceId: this._selectedCameraId ? { exact: this._selectedCameraId } : undefined,
             width: { ideal: res.width },
             height: { ideal: res.height },
-            facingMode: !this._selectedCameraId ? { ideal: this.currentFacingMode } : undefined,
-            focusMode: { ideal: 'continuous' }
+            facingMode: !this._selectedCameraId ? { ideal: this.currentFacingMode } : undefined
           },
           audio: false
         });
         this.mediaStream.getTracks().forEach(t => t.stop());
         this.mediaStream = newStream;
-        applyAutofocus(newStream);
+        initialFocus(newStream);
         this._selectedCameraId = newStream.getVideoTracks()[0]?.getSettings()?.deviceId || null;
         const video = modal.querySelector('#vmsg-preview-video');
         if (video) video.srcObject = newStream;

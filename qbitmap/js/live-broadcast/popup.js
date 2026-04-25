@@ -4,6 +4,7 @@ import { AuthSystem } from '../auth.js';
 import { Analytics } from '../analytics.js';
 import { ReportSystem } from '../report.js';
 import * as AppState from '../state.js';
+import { bindTapToFocus } from '../video-message/media.js';
 
 const PopupMixin = {
   /**
@@ -132,6 +133,13 @@ const PopupMixin = {
           audioBtn.querySelector('.audio-on').style.display = videoEl.muted ? 'none' : 'block';
           audioBtn.querySelector('.audio-off').style.display = videoEl.muted ? 'block' : 'none';
         };
+      }
+
+      // Broadcaster-side tap-to-focus: applies AF on the local camera track.
+      // The popup video shows the WHEP-routed stream, but tap coordinates
+      // line up with the source frame, so binding to this.mediaStream works.
+      if (isOwnBroadcast && videoEl && this.mediaStream) {
+        bindTapToFocus(videoEl, this.mediaStream);
       }
 
       // Camera switch button (own broadcast only)

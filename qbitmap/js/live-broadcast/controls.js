@@ -1,6 +1,6 @@
 import { Logger } from '../utils.js';
 import { AuthSystem } from '../auth.js';
-import { applyAutofocus, saveCameraId } from '../video-message/media.js';
+import { initialFocus, saveCameraId } from '../video-message/media.js';
 
 const ControlsMixin = {
   // ==================== Camera Switch ====================
@@ -20,8 +20,7 @@ const ControlsMixin = {
       const videoBase = {
         width: { ideal: this.currentResolution.width },
         height: { ideal: this.currentResolution.height },
-        frameRate: { ideal: 24 },
-        focusMode: { ideal: 'continuous' }
+        frameRate: { ideal: 24 }
       };
 
       // Stop old video track first — some devices can't open two cameras at once
@@ -41,7 +40,7 @@ const ControlsMixin = {
           video: { ...videoBase, facingMode: { ideal: newMode } }, audio: false
         });
       }
-      applyAutofocus(newStream);
+      initialFocus(newStream);
 
       const newVideoTrack = newStream.getVideoTracks()[0];
 
@@ -270,12 +269,11 @@ const ControlsMixin = {
           width: { ideal: res.width },
           height: { ideal: res.height },
           frameRate: { ideal: 24 },
-          facingMode: { ideal: this.currentFacingMode },
-          focusMode: { ideal: 'continuous' }
+          facingMode: { ideal: this.currentFacingMode }
         },
         audio: false
       });
-      applyAutofocus(newStream);
+      initialFocus(newStream);
 
       const newVideoTrack = newStream.getVideoTracks()[0];
 
