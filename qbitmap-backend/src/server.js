@@ -349,6 +349,7 @@ async function buildServer() {
   await fastify.register(teslaRoutes, { prefix: '/auth' });
   await fastify.register(teslaApiRoutes, { prefix: '/api/tesla' });
   await fastify.register(teslaTelemetryRoutes, { prefix: '/api/tesla' });
+  await fastify.register(require('./routes/tesla-gallery'), { prefix: '/api/tesla' });
 
   // Register TeslaCAM routes (locally cached segments from car's Pi)
   await fastify.register(require('./routes/teslacam'), { prefix: '/api/teslacam' });

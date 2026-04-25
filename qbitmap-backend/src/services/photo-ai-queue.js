@@ -197,4 +197,4 @@ async function getStats() {
   return { pending: photo?.cnt || 0, activeCount };
 }
 
-module.exports = { enqueue, start, stop, getStats, setOnComplete };
+module.exports = { enqueue, start, stop, getStats, setOnComplete, downscaleForAi };

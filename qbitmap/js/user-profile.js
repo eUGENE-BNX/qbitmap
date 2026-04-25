@@ -365,6 +365,19 @@ const UserProfileSystem = {
           </button>
         </div>
 
+        <div class="profile-tesla-gallery" data-vehicle-id="${escapeHtml(vehicleId)}">
+          <span class="profile-tesla-gallery-label">GALERİ</span>
+          <div class="profile-tesla-gallery-slots" data-vehicle-id="${escapeHtml(vehicleId)}">
+            ${[0,1,2,3,4,5,6,7].map(i => `
+              <button type="button" class="profile-tesla-gallery-slot is-empty"
+                      data-vehicle-id="${escapeHtml(vehicleId)}" data-slot="${i}"
+                      aria-label="Fotoğraf ekle">
+                <span class="profile-tesla-gallery-plus">+</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
         <div class="profile-tesla-shares" data-vehicle-id="${escapeHtml(vehicleId)}">
           <div class="profile-tesla-shares-header">Paylaşılan Kişiler</div>
           <div class="profile-tesla-shares-hint">Araç gizliyken yalnızca siz ve aşağıdaki kişiler aracı haritada görür. Yakınlık uyarısı işaretli kişilerle 250m çapına girdiğinizde popup gösterilir.</div>
@@ -389,6 +402,43 @@ const UserProfileSystem = {
       this.renderTeslaShares(listEl, data.shares || []);
     } catch {
       listEl.textContent = 'Paylaşımlar yüklenemedi';
+    }
+  },
+
+  async loadTeslaGallery(vehicleId, slotsEl) {
+    if (!slotsEl) return;
+    try {
+      const res = await fetch(`${QBitmapConfig.api.base}/api/tesla/vehicles/${vehicleId}/photos`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      const bySlot = new Map();
+      for (const p of data.photos || []) bySlot.set(Number(p.slot), p);
+      const cacheBust = Date.now();
+
+      slotsEl.querySelectorAll('.profile-tesla-gallery-slot').forEach(slotEl => {
+        const slot = Number(slotEl.dataset.slot);
+        const photo = bySlot.get(slot);
+        if (photo) {
+          slotEl.classList.remove('is-empty');
+          slotEl.classList.add('is-filled');
+          slotEl.innerHTML = `
+            <img src="${escapeHtml(QBitmapConfig.api.base + photo.url)}?t=${cacheBust}" alt="" loading="lazy">
+            <button type="button" class="profile-tesla-gallery-del"
+                    data-vehicle-id="${escapeHtml(vehicleId)}" data-slot="${slot}"
+                    aria-label="Sil">×</button>
+          `;
+          slotEl.setAttribute('aria-label', `Slot ${slot + 1}`);
+        } else {
+          slotEl.classList.remove('is-filled');
+          slotEl.classList.add('is-empty');
+          slotEl.innerHTML = `<span class="profile-tesla-gallery-plus">+</span>`;
+          slotEl.setAttribute('aria-label', 'Fotoğraf ekle');
+        }
+      });
+    } catch (err) {
+      Logger.warn('[Profile] Gallery load failed', err);
     }
   },
 
@@ -644,6 +694,53 @@ const UserProfileSystem = {
         } catch {
           e.target.checked = !enabled;
           AuthSystem.showNotification('Uyarı ayarı kaydedilemedi', 'error');
+        }
+      });
+    });
+
+    // Tesla photo gallery — load + click delegation per vehicle
+    content.querySelectorAll('.profile-tesla-gallery').forEach(gallerySection => {
+      const vehicleId = gallerySection.dataset.vehicleId;
+      const slotsEl = gallerySection.querySelector('.profile-tesla-gallery-slots');
+      if (!slotsEl) return;
+
+      this.loadTeslaGallery(vehicleId, slotsEl);
+
+      slotsEl.addEventListener('click', async (ev) => {
+        const delBtn = ev.target.closest('.profile-tesla-gallery-del');
+        if (delBtn) {
+          ev.stopPropagation();
+          if (!confirm('Bu fotoğrafı silmek istediğinize emin misiniz?')) return;
+          const slot = delBtn.dataset.slot;
+          delBtn.disabled = true;
+          try {
+            const res = await fetch(
+              `${QBitmapConfig.api.base}/api/tesla/vehicles/${vehicleId}/photos/${slot}`,
+              { method: 'DELETE', credentials: 'include' }
+            );
+            if (!res.ok && res.status !== 204) throw new Error('http ' + res.status);
+            await this.loadTeslaGallery(vehicleId, slotsEl);
+          } catch {
+            AuthSystem.showNotification('Fotoğraf silinemedi', 'error');
+          } finally {
+            delBtn.disabled = false;
+          }
+          return;
+        }
+
+        const slotEl = ev.target.closest('.profile-tesla-gallery-slot');
+        if (!slotEl || !slotEl.classList.contains('is-empty')) return;
+
+        const slot = Number(slotEl.dataset.slot);
+        try {
+          const { captureTeslaPhoto } = await import('./user-profile/tesla-gallery-capture.js');
+          await captureTeslaPhoto({ vehicleId, slotIndex: slot });
+          await this.loadTeslaGallery(vehicleId, slotsEl);
+        } catch (e) {
+          if (e !== 'cancelled') {
+            Logger.warn('[Profile] Gallery capture failed', e);
+            AuthSystem.showNotification('Fotoğraf eklenemedi', 'error');
+          }
         }
       });
     });
