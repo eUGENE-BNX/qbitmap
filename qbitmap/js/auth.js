@@ -1,5 +1,5 @@
 import { QBitmapConfig } from './config.js';
-import { Logger, escapeHtml, showNotification } from './utils.js';
+import { Logger, escapeHtml, showNotification, onDomReady } from './utils.js';
 import { Analytics } from './analytics.js';
 
 /**
@@ -484,9 +484,7 @@ const AuthSystem = {
 };
 
 // Initialize on DOM ready
-document.addEventListener('DOMContentLoaded', () => {
-  AuthSystem.init();
-});
+onDomReady(() => AuthSystem.init());
 
 // Close dropdown when clicking outside
 document.addEventListener('click', (e) => {

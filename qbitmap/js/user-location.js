@@ -1,5 +1,5 @@
 import { QBitmapConfig } from './config.js';
-import { Logger, escapeHtml } from './utils.js';
+import { Logger, escapeHtml, onDomReady } from './utils.js';
 import { AuthSystem } from './auth.js';
 import { CameraSystem } from './camera-system/index.js';
 import * as AppState from './state.js';
@@ -706,8 +706,6 @@ const UserLocationSystem = {
 };
 
 // Initialize on DOM ready
-document.addEventListener('DOMContentLoaded', () => {
-    UserLocationSystem.init();
-});
+onDomReady(() => UserLocationSystem.init());
 
 export { UserLocationSystem };

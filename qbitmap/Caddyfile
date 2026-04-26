@@ -66,7 +66,7 @@ qbitmap.com {
 	# uses js/tesla-sei-decoder.js — a hand-rolled minimal reader. No
 	# other source or vendor in the bundle needs runtime code generation.
 	@notOffline not path /offline.html
-	header @notOffline Content-Security-Policy "default-src 'self'; script-src 'self' https://www.googletagmanager.com https://cdn.jsdelivr.net https://cdn.plyr.io https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.plyr.io; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' data: https://stream.qbitmap.com wss://stream.qbitmap.com https://h3.qbitmap.com https://static.qbitmap.com https://hls.qbitmap.com https://matcher.qbitwise.com https://www.google-analytics.com https://protomaps.github.io https://cdn.plyr.io https://static.cloudflareinsights.com https://cloudflareinsights.com; media-src 'self' blob: https://hls.qbitmap.com https://stream.qbitmap.com; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'"
+	header @notOffline Content-Security-Policy "default-src 'self'; script-src 'self' https://www.googletagmanager.com https://cdn.jsdelivr.net https://cdn.plyr.io https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.plyr.io; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' data: https://stream.qbitmap.com wss://stream.qbitmap.com https://h3.qbitmap.com https://static.qbitmap.com https://hls.qbitmap.com https://matcher.qbitwise.com https://www.google-analytics.com https://protomaps.github.io https://cdn.plyr.io https://static.cloudflareinsights.com https://cloudflareinsights.com; media-src 'self' blob: https://hls.qbitmap.com https://stream.qbitmap.com https://cdn.plyr.io; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'"
 
 	# Self-contained fallback: no user input, no API calls, no third-party
 	# content — inline <script> + onclick are safe here, and extracting
@@ -135,7 +135,13 @@ qbitmap.com {
 
 	@html path *.html /
 	header @html Cache-Control "no-cache, must-revalidate"
-	header @html Link "</vendor/maplibre-gl.css>; rel=preload; as=style, </vendor/maplibre-gl.js>; rel=preload; as=script, </vendor/basemaps.js>; rel=preload; as=script, <https://stream.qbitmap.com>; rel=preconnect; crossorigin, <https://hls.qbitmap.com>; rel=preconnect; crossorigin, <https://protomaps.github.io>; rel=preconnect; crossorigin"
+
+	# MapLibre/basemaps preload only on the map page. /admin and /status
+	# don't render a map, so shipping ~1.16 MB of vendor preload to them is
+	# pure waste. Map page uses the URL "/" or "/index.html" — admin/status
+	# are rewritten to /admin.html and /status.html in the handle blocks above.
+	@mapPages path / /index.html
+	header @mapPages Link "</vendor/maplibre-gl.css>; rel=preload; as=style, </vendor/maplibre-gl.js>; rel=preload; as=script, </vendor/basemaps.js>; rel=preload; as=script, <https://stream.qbitmap.com>; rel=preconnect; crossorigin, <https://hls.qbitmap.com>; rel=preconnect; crossorigin, <https://protomaps.github.io>; rel=preconnect; crossorigin"
 }
 
 # QBitmap Backend API Server

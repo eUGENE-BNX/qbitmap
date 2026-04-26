@@ -1,6 +1,6 @@
-import { viewTransition } from './utils.js';
+import { viewTransition, onDomReady } from './utils.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+onDomReady(() => {
     // ================= MODAL FONKSİYONLARI BAŞLANGIÇ =================
 
     // HTML elementlerini seç

@@ -196,4 +196,18 @@ function viewTransition(fn) {
   return document.startViewTransition(fn);
 }
 
-export { Logger, escapeHtml, escapeHtmlAllowFormat, sanitize, fetchWithTimeout, loadUserCameras, showNotification, TimerManager, viewTransition };
+/**
+ * Run `fn` once the DOM is ready. Safe against late registration: if
+ * DOMContentLoaded already fired (which happens when an upstream module
+ * uses top-level await — e.g. map.js awaiting loadMapLibre — and delays
+ * its importers' evaluation past the event), invokes `fn` synchronously.
+ */
+function onDomReady(fn) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fn, { once: true });
+  } else {
+    fn();
+  }
+}
+
+export { Logger, escapeHtml, escapeHtmlAllowFormat, sanitize, fetchWithTimeout, loadUserCameras, showNotification, TimerManager, viewTransition, onDomReady };

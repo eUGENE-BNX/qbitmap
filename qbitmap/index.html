@@ -17,13 +17,10 @@
   <!-- Google Analytics 4 (bootstrap lives in js/html-bootstrap.js so CSP can drop 'unsafe-inline') -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-5Y929W13D6"></script>
 
-  <!-- Core vendor libraries (maplibre + basemaps required at startup) -->
-  <script defer src="/vendor/maplibre-gl.js"></script>
-  <script defer src="/vendor/basemaps.js"></script>
-  <!-- hls, deck.gl, h3-js, protobuf loaded on demand via vendor-loader.js -->
-  <!-- Plyr Video Player (non-blocking: media="print" until html-bootstrap.js swaps it to "all") -->
-  <link rel="stylesheet" href="https://cdn.plyr.io/3.8.4/plyr.css" integrity="sha384-VqqE0KSv00qfHvKpRa8aov+g3xtUu2Rw0NsEmtjTOPGn/JDKVghgd56iw/VObHa7" crossorigin="anonymous" media="print" id="plyr-css">
-  <script async src="https://cdn.plyr.io/3.8.4/plyr.polyfilled.js" integrity="sha384-ZDYtn77N2Oxc6W8oilE9z73hj1EZqidVlQeqTwsKW19gglwyUYHMn/LzX+ewyFJD" crossorigin="anonymous"></script>
+  <!-- Vendor libraries (maplibre, basemaps, hls, deck.gl, h3-js, plyr) are
+       all loaded on demand via vendor-loader.js. The Caddy `Link rel=preload`
+       header on this route warms the browser cache for maplibre + basemaps
+       so map.js's dynamic load resolves immediately. -->
 </head>
 <body>
   <div id="map"></div>

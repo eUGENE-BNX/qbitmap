@@ -1,5 +1,6 @@
 import { QBitmapConfig } from '../config.js';
 import { Logger, escapeHtml, TimerManager } from '../utils.js';
+import { loadPlyr } from '../vendor-loader.js';
 
 /**
  * QBitmap Camera System - Recordings Modal Module
@@ -286,12 +287,22 @@ const RecordingsModalMixin = {
     videoEl.removeAttribute('src');
     videoEl.load();
 
+    // Lazy-load Plyr (CDN script + stylesheet) before binding to the video.
+    // First open pays the CDN handshake; subsequent opens hit the browser
+    // cache. Failure here just falls through to the native <video> controls.
+    try {
+      await loadPlyr();
+    } catch (err) {
+      Logger.warn('[Recordings] Plyr load failed, falling back to native controls:', err);
+    }
+
     // Set video source
     videoEl.src = videoUrl;
 
     // Wait for video to be ready before initializing Plyr
     videoEl.onloadedmetadata = () => {
       // Initialize Plyr after source is loaded
+      if (typeof Plyr === 'undefined') return;
       this.recordingsPlayer = new Plyr(videoEl, {
         controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'fullscreen'],
         hideControls: false,

@@ -1,5 +1,7 @@
+import '../vendor/maplibre-gl.css';
+import { loadMapLibre } from './vendor-loader.js';
 import { QBitmapConfig } from './config.js';
-import { Logger } from './utils.js';
+import { Logger, onDomReady } from './utils.js';
 import { Analytics } from './analytics.js';
 import { addLabels } from './labels.js';
 import { H3Grid } from './h3-grid.js';
@@ -7,6 +9,12 @@ import { H3TronTrails } from './h3-tron-trails.js';
 import { CameraSystem } from './camera-system/index.js';
 import { setMap, layers, satelliteMode, setSatelliteMode } from './state.js';
 import { LocationService } from './services/location-service.js';
+
+// Block module evaluation until maplibregl + basemaps globals exist.
+// Top-level await keeps HTML parse non-blocking (this is still an async
+// module); the Caddy `Link rel=preload` header on the / route warms the
+// browser cache so the dynamic script tags resolve almost instantly.
+await loadMapLibre();
 
 // [ARCH-10] Lazy-loaded module cache — replaces window.VehicleAnimation global
 let _VehicleAnimation = null;
@@ -463,7 +471,7 @@ let _videoMessagesVisible = true;
 let _photoMessagesVisible = true;
 
 // Logo click → fly to user's home location
-document.addEventListener('DOMContentLoaded', () => {
+onDomReady(() => {
     const logo = document.querySelector('.qbitmap-logo-control');
     if (logo) {
         logo.style.cursor = 'pointer';

@@ -3,12 +3,12 @@
  * Imports all modules in the correct order for the main map page
  */
 
-// Page bootstrap (window.gtag, Plyr CSS swap). Must run before anything
-// else touches those globals — keep it as the first import.
+// Page bootstrap (window.gtag). Must run before anything else touches
+// that global — keep it as the first import.
 import './html-bootstrap.js';
 
-// Core stylesheets (always needed)
-import '../vendor/maplibre-gl.css';
+// Core stylesheets (always needed). maplibre-gl.css is imported by
+// js/map.js so it lands in the map chunk alongside the maplibregl runtime.
 import '../css/base.css';
 import '../css/animations.css';
 import '../css/style.css';
@@ -33,6 +33,7 @@ import './auth.js';
 import './user-location.js';
 // Camera system (index.js imports all mixins)
 import { CameraSystem, startCameraSystem } from './camera-system/index.js';
+import { onDomReady } from './utils.js';
 
 // UI
 import './modal.js';
@@ -65,7 +66,8 @@ import('./services/upload-outbox-ui.js')
   .then((m) => m.initOutboxUI?.())
   .catch(() => {});
 
-// Start camera system after all modules are loaded
-document.addEventListener('DOMContentLoaded', () => {
-  startCameraSystem();
-});
+// Start camera system after all modules are loaded.
+// map.js uses top-level await for loadMapLibre(), which delays main.js's
+// evaluation past DOMContentLoaded — onDomReady handles the late-registration
+// race so startCameraSystem fires whether the event has already happened or not.
+onDomReady(() => startCameraSystem());
