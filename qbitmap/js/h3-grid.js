@@ -183,6 +183,12 @@ const H3Grid = {
       this._showLeaderboardBtn(true);
     } else {
       this._detachListeners();
+      // Cancel any in-flight ownership fetch so its response handler
+      // doesn't repopulate _ownershipMap after we just cleared it.
+      if (this._ownershipFetchController) {
+        this._ownershipFetchController.abort();
+        this._ownershipFetchController = null;
+      }
       if (this._overlay) this._overlay.setProps({ layers: [] });
       this._hexagonData = [];
       this._ownershipData = [];
@@ -587,25 +593,49 @@ const H3Grid = {
     if (!show) {
       this._leaderboardPanel.style.display = 'none';
       this._leaderboardVisible = false;
-      if (this._leaderboardInterval) {
-        clearInterval(this._leaderboardInterval);
-        this._leaderboardInterval = null;
-      }
+      this._stopLeaderboardPolling();
     }
   },
 
   _toggleLeaderboard() {
     this._leaderboardVisible = !this._leaderboardVisible;
     this._leaderboardPanel.style.display = this._leaderboardVisible ? 'block' : 'none';
-
     if (this._leaderboardVisible) {
-      this._fetchLeaderboard();
-      this._leaderboardInterval = setInterval(() => this._fetchLeaderboard(), 60000);
+      this._startLeaderboardPolling();
     } else {
-      if (this._leaderboardInterval) {
-        clearInterval(this._leaderboardInterval);
-        this._leaderboardInterval = null;
-      }
+      this._stopLeaderboardPolling();
+    }
+  },
+
+  _startLeaderboardPolling() {
+    this._fetchLeaderboard();
+    if (this._leaderboardInterval) clearInterval(this._leaderboardInterval);
+    // Skip the network round-trip while the tab is hidden — the user
+    // can't see the panel anyway, and modern browsers throttle hidden
+    // intervals so the timer barely costs anything.
+    this._leaderboardInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') this._fetchLeaderboard();
+    }, 60000);
+    // Catch up immediately when the tab returns to visible so the panel
+    // isn't stale up to a full minute after coming back.
+    if (!this._leaderboardVisHandler) {
+      this._leaderboardVisHandler = () => {
+        if (document.visibilityState === 'visible' && this._leaderboardVisible) {
+          this._fetchLeaderboard();
+        }
+      };
+      document.addEventListener('visibilitychange', this._leaderboardVisHandler);
+    }
+  },
+
+  _stopLeaderboardPolling() {
+    if (this._leaderboardInterval) {
+      clearInterval(this._leaderboardInterval);
+      this._leaderboardInterval = null;
+    }
+    if (this._leaderboardVisHandler) {
+      document.removeEventListener('visibilitychange', this._leaderboardVisHandler);
+      this._leaderboardVisHandler = null;
     }
   },
 

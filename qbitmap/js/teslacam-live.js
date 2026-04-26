@@ -142,13 +142,32 @@ var TeslaCamLive = {
   _startPolling: function() {
     if (this.pollIntervalId) return;
     var self = this;
-    this.pollIntervalId = setInterval(function() { self._poll(); }, this.POLL_INTERVAL);
+    this.pollIntervalId = setInterval(function() {
+      // Skip the round-trip while the tab is hidden — segment list
+      // refresh has no value if the user can't see the popup.
+      if (document.visibilityState !== 'visible') return;
+      self._poll();
+    }, this.POLL_INTERVAL);
+    // Catch up immediately when the tab returns to visible so the next
+    // segment isn't delayed by up to POLL_INTERVAL ms after coming back.
+    if (!this._visHandler) {
+      this._visHandler = function() {
+        if (document.visibilityState === 'visible' && self.pollIntervalId) {
+          self._poll();
+        }
+      };
+      document.addEventListener('visibilitychange', this._visHandler);
+    }
   },
 
   _stopPolling: function() {
     if (this.pollIntervalId) {
       clearInterval(this.pollIntervalId);
       this.pollIntervalId = null;
+    }
+    if (this._visHandler) {
+      document.removeEventListener('visibilitychange', this._visHandler);
+      this._visHandler = null;
     }
   },
 
