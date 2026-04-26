@@ -20,16 +20,16 @@
   ],
   "screenshots": [
     {
-      "src": "/icons/screenshot-mobile.png",
+      "src": "/icons/screenshot-mobile.webp",
       "sizes": "720x1440",
-      "type": "image/png",
+      "type": "image/webp",
       "form_factor": "narrow",
       "label": "Harita ve kamera popup'ı — mobil görünüm"
     },
     {
-      "src": "/icons/screenshot-desktop.png",
+      "src": "/icons/screenshot-desktop.webp",
       "sizes": "1920x1080",
-      "type": "image/png",
+      "type": "image/webp",
       "form_factor": "wide",
       "label": "Kamera ağı haritası — masaüstü görünüm"
     }

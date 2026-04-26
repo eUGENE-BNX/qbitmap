@@ -444,7 +444,7 @@ const H3TronTrails = {
     container.className = 'mesh-ad-container';
     container.innerHTML = `
       <button class="mesh-ad-close">&times;</button>
-      <img src="/swiss-choco-bits.png" class="mesh-ad-img" alt="Swiss Choco Bits" />
+      <img src="/swiss-choco-bits.webp" class="mesh-ad-img" alt="Swiss Choco Bits" />
       <div class="mesh-ad-text">
         <div class="mesh-ad-label">AI MESH DISCOVERY</div>
         <div class="mesh-ad-title">Firsat Bulundu!</div>
