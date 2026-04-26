@@ -299,6 +299,10 @@ const UserProfileSystem = {
         ` : ''}
         <div class="profile-tesla-header">
           <div class="profile-tesla-title">
+            <div>
+              <span class="profile-tesla-model">${model}</span>
+              ${color ? `<span class="profile-tesla-color"> · ${escapeHtml(color)}</span>` : ''}
+            </div>
             <div class="profile-tesla-plate-row" data-vehicle-id="${escapeHtml(vehicleId)}">
               ${licensePlate
                 ? `<span class="profile-tesla-plate">${escapeHtml(licensePlate)}</span>
@@ -310,10 +314,6 @@ const UserProfileSystem = {
                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                    </button>`
               }
-            </div>
-            <div>
-              <span class="profile-tesla-model">${model}</span>
-              ${color ? `<span class="profile-tesla-color"> · ${escapeHtml(color)}</span>` : ''}
             </div>
           </div>
           ${(() => { const u = getTeslaIconUrl(vehicle); return u

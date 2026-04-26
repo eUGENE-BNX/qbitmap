@@ -327,11 +327,11 @@
 }
 
 .profile-tesla-car-icon {
-  width: 113px;
-  height: 75px;
+  width: 141px;
+  height: 94px;
   object-fit: contain;
   flex-shrink: 0;
-  margin-top: -12px;
+  margin-top: -22px;
   margin-bottom: -8px;
 }
 
@@ -1022,8 +1022,8 @@
   }
 
   .profile-tesla-car-icon {
-    width: 95px;
-    height: 65px;
+    width: 119px;
+    height: 81px;
     display: block;
   }
 
