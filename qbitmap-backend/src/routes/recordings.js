@@ -15,6 +15,33 @@ const MAX_DISK_USAGE_GB = 10;
 // Auto-stop timers (in-memory, restored on startup from DB)
 const autoStopTimers = new Map(); // cameraId -> timerId
 
+// Poll MediaMTX until the named path reports ready with at least one
+// track, or the timeout elapses. Used for needs_remux paths where the
+// recording-start PATCH swaps source: rtsp → publisher and the runOnInit
+// ffmpeg child needs ~3-4s to spin up before WHEP can be served. Without
+// this wait, the frontend's WHEP reconnect attempt fires before the
+// publisher is up and 404s out.
+async function waitForPathReady(pathName, timeoutMs = 8000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${MEDIAMTX_API}/v3/paths/get/${pathName}`, {
+        signal: AbortSignal.timeout(2000)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ready && Array.isArray(data.tracks) && data.tracks.length > 0) {
+          return true;
+        }
+      }
+    } catch {
+      // ignore — MediaMTX briefly 404s the path during config reload
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return false;
+}
+
 async function recordingsRoutes(fastify, options) {
   // All routes require authentication
   fastify.addHook('preHandler', authHook);
@@ -84,10 +111,29 @@ async function recordingsRoutes(fastify, options) {
     try {
       // Enable recording via MediaMTX API
       // Disable sourceOnDemand to keep RTSP connection alive during recording
+      const patchBody = { record: true, sourceOnDemand: false };
+
+      // Cameras flagged needs_remux need an ffmpeg restream layer to
+      // scrub broken NAL access units before MediaMTX's fmp4 muxer
+      // touches them (e.g. Tapo C236 substream). Switch the path from
+      // direct RTSP to a publisher-mode source fed by a local ffmpeg
+      // child (-c copy + h264_mp4toannexb). On recording stop the path
+      // is switched back to direct RTSP so the ffmpeg shuts down and
+      // idle CPU returns to zero. WHEP live preview keeps working in
+      // both states (Chrome WebRTC tolerates the broken NAL that the
+      // MP4 demuxer can't).
+      if (camera.needs_remux && camera.rtsp_source_url) {
+        patchBody.source = 'publisher';
+        patchBody.runOnInit = `ffmpeg -hide_banner -loglevel warning -rtsp_transport tcp -i ${camera.rtsp_source_url} -c:v copy -c:a copy -bsf:v h264_mp4toannexb -f rtsp rtsp://localhost:8554/${pathName}`;
+        patchBody.runOnInitRestart = true;
+        // sourceOnDemand stays at false (init value) — required since
+        // source: publisher rejects sourceOnDemand: true.
+      }
+
       const response = await fetch(`${MEDIAMTX_API}/v3/config/paths/patch/${pathName}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ record: true, sourceOnDemand: false }),
+        body: JSON.stringify(patchBody),
         signal: AbortSignal.timeout(10000)
       });
 
@@ -95,6 +141,15 @@ async function recordingsRoutes(fastify, options) {
         const errorText = await response.text().catch(() => 'unknown');
         logger.error({ status: response.status, errorText, pathName }, 'MediaMTX API error');
         throw new Error(`MediaMTX API error: ${response.status} - ${errorText}`);
+      }
+
+      // For needs_remux paths the PATCH above swaps source: rtsp →
+      // publisher, which kicks any connected WHEP viewers and takes a
+      // few seconds to come back up via the runOnInit ffmpeg. Wait for
+      // the path to be ready before responding so the frontend's WHEP
+      // reconnect lands on a ready stream instead of 404ing.
+      if (camera.needs_remux) {
+        await waitForPathReady(pathName, 8000);
       }
 
       // Save to database (survives restart)
@@ -299,7 +354,7 @@ async function recordingsRoutes(fastify, options) {
 
     try {
       const response = await fetch(
-        `${MEDIAMTX_RECORDING_API}/delete?path=${encodeURIComponent(pathName)}&start=${encodeURIComponent(start)}`,
+        `${MEDIAMTX_RECORDING_API}/v3/recordings/deletesegment?path=${encodeURIComponent(pathName)}&start=${encodeURIComponent(start)}`,
         { method: 'DELETE', signal: AbortSignal.timeout(10000) }
       );
 
@@ -333,10 +388,24 @@ async function recordingsRoutes(fastify, options) {
 
     // Disable recording and restore sourceOnDemand via MediaMTX API
     try {
+      const patchBody = { record: false, sourceOnDemand: true };
+
+      // For needs_remux cameras: switch the path back from publisher
+      // mode to direct RTSP so the ffmpeg child shuts down (idle CPU = 0).
+      // Looking the camera up here so the helper stays callable from
+      // the auto-stop timer where the camera object isn't in scope.
+      const camera = await db.getCameraByDeviceId(cameraId);
+      if (camera?.needs_remux && camera.rtsp_source_url) {
+        patchBody.source = camera.rtsp_source_url;
+        patchBody.sourceProtocol = 'tcp';
+        patchBody.runOnInit = '';
+        patchBody.runOnInitRestart = false;
+      }
+
       await fetch(`${MEDIAMTX_API}/v3/config/paths/patch/${pathName}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ record: false, sourceOnDemand: true }),
+        body: JSON.stringify(patchBody),
         signal: AbortSignal.timeout(10000)
       });
     } catch (err) {

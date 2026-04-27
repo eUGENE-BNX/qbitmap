@@ -94,6 +94,21 @@ pathDefaults:
 # Cameras are added from qbitmap-backend
 ###############################################
 paths:
+  # Office 04 (Tapo C236) — substream H.264 High profile produces broken
+  # NAL access units in MediaMTX's fmp4 muxer (recording playback shows
+  # "missing picture in access unit" / "no frame!"). Idle state below is
+  # the original direct-RTSP config; live WHEP works fine because Chrome
+  # WebRTC tolerates broken NAL where the MP4 demuxer doesn't.
+  # Backend (cameras.needs_remux=1) switches the path to source: publisher
+  # + runOnInit ffmpeg ... -bsf:v h264_mp4toannexb on recording start,
+  # and switches it back on recording stop. ffmpeg only runs while
+  # recording is active.
+  cam_1_mo8fjaf2_60b73dbc22a9ae99:
+    source: rtsp://qbitc236:c236c236@212.253.82.220:13554/stream2
+    sourceProtocol: tcp
+    sourceOnDemand: true
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 60s
 
 ###############################################
 # Authentication

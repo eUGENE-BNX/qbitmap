@@ -10,7 +10,7 @@ const logger = require('../../utils/logger').child({ module: 'db-cameras' });
 // them keeps the row payload small — alarm_trigger_names in particular is
 // a TEXT column that can grow arbitrarily. Admin-side flows that need
 // every column should build a bespoke query.
-const CAMERA_COLS = 'id, device_id, user_id, name, lng, lat, is_public, camera_type, whep_url, voice_call_enabled, mediamtx_path, onvif_camera_id, rtsp_source_url, audio_muted, created_at';
+const CAMERA_COLS = 'id, device_id, user_id, name, lng, lat, is_public, camera_type, whep_url, voice_call_enabled, mediamtx_path, onvif_camera_id, rtsp_source_url, audio_muted, needs_remux, created_at';
 
 module.exports = function(DatabaseService) {
 

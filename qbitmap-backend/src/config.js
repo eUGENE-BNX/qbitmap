@@ -85,7 +85,7 @@ module.exports = {
       mediamtxWhepBase: process.env.MEDIAMTX_WHEP_BASE || `http://${mtxHost}:8889`,
       mediamtxHlsBase: process.env.MEDIAMTX_HLS_BASE || 'https://hls.qbitmap.com',
       mediamtxPlayback: process.env.MEDIAMTX_PLAYBACK || `http://${mtxHost}:9996`,
-      mediamtxRecordingApi: process.env.MEDIAMTX_RECORDING_API || `http://${mtxHost}:9999`,
+      mediamtxRecordingApi: process.env.MEDIAMTX_RECORDING_API || `http://${mtxHost}:9997`,
       mediamtxServer: process.env.MEDIAMTX_SERVER || mtxHost,
       onvifServiceUrl: process.env.ONVIF_SERVICE_URL || `http://${mtxHost}:3003`,
       captureServiceUrl: process.env.CAPTURE_SERVICE_URL || `http://${mtxHost}:3002`,
