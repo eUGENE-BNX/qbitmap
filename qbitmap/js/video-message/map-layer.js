@@ -6,13 +6,7 @@ import { buildMessagePopupProps } from './props.js';
 
 const MapLayerMixin = {
   initMapLayer() {
-    if (AppState.map && AppState.map.isStyleLoaded()) {
-      this.addVideoMessageLayer(AppState.map);
-    } else if (AppState.map) {
-      AppState.map.on('load', () => this.addVideoMessageLayer(AppState.map));
-    } else {
-      setTimeout(() => this.initMapLayer(), 500);
-    }
+    AppState.mapReady.then(map => this.addVideoMessageLayer(map));
   },
 
   addVideoMessageLayer(map) {
@@ -356,57 +350,12 @@ const MapLayerMixin = {
 
     if (!msg) return;
 
-    // Wait for map to be ready, then fly to location and open popup
-    const openMsg = () => {
-      AppState.map.flyTo({ center: [msg.lng, msg.lat], zoom: Math.max(AppState.map.getZoom(), 16) });
+    AppState.mapReady.then(map => {
+      map.flyTo({ center: [msg.lng, msg.lat], zoom: Math.max(map.getZoom(), 16) });
       setTimeout(() => {
         this.openMessagePopup(buildMessagePopupProps(msg), [msg.lng, msg.lat]);
       }, 1500);
-    };
-
-    if (AppState.map && AppState.map.isStyleLoaded()) {
-      openMsg();
-    } else if (AppState.map) {
-      AppState.map.on('load', openMsg);
-    } else {
-      // Map not yet created, wait for it.
-      //
-      // [PERF-08] Store both timer ids on `this` so we can:
-      //   (a) cancel an in-flight wait if handleDeepLink is re-entered
-      //       before the previous one resolved (otherwise we'd stack up
-      //       independent intervals with no way to stop the old ones);
-      //   (b) clear the 10s fallback setTimeout the instant the interval
-      //       wins — the original code never did this, so a 10s ghost
-      //       setTimeout would sit in the event loop for the full
-      //       duration even after openMsg had already fired;
-      //   (c) be cancellable from an external teardown path in the
-      //       future (no caller does this today, but storing the ids is
-      //       a precondition).
-      this._cancelDeepLinkMapWait();
-      this._deepLinkMapWaitInterval = setInterval(() => {
-        if (AppState.map && AppState.map.isStyleLoaded()) {
-          this._cancelDeepLinkMapWait();
-          openMsg();
-        }
-      }, 500);
-      this._deepLinkMapWaitTimeout = setTimeout(() => {
-        this._cancelDeepLinkMapWait();
-        Logger.warn('[VideoMessage] Deep link: map never became ready within 10s, giving up');
-      }, 10000);
-    }
-  },
-
-  // [PERF-08] Clear the handleDeepLink() poll + fallback timer together.
-  // Safe to call from any state — unset/cleared timers are no-ops.
-  _cancelDeepLinkMapWait() {
-    if (this._deepLinkMapWaitInterval) {
-      clearInterval(this._deepLinkMapWaitInterval);
-      this._deepLinkMapWaitInterval = null;
-    }
-    if (this._deepLinkMapWaitTimeout) {
-      clearTimeout(this._deepLinkMapWaitTimeout);
-      this._deepLinkMapWaitTimeout = null;
-    }
+    });
   },
 };
 

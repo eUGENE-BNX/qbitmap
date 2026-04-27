@@ -3,16 +3,10 @@ import * as AppState from '../state.js';
 
 const MapLayerMixin = {
   /**
-   * Initialize map layer (retry until map is ready)
+   * Initialize map layer once the map style is ready.
    */
   initMapLayer() {
-    if (AppState.map && AppState.map.isStyleLoaded()) {
-      this.addBroadcastLayer(AppState.map);
-    } else if (AppState.map) {
-      AppState.map.on('load', () => this.addBroadcastLayer(AppState.map));
-    } else {
-      setTimeout(() => this.initMapLayer(), 500);
-    }
+    AppState.mapReady.then(map => this.addBroadcastLayer(map));
   },
 
   /**
