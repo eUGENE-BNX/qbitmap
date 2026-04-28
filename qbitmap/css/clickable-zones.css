@@ -293,22 +293,6 @@
   stroke: transparent !important;
 }
 
-/* But show feedback even when hidden */
-.zones-overlay.zones-hidden .zone-polygon.zone-pending {
-  fill: rgba(255, 255, 0, 0.3) !important;
-  stroke: rgba(255, 255, 0, 0.6) !important;
-}
-
-.zones-overlay.zones-hidden .zone-polygon.zone-success {
-  fill: rgba(0, 255, 0, 0.4) !important;
-  stroke: rgba(0, 255, 0, 0.8) !important;
-}
-
-.zones-overlay.zones-hidden .zone-polygon.zone-error {
-  fill: rgba(118, 185, 0, 0.4) !important;
-  stroke: rgba(118, 185, 0, 0.8) !important;
-}
-
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-5px); }
