@@ -84,11 +84,19 @@ async function buildServer() {
   // Routes that already set httpOnly/secure/sameSite explicitly stay
   // unchanged; these defaults act as a backstop against accidentally
   // shipping a cookie without one of the flags.
+  //
+  // sameSite=lax (not strict) because @fastify/oauth2 sets a CSRF
+  // state cookie via these defaults, and the Google OAuth callback
+  // is a top-level navigation back from accounts.google.com. Strict
+  // would refuse to send the state cookie on that hop, breaking
+  // login. Auth-token cookies in routes/auth.js getCookieOptions()
+  // explicitly override to strict, where it's safe (login already
+  // happened, exchange POST is same-site).
   await fastify.register(cookie, {
     parseOptions: {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict',
+      sameSite: 'lax',
       path: '/'
     }
   });
