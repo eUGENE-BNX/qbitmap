@@ -440,7 +440,7 @@ async function teslaApiRoutes(fastify) {
           GpsHeading: { interval_seconds: 15 },
           Gear: { interval_seconds: 15 },
           BatteryLevel: { interval_seconds: 600 },
-          EstBatteryRange: { interval_seconds: 600 },
+          RatedRange: { interval_seconds: 600 },
           InsideTemp: { interval_seconds: 600 },
           OutsideTemp: { interval_seconds: 600 },
           Locked: { interval_seconds: 600 },
