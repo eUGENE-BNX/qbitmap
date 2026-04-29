@@ -27,7 +27,7 @@
     "fastify": "^5.2.2",
     "jsonwebtoken": "^9.0.2",
     "lru-cache": "^11.3.3",
-    "mysql2": "^3.11.0",
+    "mysql2": "^3.22.3",
     "node-cron": "^4.2.1",
     "pino-pretty": "^13.1.2",
     "prom-client": "^15.1.3",
