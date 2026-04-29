@@ -248,6 +248,11 @@ async function buildServer() {
   // Wait for MySQL connection pool and seed data
   await db.ensureReady();
 
+  // Audit log (records auth/admin/mutating requests to MySQL audit_log
+  // table). Registered after db.ensureReady so the audit_log migration
+  // is guaranteed to have run before the first onResponse fires.
+  await fastify.register(require('./plugins/audit-log'));
+
   // Liveness + readiness probe. Previously this always returned 200 even
   // when MySQL was down or the WS server never initialized — probes were
   // useless for detecting real outages. Now:
