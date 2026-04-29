@@ -273,17 +273,40 @@ async function recordingsRoutes(fastify, options) {
    * Stream/download a recording
    * Query params: start, duration, format (optional, default: fmp4)
    */
-  fastify.get('/:cameraId/get', async (request, reply) => {
+  fastify.get('/:cameraId/get', {
+    schema: {
+      // Tight schema on the playback params: `start` must be an
+      // RFC3339 timestamp (the same format MediaMTX returns from
+      // /list), `duration` is a positive integer up to 4 hours, and
+      // `download` / `format` are restricted to known values. Anything
+      // else is rejected with 400 before the camera-access lookup runs.
+      params: {
+        type: 'object',
+        required: ['cameraId'],
+        properties: { cameraId: { type: 'string', pattern: '^[0-9]+$' } }
+      },
+      querystring: {
+        type: 'object',
+        required: ['start'],
+        properties: {
+          start: {
+            type: 'string',
+            pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:?\\d{2})$',
+            maxLength: 40
+          },
+          duration: { type: 'string', pattern: '^\\d+(?:\\.\\d+)?s?$', maxLength: 16 },
+          download: { type: 'string', enum: ['true', 'false'] },
+          format: { type: 'string', enum: ['mp4', 'fmp4'] }
+        }
+      }
+    }
+  }, async (request, reply) => {
     const { cameraId } = request.params;
     const { start, duration } = request.query;
     const { valid, error, camera } = await checkCameraAccess(request.user.userId, cameraId);
 
     if (!valid) {
       return reply.code(403).send({ error });
-    }
-
-    if (!start) {
-      return reply.code(400).send({ error: 'start parameter is required' });
     }
 
     const pathName = camera.whep_url?.match(/\/([^\/]+)\/whep/i)?.[1] || cameraId;
@@ -335,19 +358,34 @@ async function recordingsRoutes(fastify, options) {
   /**
    * DELETE /api/recordings/:cameraId/delete
    * Delete a specific recording
-   * Query params: start (ISO timestamp)
+   * Query params: start (RFC3339 timestamp)
    */
-  fastify.delete('/:cameraId/delete', async (request, reply) => {
+  fastify.delete('/:cameraId/delete', {
+    schema: {
+      params: {
+        type: 'object',
+        required: ['cameraId'],
+        properties: { cameraId: { type: 'string', pattern: '^[0-9]+$' } }
+      },
+      querystring: {
+        type: 'object',
+        required: ['start'],
+        properties: {
+          start: {
+            type: 'string',
+            pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:?\\d{2})$',
+            maxLength: 40
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
     const { cameraId } = request.params;
     const { start } = request.query;
     const { valid, error, camera } = await checkCameraAccess(request.user.userId, cameraId);
 
     if (!valid) {
       return reply.code(403).send({ error });
-    }
-
-    if (!start) {
-      return reply.code(400).send({ error: 'start parameter is required' });
     }
 
     const pathName = camera.whep_url?.match(/\/([^\/]+)\/whep/i)?.[1] || cameraId;
