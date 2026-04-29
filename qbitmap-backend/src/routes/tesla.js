@@ -9,6 +9,41 @@ const logger = require('../utils/logger').child({ module: 'tesla' });
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Lazy backfill of static vehicle_config (trim_badging, etc.) for vehicles
+// missed by the initial sync. Runs from the telemetry webhook when the
+// vehicle is awake (telemetry is flowing). Per-VIN cooldown prevents
+// hammering Tesla on every Location event when the vehicle is asleep but
+// MQTT is still draining buffered messages.
+const trimBackfillCooldown = new Map();
+const TRIM_BACKFILL_COOLDOWN_MS = 30 * 60 * 1000;
+
+async function backfillVehicleConfig(vehicle) {
+  try {
+    const tokens = await db.getTeslaTokensByAccountId(vehicle.tesla_account_id);
+    if (!tokens || new Date(tokens.expires_at) < new Date()) return;
+    const accessToken = decrypt(tokens.access_token);
+    const url = `${config.tesla.apiBase}/api/1/vehicles/${vehicle.vehicle_id}/vehicle_data?endpoints=vehicle_config`;
+    const res = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${accessToken}` } }, 15000);
+    if (!res.ok) return; // 408 = asleep — try again next cooldown window
+    const vc = (await res.json()).response?.vehicle_config;
+    if (!vc?.trim_badging) return;
+    await db.upsertTeslaVehicle({
+      teslaAccountId: vehicle.tesla_account_id,
+      vehicleId: vehicle.vehicle_id,
+      vin: vehicle.vin,
+      displayName: vehicle.display_name,
+      model: vehicle.model,
+      carType: vc.car_type || null,
+      color: vc.exterior_color || null,
+      wheelType: vc.wheel_type || null,
+      trimBadging: vc.trim_badging,
+    });
+    logger.info({ vin: vehicle.vin, trim: vc.trim_badging }, 'trim backfilled');
+  } catch (err) {
+    logger.warn({ err: err.message, vin: vehicle.vin }, 'trim backfill error');
+  }
+}
+
 // PKCE state storage (short-lived, in-memory)
 const pendingStates = new Map();
 const STATE_TTL = 10 * 60 * 1000; // 10 minutes
@@ -516,6 +551,13 @@ async function teslaTelemetryRoutes(fastify) {
     // Broadcast via WebSocket if available
     const vehicle = await db.getTeslaVehicleByVin(vin);
     if (vehicle) {
+      if (vehicle.trim_badging == null) {
+        const last = trimBackfillCooldown.get(vin) || 0;
+        if (Date.now() - last > TRIM_BACKFILL_COOLDOWN_MS) {
+          trimBackfillCooldown.set(vin, Date.now());
+          backfillVehicleConfig(vehicle);
+        }
+      }
       const wsService = require('../services/websocket');
       const effectiveLat = lat ?? vehicle.last_lat;
       const effectiveLng = lng ?? vehicle.last_lng;
