@@ -65,15 +65,17 @@ DatabaseService.prototype.getExpiringTeslaTokens = async function(minutesBefore 
   return rows;
 };
 
-DatabaseService.prototype.upsertTeslaVehicle = async function({ teslaAccountId, vehicleId, vin, displayName, model, carType, color, wheelType, carVersion, odometer }) {
+DatabaseService.prototype.upsertTeslaVehicle = async function({ teslaAccountId, vehicleId, vin, displayName, model, carType, color, wheelType, trimBadging, carVersion, odometer }) {
   await this.pool.execute(
-    `INSERT INTO tesla_vehicles (tesla_account_id, vehicle_id, vin, display_name, model, car_type, color, wheel_type, car_version, odometer)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO tesla_vehicles (tesla_account_id, vehicle_id, vin, display_name, model, car_type, color, wheel_type, trim_badging, car_version, odometer)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), model = VALUES(model),
        car_type = COALESCE(VALUES(car_type), car_type), color = COALESCE(VALUES(color), color),
-       wheel_type = COALESCE(VALUES(wheel_type), wheel_type), car_version = COALESCE(VALUES(car_version), car_version),
+       wheel_type = COALESCE(VALUES(wheel_type), wheel_type),
+       trim_badging = COALESCE(VALUES(trim_badging), trim_badging),
+       car_version = COALESCE(VALUES(car_version), car_version),
        odometer = COALESCE(VALUES(odometer), odometer), updated_at = NOW()`,
-    [teslaAccountId, vehicleId, vin, displayName ?? vin, model ?? null, carType ?? null, color ?? null, wheelType ?? null, carVersion ?? null, odometer ?? null]
+    [teslaAccountId, vehicleId, vin, displayName ?? vin, model ?? null, carType ?? null, color ?? null, wheelType ?? null, trimBadging ?? null, carVersion ?? null, odometer ?? null]
   );
 };
 

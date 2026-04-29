@@ -4,6 +4,7 @@ const { verifyTokenWithVersion } = require('../utils/jwt');
 const config = require('../config');
 const logger = require('../utils/logger').child({ module: 'websocket' });
 const cookie = require('cookie');
+const { formatModel } = require('../utils/tesla-trim');
 
 // Allow-list of origins permitted to open /ws/cameras. Browser WS handshakes
 // always send Origin; non-browser callers (there are none — WS is frontend-
@@ -689,7 +690,8 @@ class WebSocketService {
       vin: v.vin,
       vehicleId: v.vehicle_id,
       displayName: v.display_name,
-      model: v.model,
+      model: formatModel(v.model, v.trim_badging),
+      trimBadging: v.trim_badging || null,
       lat: v.last_lat,
       lng: v.last_lng,
       soc: v.last_soc,

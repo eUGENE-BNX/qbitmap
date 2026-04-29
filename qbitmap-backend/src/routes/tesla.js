@@ -4,6 +4,7 @@ const db = require('../services/database');
 const { authHook, extractToken, verifyToken } = require('../utils/jwt');
 const { encrypt, decrypt } = require('../utils/encryption');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
+const { formatModel } = require('../utils/tesla-trim');
 const logger = require('../utils/logger').child({ module: 'tesla' });
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -233,7 +234,8 @@ async function teslaApiRoutes(fastify) {
         vehicleId: v.vehicle_id,
         vin: v.vin,
         displayName: v.display_name,
-        model: v.model,
+        model: formatModel(v.model, v.trim_badging),
+        trimBadging: v.trim_badging || null,
         color: v.color,
         lat: v.last_lat,
         lng: v.last_lng,
@@ -604,6 +606,7 @@ async function syncTeslaVehicles(teslaAccountId, accessToken, apiBase) {
             carType: vc?.car_type || null,
             color: vc?.exterior_color || null,
             wheelType: vc?.wheel_type || null,
+            trimBadging: vc?.trim_badging || null,
             carVersion: vs?.car_version || null,
             // Tesla returns odometer in miles — store as km
             odometer: vs?.odometer != null ? vs.odometer * 1.60934 : null,
