@@ -46,6 +46,21 @@
   color: #1a1a1a;
 }
 
+/* Initials (e.g. "AO" for "Alp Özdemir") — default gizli, sadece landscape phone'da görünür */
+.camera-popup-title .camera-id-initials {
+  display: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a1a;
+  background: #f0f0f0;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.5px;
+}
+
 .camera-popup-title .camera-time {
   font-size: 11px;
   color: #888;
@@ -825,6 +840,10 @@
 
 /* Mobile: smaller camera popups */
 @media (max-width: 768px) {
+  .camera-popup-content {
+    zoom: 0.7;
+  }
+
   .camera-frame-container {
     width: 216px;
     height: 122px;
@@ -954,6 +973,43 @@
 
   .settings-form .form-group-h label {
     min-width: unset;
+  }
+}
+
+/* Landscape phones (width > 700px ama yatay telefon): header gereksiz butonlar yüzünden
+   geniş kalıyor, video sabit kalınca sağda boş alan oluşuyor. Çözüm: portrait mobile gibi
+   ekstra butonları gizle, header daralsın → gap kapansın. Video küçük sabit kalsın. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .camera-popup-content {
+    zoom: 0.7;
+  }
+
+  /* Uzun ismi initials ile değiştir (Alp Özdemir → AO) */
+  .camera-popup-title .camera-id {
+    display: none;
+  }
+  .camera-popup-title .camera-id-initials {
+    display: inline-flex;
+  }
+
+  .camera-frame-container.camera-frame-container.zoom-0:not(.portrait) {
+    width: 280px;
+    height: 158px;
+    aspect-ratio: 16 / 9;
+  }
+
+  .camera-popup-buttons .draw-zone-btn,
+  .camera-popup-buttons .toggle-zones-btn,
+  .camera-popup-buttons .ai-search-btn,
+  .camera-popup-buttons .ai-active-btn,
+  .camera-popup-buttons .ai-btn,
+  .camera-popup-buttons .search-btn,
+  .camera-popup-buttons .mjpeg-btn,
+  .camera-popup-buttons .settings-btn,
+  .camera-popup-buttons .broadcast-switch-cam-btn,
+  .camera-popup-buttons .broadcast-ai-btn,
+  .camera-popup-buttons .broadcast-face-btn {
+    display: none !important;
   }
 }
 

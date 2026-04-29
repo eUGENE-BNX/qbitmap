@@ -45,6 +45,15 @@ const PopupCoreMixin = {
    */
   getPopupHTML(camera) {
     const displayName = escapeHtml(camera.name || camera.device_id);
+    const initials = escapeHtml(
+      (camera.name || camera.device_id || '')
+        .trim()
+        .split(/\s+/)
+        .map(s => s[0] || '')
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    );
     const isCity = camera.camera_type === 'city';
     const dataType = isCity ? 'city' : 'whep';
 
@@ -77,6 +86,7 @@ const PopupCoreMixin = {
             <div class="camera-popup-title">
               <div class="camera-title-line1">
                 <span class="camera-id">${displayName}</span>
+                <span class="camera-id-initials" title="${displayName}">${initials}</span>
               </div>
               <div class="camera-title-line2">
                 <span class="live-badge"><b>LIVE</b></span>
