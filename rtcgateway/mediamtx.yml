@@ -55,8 +55,15 @@ webrtcAdditionalHosts: [91.98.90.57]
 hls: yes
 hlsAddress: :8888
 hlsEncryption: no
-hlsAllowOrigins: ['*']
-hlsTrustedProxies: []
+# Lock CORS to qbitmap origins. The HLS port (8888) is already
+# unreachable from the public internet thanks to Hetzner Cloud FW
+# (S1-only) + Caddy hls.qbitmap.com proxy, so this is the third
+# layer — browsers calling the playlist directly with another
+# Origin header will be denied at the muxer level. MediaMTX 1.18
+# expects this as a comma-separated string on a singular key
+# (hlsAllowOrigin), not an array on hlsAllowOrigins.
+hlsAllowOrigin: "https://qbitmap.com,https://stream.qbitmap.com,https://hls.qbitmap.com"
+hlsTrustedProxies: [91.99.219.248]
 hlsVariant: lowLatency
 hlsSegmentCount: 10
 hlsSegmentDuration: 1s
