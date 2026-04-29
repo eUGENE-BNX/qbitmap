@@ -33,8 +33,25 @@
 	}
 }
 
+# JSON access log for fail2ban — failregex matches "client_ip" + 4xx burst.
+# `client_ip` is populated by the global client_ip_headers directive
+# (CF-Connecting-IP), so banned IPs are real visitors, not CF edges.
+# Path is /var/lib/caddy/logs so it works under the default systemd
+# ReadWritePaths sandbox without needing a unit override.
+(access_log) {
+	log {
+		output file /var/lib/caddy/logs/access.log {
+			roll_size 100mb
+			roll_keep 5
+			roll_keep_for 720h
+		}
+		format json
+	}
+}
+
 qbitmap.com {
 	import cf_aop
+	import access_log
 	handle /status {
 		rewrite * /status.html
 		file_server
@@ -182,6 +199,7 @@ qbitmap.com {
 # QBitmap Backend API Server
 stream.qbitmap.com {
 	import cf_aop
+	import access_log
 
 	# Disable HTTP/3 upgrade via Alt-Svc header
 	header Alt-Svc "clear"
@@ -221,6 +239,7 @@ stream.qbitmap.com {
 # QBitmap H3 Grid Service
 h3.qbitmap.com {
 	import cf_aop
+	import access_log
 	reverse_proxy 46.224.128.93:3100
 	encode gzip zstd
 }
@@ -228,6 +247,7 @@ h3.qbitmap.com {
 # QBitmap HLS Streaming (CDN origin)
 hls.qbitmap.com {
 	import cf_aop
+	import access_log
 
 	# City camera pre-recorded clips (static files from clip scheduler)
 	handle /clips/* {
