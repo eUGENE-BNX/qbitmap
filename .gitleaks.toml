@@ -1,0 +1,27 @@
+# gitleaks config for QBitmap. Inherits the upstream default ruleset
+# (covers AWS/GCP/Azure keys, generic high-entropy strings, JWT, etc.)
+# and layers project-specific allowlist entries below for known false
+# positives — never broaden allowlists for real production secrets.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "QBitmap allowlist — test fixtures + non-secret config"
+
+paths = [
+  '''node_modules/.*''',
+  '''.*\.test\.js$''',
+  '''.*/tests/unit/.*''',
+  '''.*\.example$''',
+  '''\.env\.example$''',
+  '''package-lock\.json$''',
+]
+
+regexes = [
+  # Stub Tesla telemetry payloads in fixture files
+  '''00000000-0000-0000-0000-000000000000''',
+  # VAPID public key is intentionally exposed via /api/push/vapid-public-key
+  '''VAPID_PUBLIC_KEY''',
+  # Cloudflare-published origin pull CA cert
+  '''cf-aop-ca\.pem''',
+]

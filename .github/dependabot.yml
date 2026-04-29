@@ -1,0 +1,53 @@
+version: 2
+updates:
+  # Frontend (vanilla JS + Vite + Workbox)
+  - package-ecosystem: "npm"
+    directory: "/qbitmap"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "frontend"
+
+  # Fastify backend
+  - package-ecosystem: "npm"
+    directory: "/qbitmap-backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "backend"
+
+  # H3 grid service
+  - package-ecosystem: "npm"
+    directory: "/h3-service"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "h3-service"
+
+  # MediaMTX gateway (image pin in docker-compose.yml)
+  - package-ecosystem: "docker"
+    directory: "/rtcgateway"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "deps"
+      - "rtcgateway"
+
+  # GitHub Actions versions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "deps"
+      - "ci"

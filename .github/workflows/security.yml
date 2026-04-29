@@ -1,0 +1,69 @@
+name: Security
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly Monday 04:00 UTC — picks up new CVEs even when no PRs land
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  npm-audit:
+    name: npm audit (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: [qbitmap, qbitmap-backend, h3-service]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: npm audit (high+critical only)
+        working-directory: ${{ matrix.dir }}
+        # `--audit-level=high` fails the job on high or critical CVEs.
+        # `--omit=dev` ignores dev-only deps (test/build runners can carry
+        # vulns that don't ship to production). Lockfile may not exist
+        # for every directory; fall through gracefully.
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm audit --audit-level=high --omit=dev
+          else
+            echo "no lockfile in ${{ matrix.dir }} — skipping"
+          fi
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          config-path: .gitleaks.toml
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: javascript-typescript
