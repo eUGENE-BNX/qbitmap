@@ -32,6 +32,18 @@ async function adminRoutes(fastify, options) {
     }
   });
 
+  // Inject a default per-IP rate limit on every admin route. Cloudflare
+  // already enforces 30/min on /api/admin/*, but a compromised CF token
+  // or a future routing change could bypass the edge — keep this layer
+  // here as defense in depth. Routes that need a different limit can
+  // still override by setting their own `config.rateLimit`.
+  fastify.addHook('onRoute', (routeOptions) => {
+    if (!routeOptions.config) routeOptions.config = {};
+    if (!routeOptions.config.rateLimit) {
+      routeOptions.config.rateLimit = { max: 30, timeWindow: '1 minute' };
+    }
+  });
+
   // [ARCH-07] Register route groups
   await require('./users')(fastify);
   await require('./cameras')(fastify);

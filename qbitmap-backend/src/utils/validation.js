@@ -36,6 +36,21 @@ const linkCameraSchema = z.object({
   templateId: z.number().int().positive().optional()
 });
 
+// Recursive depth check — pathological deeply-nested objects can blow
+// the stack inside the JSON serializer or downstream consumers, so cap
+// nesting before we serialize/store it. 10 levels is plenty for ONVIF
+// payloads (which are mostly flat) and rules out worst-case attacks.
+function _objectDepth(value, current = 0) {
+  if (current > 12) return current; // bail early
+  if (value === null || typeof value !== 'object') return current;
+  let max = current;
+  for (const v of Object.values(value)) {
+    const d = _objectDepth(v, current + 1);
+    if (d > max) max = d;
+  }
+  return max;
+}
+
 const webhookEventSchema = z.object({
   onvifCameraId: z.string().min(1).max(100),
   eventType: z.string().min(1).max(100),
@@ -44,6 +59,9 @@ const webhookEventSchema = z.object({
 }).refine(
   (data) => !data.eventData || JSON.stringify(data.eventData).length < 10000,
   { message: 'eventData too large (max 10KB)' }
+).refine(
+  (data) => !data.eventData || _objectDepth(data.eventData) <= 10,
+  { message: 'eventData nesting too deep (max 10 levels)' }
 );
 
 // ==================== RTSP CAMERA SCHEMAS ====================

@@ -463,7 +463,21 @@ async function publicRoutes(fastify, options) {
    * Get MediaMTX metrics for a specific stream path
    * Returns viewer count and bandwidth information
    */
-  fastify.get('/mediamtx/metrics/:path', async (request, reply) => {
+  fastify.get('/mediamtx/metrics/:path', {
+    schema: {
+      // MediaMTX path names are camera-system generated and follow a
+      // strict ABCDEFabcdef0-9_ pattern (e.g. cam_1_mo8fjaf2_60b73dbc...).
+      // Reject anything else outright so attacker-controlled values
+      // never reach the MediaMTX admin API or get logged.
+      params: {
+        type: 'object',
+        required: ['path'],
+        properties: {
+          path: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,128}$' }
+        }
+      }
+    }
+  }, async (request, reply) => {
     const { path } = request.params;
 
     try {
