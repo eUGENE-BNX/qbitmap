@@ -39,17 +39,83 @@ async function fetchWithTimeout(url, options = {}, timeout = 30000, retries = 0)
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
 
+  // If the caller already passed a signal (e.g. from a LifecycleScope),
+  // wire it through so aborting their controller cancels the inner fetch
+  // too. AbortSignal.any composes — falls back to caller's signal alone
+  // if browser doesn't support it (very rare on PWA-capable engines).
+  let signal = controller.signal;
+  if (options.signal) {
+    signal = AbortSignal.any
+      ? AbortSignal.any([controller.signal, options.signal])
+      : options.signal;
+  }
+
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { ...options, signal });
     clearTimeout(id);
+
+    // Honor 429 Retry-After when retries are available — exponential
+    // backoff would also be valid, but Retry-After is the explicit
+    // server hint when our Cloudflare rate-limit kicks in.
+    if (response.status === 429 && retries > 0) {
+      const retryAfter = parseInt(response.headers.get('Retry-After') || '1', 10);
+      const waitMs = Math.min(Math.max(retryAfter * 1000, 1000), 10000);
+      Logger.warn(`[Fetch] 429 rate-limited, waiting ${waitMs}ms before retry (${retries} left)`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      return fetchWithTimeout(url, options, timeout, retries - 1);
+    }
+
     return response;
   } catch (error) {
     clearTimeout(id);
-    if (retries > 0 && error.name === 'AbortError') {
+    if (retries > 0 && error.name === 'AbortError' && !options.signal?.aborted) {
       Logger.warn(`[Fetch] Timeout, retrying... (${retries} left)`);
       return fetchWithTimeout(url, options, timeout, retries - 1);
     }
     throw error;
+  }
+}
+
+/**
+ * AbortController-backed lifecycle scope. Wraps event listeners and
+ * fetches in a single signal so destroying the scope cancels every
+ * pending request and removes every bound listener at once. Designed
+ * for popup / modal / temporary-component lifecycles where forgetting
+ * a removeEventListener call leaks the closure (and often the entire
+ * DOM subtree) on every open/close cycle.
+ *
+ * Usage:
+ *   const scope = new LifecycleScope();
+ *   scope.on(window, 'resize', handleResize);
+ *   scope.on(button, 'click', handleClick);
+ *   const r = await scope.fetch('/api/x');
+ *   ...
+ *   scope.destroy(); // listeners auto-removed via signal, fetch aborted
+ */
+class LifecycleScope {
+  constructor() {
+    this._controller = new AbortController();
+  }
+
+  on(target, event, handler, options = {}) {
+    if (this._controller.signal.aborted) return;
+    target.addEventListener(event, handler, { ...options, signal: this._controller.signal });
+  }
+
+  fetch(url, init = {}, timeout = 30000, retries = 0) {
+    return fetchWithTimeout(url, { ...init, signal: this._controller.signal }, timeout, retries);
+  }
+
+  get signal() {
+    return this._controller.signal;
+  }
+
+  get aborted() {
+    return this._controller.signal.aborted;
+  }
+
+  destroy() {
+    if (!this._controller.signal.aborted) this._controller.abort();
   }
 }
 
