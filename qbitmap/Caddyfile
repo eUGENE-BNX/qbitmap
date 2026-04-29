@@ -16,7 +16,25 @@
 	}
 }
 
+# Cloudflare Authenticated Origin Pulls — require & verify CF edge cert.
+# Combined with Hetzner Cloud Firewall (Phase 2) restricting :443 to CF
+# IP ranges, this gives defense-in-depth: even if a CF IP got exposed,
+# only Cloudflare-signed clients reach the origin TLS layer. CF root
+# cert is fetched from developers.cloudflare.com and pinned at
+# /etc/caddy/cf-aop-ca.pem on each Caddy host.
+(cf_aop) {
+	tls {
+		client_auth {
+			mode require_and_verify
+			trust_pool file {
+				pem_file /etc/caddy/cf-aop-ca.pem
+			}
+		}
+	}
+}
+
 qbitmap.com {
+	import cf_aop
 	handle /status {
 		rewrite * /status.html
 		file_server
@@ -163,6 +181,8 @@ qbitmap.com {
 
 # QBitmap Backend API Server
 stream.qbitmap.com {
+	import cf_aop
+
 	# Disable HTTP/3 upgrade via Alt-Svc header
 	header Alt-Svc "clear"
 
@@ -200,12 +220,15 @@ stream.qbitmap.com {
 
 # QBitmap H3 Grid Service
 h3.qbitmap.com {
+	import cf_aop
 	reverse_proxy 46.224.128.93:3100
 	encode gzip zstd
 }
 
 # QBitmap HLS Streaming (CDN origin)
 hls.qbitmap.com {
+	import cf_aop
+
 	# City camera pre-recorded clips (static files from clip scheduler)
 	handle /clips/* {
 		uri strip_prefix /clips
