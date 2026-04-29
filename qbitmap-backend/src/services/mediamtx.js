@@ -74,11 +74,47 @@ async function isBlockedHost(host) {
 }
 
 /**
+ * Wrap a single MediaMTX HTTP call with retries on transient failures.
+ * Retries network errors (timeout, ECONNREFUSED) and 5xx responses with
+ * exponential backoff (1s, 5s, 10s). Does NOT retry 4xx — those are
+ * client errors and would just fail again with the same payload. The
+ * 10s per-request timeout is preserved on every attempt.
+ */
+async function _retryFetch(url, init, { attempts = 3, baseDelayMs = 1000 } = {}) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const response = await fetch(url, init);
+      // 5xx — server temporarily unwell, retry. 4xx — client error,
+      // hand back to caller (idempotent "already exists" handling
+      // happens upstream).
+      if (response.status >= 500 && response.status < 600 && i < attempts - 1) {
+        const delay = baseDelayMs * Math.pow(5, i); // 1s, 5s
+        logger.warn({ url, status: response.status, attempt: i + 1, delay }, 'MediaMTX 5xx, retrying');
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      return response;
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        const delay = baseDelayMs * Math.pow(5, i);
+        logger.warn({ url, err: err.message, attempt: i + 1, delay }, 'MediaMTX fetch failed, retrying');
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr || new Error('All retries failed');
+}
+
+/**
  * Add a new path (camera stream) to MediaMTX
  * @param {string} pathName - Unique path name for the stream
  * @param {string} rtspUrl - Full RTSP URL with credentials
  * @param {object} options - Additional options
- * @returns {Promise<{success: boolean, error?: string}>}
+ * @returns {Promise<{success: boolean, error?: string, warning?: string}>}
  */
 async function addPath(pathName, rtspUrl, options = {}) {
   try {
@@ -98,7 +134,7 @@ async function addPath(pathName, rtspUrl, options = {}) {
       ...options
     };
 
-    const response = await fetch(`${MEDIAMTX_API}/v3/config/paths/add/${pathName}`, {
+    const response = await _retryFetch(`${MEDIAMTX_API}/v3/config/paths/add/${pathName}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
@@ -107,13 +143,15 @@ async function addPath(pathName, rtspUrl, options = {}) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error({ pathName, status: response.status, error: errorText }, 'Failed to add path to MediaMTX');
 
-      // Check if path already exists
+      // Idempotent: a concurrent add or a leftover path is a success
+      // case — the caller wanted the path to exist, and it does.
       if (response.status === 400 && errorText.includes('already exists')) {
-        return { success: false, error: 'Path already exists', code: 'PATH_EXISTS' };
+        logger.info({ pathName }, 'MediaMTX path already exists (idempotent add)');
+        return { success: true, warning: 'Path already exists' };
       }
 
+      logger.error({ pathName, status: response.status, error: errorText }, 'Failed to add path to MediaMTX');
       return { success: false, error: `MediaMTX error: ${response.status}` };
     }
 
@@ -145,7 +183,7 @@ async function addRtmpPath(pathName, options = {}) {
       ...options
     };
 
-    const response = await fetch(`${MEDIAMTX_API}/v3/config/paths/add/${pathName}`, {
+    const response = await _retryFetch(`${MEDIAMTX_API}/v3/config/paths/add/${pathName}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
@@ -154,12 +192,13 @@ async function addRtmpPath(pathName, options = {}) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error({ pathName, status: response.status, error: errorText }, 'Failed to add RTMP path to MediaMTX');
 
       if (response.status === 400 && errorText.includes('already exists')) {
+        logger.info({ pathName }, 'MediaMTX RTMP path already exists (idempotent add)');
         return { success: true, warning: 'Path already exists' };
       }
 
+      logger.error({ pathName, status: response.status, error: errorText }, 'Failed to add RTMP path to MediaMTX');
       return { success: false, error: `MediaMTX error: ${response.status}` };
     }
 
@@ -255,7 +294,7 @@ async function addHlsPath(pathName, hlsUrl, options = {}) {
       ...options
     };
 
-    const response = await fetch(`${MEDIAMTX_API}/v3/config/paths/add/${pathName}`, {
+    const response = await _retryFetch(`${MEDIAMTX_API}/v3/config/paths/add/${pathName}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
@@ -264,12 +303,13 @@ async function addHlsPath(pathName, hlsUrl, options = {}) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error({ pathName, status: response.status, error: errorText }, 'Failed to add HLS path to MediaMTX');
 
       if (response.status === 400 && errorText.includes('already exists')) {
-        return { success: false, error: 'Path already exists', code: 'PATH_EXISTS' };
+        logger.info({ pathName }, 'MediaMTX HLS path already exists (idempotent add)');
+        return { success: true, warning: 'Path already exists' };
       }
 
+      logger.error({ pathName, status: response.status, error: errorText }, 'Failed to add HLS path to MediaMTX');
       return { success: false, error: `MediaMTX error: ${response.status}` };
     }
 
