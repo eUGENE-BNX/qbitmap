@@ -283,7 +283,9 @@ async function recordingsRoutes(fastify, options) {
       params: {
         type: 'object',
         required: ['cameraId'],
-        properties: { cameraId: { type: 'string', pattern: '^[0-9]+$' } }
+        // cameraId can be numeric ("1") or alphanumeric ("RTSP_MO8FJAOCLNIN").
+        // Camera-system path slugs include letters, digits, underscores.
+        properties: { cameraId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,64}$' } }
       },
       querystring: {
         type: 'object',
@@ -365,7 +367,9 @@ async function recordingsRoutes(fastify, options) {
       params: {
         type: 'object',
         required: ['cameraId'],
-        properties: { cameraId: { type: 'string', pattern: '^[0-9]+$' } }
+        // cameraId can be numeric ("1") or alphanumeric ("RTSP_MO8FJAOCLNIN").
+        // Camera-system path slugs include letters, digits, underscores.
+        properties: { cameraId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,64}$' } }
       },
       querystring: {
         type: 'object',
