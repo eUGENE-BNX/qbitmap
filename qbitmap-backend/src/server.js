@@ -43,7 +43,12 @@ async function buildServer() {
           }
         },
     bodyLimit: 20 * 1024 * 1024,
-    trustProxy: '127.0.0.1',
+    // Caddy runs on the same host (localhost:3000 upstream). Caddy already
+    // resolves the real client IP via Cloudflare trust + client_ip_headers
+    // and writes it into X-Forwarded-For, so trusting only loopback gives
+    // the backend the visitor IP without exposure to spoofed XFF headers
+    // from anywhere else.
+    trustProxy: ['127.0.0.1', '::1'],
     disableRequestLogging: isProduction,
     // UUID-based reqId (Fastify's default is a per-process counter that
     // collides across workers / restarts). Honor a well-formed incoming
