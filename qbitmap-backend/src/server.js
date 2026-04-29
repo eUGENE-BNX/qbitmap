@@ -79,27 +79,14 @@ async function buildServer() {
   // owns the route. Labels use the route template — see metrics.js.
   metrics.registerHttpHooks(fastify);
 
-  // parseOptions are applied as defaults whenever a route calls
-  // reply.setCookie(name, value) without an explicit options object.
-  // Routes that already set httpOnly/secure/sameSite explicitly stay
-  // unchanged; these defaults act as a backstop against accidentally
-  // shipping a cookie without one of the flags.
-  //
-  // sameSite=lax (not strict) because @fastify/oauth2 sets a CSRF
-  // state cookie via these defaults, and the Google OAuth callback
-  // is a top-level navigation back from accounts.google.com. Strict
-  // would refuse to send the state cookie on that hop, breaking
-  // login. Auth-token cookies in routes/auth.js getCookieOptions()
-  // explicitly override to strict, where it's safe (login already
-  // happened, exchange POST is same-site).
-  await fastify.register(cookie, {
-    parseOptions: {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
-      path: '/'
-    }
-  });
+  // [Phase 6a was reverted] parseOptions backstop removed — even with
+  // sameSite='lax' the @fastify/oauth2 state cookie was still failing
+  // its check on the Google callback hop, breaking login. All current
+  // routes that setCookie() explicitly pass their own options
+  // (auth.js getCookieOptions returns httpOnly+secure+strict), so the
+  // backstop wasn't actually adding security; it was just stepping on
+  // the OAuth plugin's own cookie defaults.
+  await fastify.register(cookie);
 
   // GZIP/Deflate compression for responses > 1KB
   await fastify.register(compress, {
