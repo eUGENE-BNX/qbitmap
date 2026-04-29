@@ -10,6 +10,7 @@ const crypto = require('node:crypto');
 const { randomUUID } = crypto;
 const config = require('./config');
 const logger = require('./utils/logger');
+const { REDACT_PATHS, REDACT_CENSOR } = require('./utils/logger');
 const metrics = require('./services/metrics');
 
 // Accept upstream X-Request-Id only if it looks sane — keeps attacker-
@@ -31,9 +32,13 @@ const isProduction = process.env.NODE_ENV === 'production';
 async function buildServer() {
   const fastify = Fastify({
     logger: isProduction
-      ? { level: 'info' }
+      ? {
+          level: 'info',
+          redact: { paths: REDACT_PATHS, censor: REDACT_CENSOR }
+        }
       : {
           level: 'info',
+          redact: { paths: REDACT_PATHS, censor: REDACT_CENSOR },
           transport: {
             target: 'pino-pretty',
             options: {
@@ -74,7 +79,19 @@ async function buildServer() {
   // owns the route. Labels use the route template — see metrics.js.
   metrics.registerHttpHooks(fastify);
 
-  await fastify.register(cookie);
+  // parseOptions are applied as defaults whenever a route calls
+  // reply.setCookie(name, value) without an explicit options object.
+  // Routes that already set httpOnly/secure/sameSite explicitly stay
+  // unchanged; these defaults act as a backstop against accidentally
+  // shipping a cookie without one of the flags.
+  await fastify.register(cookie, {
+    parseOptions: {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'strict',
+      path: '/'
+    }
+  });
 
   // GZIP/Deflate compression for responses > 1KB
   await fastify.register(compress, {

@@ -28,6 +28,34 @@ function enterRequestId(reqId) {
   requestIdStore.enterWith(reqId);
 }
 
+// Shared redact rules — applied to both this logger and the Fastify
+// request logger in server.js. Anything carrying credentials, session
+// tokens or password material is replaced with [REDACTED] before pino
+// serializes the record. Nested wildcards catch the same fields under
+// arbitrary keys (e.g. err.cause.token, body.user.password).
+const REDACT_PATHS = [
+  'req.headers.authorization',
+  'req.headers.cookie',
+  'req.headers["x-api-key"]',
+  'res.headers["set-cookie"]',
+  'headers.authorization',
+  'headers.cookie',
+  'body.password',
+  'body.token',
+  'body.refreshToken',
+  'body.access_token',
+  'body.refresh_token',
+  'body.client_secret',
+  '*.password',
+  '*.token',
+  '*.refreshToken',
+  '*.access_token',
+  '*.refresh_token',
+  '*.client_secret',
+  '*.authorization',
+];
+const REDACT_CENSOR = '[REDACTED]';
+
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
   // Mixin fires on every log write and its output is merged into the record.
@@ -37,6 +65,7 @@ const logger = pino({
     const reqId = requestIdStore.getStore();
     return reqId ? { reqId } : {};
   },
+  redact: { paths: REDACT_PATHS, censor: REDACT_CENSOR },
   ...(isProduction
     ? {
         formatters: {
@@ -60,3 +89,5 @@ logger.getRequestId = getRequestId;
 logger.enterRequestId = enterRequestId;
 
 module.exports = logger;
+module.exports.REDACT_PATHS = REDACT_PATHS;
+module.exports.REDACT_CENSOR = REDACT_CENSOR;
