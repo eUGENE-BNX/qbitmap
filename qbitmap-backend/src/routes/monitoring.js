@@ -241,7 +241,7 @@ async function monitoringRoutes(fastify, options) {
             id: a.id,
             deviceId: a.device_id,
             cameraName: a.name,
-            data: JSON.parse(a.alarm_data),
+            data: a.alarm_data,
             triggeredAt: a.triggered_at
           }))
         };
@@ -254,7 +254,7 @@ async function monitoringRoutes(fastify, options) {
           id: a.id,
           deviceId: a.device_id,
           cameraName: a.name,
-          data: JSON.parse(a.alarm_data),
+          data: a.alarm_data,
           triggeredAt: a.triggered_at
         })),
         pagination: result.pagination
@@ -296,7 +296,7 @@ async function monitoringRoutes(fastify, options) {
           deviceId,
           alarms: alarms.map(a => ({
             id: a.id,
-            data: JSON.parse(a.alarm_data),
+            data: a.alarm_data,
             triggeredAt: a.triggered_at,
             clearedAt: a.cleared_at,
             acknowledged: !!a.acknowledged
@@ -310,7 +310,7 @@ async function monitoringRoutes(fastify, options) {
         deviceId,
         alarms: result.items.map(a => ({
           id: a.id,
-          data: JSON.parse(a.alarm_data),
+          data: a.alarm_data,
           triggeredAt: a.triggered_at,
           clearedAt: a.cleared_at,
           acknowledged: !!a.acknowledged

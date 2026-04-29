@@ -443,7 +443,7 @@ class WebSocketService {
             id: a.id,
             deviceId: a.device_id,
             cameraName: a.name,
-            data: JSON.parse(a.alarm_data),
+            data: a.alarm_data,
             triggeredAt: a.triggered_at
           })),
           broadcasts: activeBroadcasts,
