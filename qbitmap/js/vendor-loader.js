@@ -4,11 +4,15 @@
  */
 const _cache = {};
 
-export function loadScript(url) {
+export function loadScript(url, { integrity } = {}) {
   if (_cache[url]) return _cache[url];
   _cache[url] = new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = url;
+    if (integrity) {
+      s.integrity = integrity;
+      s.crossOrigin = 'anonymous';
+    }
     s.onload = resolve;
     s.onerror = () => reject(new Error(`Failed to load ${url}`));
     document.head.appendChild(s);
@@ -16,12 +20,16 @@ export function loadScript(url) {
   return _cache[url];
 }
 
-function loadStylesheet(url) {
+function loadStylesheet(url, { integrity } = {}) {
   if (_cache[url]) return _cache[url];
   _cache[url] = new Promise((resolve, reject) => {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = url;
+    if (integrity) {
+      link.integrity = integrity;
+      link.crossOrigin = 'anonymous';
+    }
     link.onload = resolve;
     link.onerror = () => reject(new Error(`Failed to load ${url}`));
     document.head.appendChild(link);
@@ -48,12 +56,20 @@ export async function loadMapLibre() {
   await loadScript('/vendor/basemaps.js');
 }
 
+// Plyr 3.8.4 SRI hashes — recompute with
+//   curl -sS https://cdn.plyr.io/3.8.4/plyr.polyfilled.js | openssl dgst -sha384 -binary | openssl base64 -A
+// when bumping the version. SRI ensures a CDN compromise can't ship
+// a substituted plyr.polyfilled.js to our visitors; the browser
+// rejects the script outright if the bytes don't match.
+const PLYR_JS_INTEGRITY  = 'sha384-ZDYtn77N2Oxc6W8oilE9z73hj1EZqidVlQeqTwsKW19gglwyUYHMn/LzX+ewyFJD';
+const PLYR_CSS_INTEGRITY = 'sha384-VqqE0KSv00qfHvKpRa8aov+g3xtUu2Rw0NsEmtjTOPGn/JDKVghgd56iw/VObHa7';
+
 export async function loadPlyr() {
   if (typeof Plyr !== 'undefined') return;
   // Load script + stylesheet in parallel; both are required before instantiating Plyr.
   await Promise.all([
-    loadScript('https://cdn.plyr.io/3.8.4/plyr.polyfilled.js'),
-    loadStylesheet('https://cdn.plyr.io/3.8.4/plyr.css'),
+    loadScript('https://cdn.plyr.io/3.8.4/plyr.polyfilled.js', { integrity: PLYR_JS_INTEGRITY }),
+    loadStylesheet('https://cdn.plyr.io/3.8.4/plyr.css', { integrity: PLYR_CSS_INTEGRITY }),
   ]);
 }
 
