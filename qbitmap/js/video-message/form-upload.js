@@ -239,7 +239,7 @@ const FormUploadMixin = {
 
       resultsEl.innerHTML = (data.users || []).map(u => `
         <div class="video-msg-recipient-item" data-id="${u.id}" data-email="${esc(u.email)}" data-name="${esc(u.display_name)}">
-          <img src="${esc(u.avatar_url || '')}" alt="" onerror="this.style.display='none'">
+          <img src="${esc(u.avatar_url || '')}" alt="" data-onerror="hide">
           <div>
             <div class="name">${esc(u.display_name)}</div>
             <div class="email">${esc(u.email)}</div>

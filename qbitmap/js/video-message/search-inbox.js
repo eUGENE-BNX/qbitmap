@@ -74,7 +74,7 @@ const SearchInboxMixin = {
         ${messages.length === 0 ? '<div class="video-msg-inbox-empty">Henüz video mesajınız yok</div>' :
           messages.map(m => `
             <div class="video-msg-inbox-item ${m.is_read ? '' : 'unread'}" data-message-id="${esc(m.message_id)}" data-lng="${m.lng}" data-lat="${m.lat}">
-              <img src="${esc(m.sender_avatar || '')}" alt="" onerror="this.style.display='none'">
+              <img src="${esc(m.sender_avatar || '')}" alt="" data-onerror="hide">
               <div class="video-msg-inbox-item-info">
                 <div class="video-msg-inbox-item-name">${esc(m.sender_name || 'Kullanıcı')}</div>
                 <div class="video-msg-inbox-item-time">${esc(this.formatTimeAgo(m.created_at))}</div>
@@ -302,7 +302,7 @@ const SearchInboxMixin = {
                data-lng="${m.lng}" data-lat="${m.lat}">
             <div class="vmsg-search-thumb">
               ${thumbUrl
-                ? `<img src="${thumbUrl}" alt="" loading="lazy" onerror="this.parentElement.classList.add('no-thumb')">`
+                ? `<img src="${thumbUrl}" alt="" loading="lazy" data-onerror="parent-class" data-onerror-class="no-thumb">`
                 : '<div class="vmsg-search-thumb-placeholder"><svg width="20" height="16" viewBox="0 0 36 28"><rect x="1" y="2" width="24" height="24" rx="4" fill="#e67e22"/><polygon points="28,8 35,4 35,24 28,20" fill="#e67e22"/></svg></div>'}
             </div>
             <div class="vmsg-search-info">

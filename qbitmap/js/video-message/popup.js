@@ -113,7 +113,7 @@ const PopupMixin = {
     const html = `
       <div class="video-msg-popup" data-message-id="${esc(messageId)}">
         <div class="video-msg-popup-header">
-          <img class="video-msg-popup-avatar" src="${esc(senderAvatar)}" alt="" onerror="this.style.display='none'">
+          <img class="video-msg-popup-avatar" src="${esc(senderAvatar)}" alt="" data-onerror="hide">
           <div class="video-msg-popup-sender">
             <div class="video-msg-popup-name">
               ${esc(senderName)}

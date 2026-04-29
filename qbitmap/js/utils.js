@@ -54,6 +54,33 @@ async function fetchWithTimeout(url, options = {}, timeout = 30000, retries = 0)
 }
 
 /**
+ * Document-level <img> error handler delegator. Inline `onerror="..."`
+ * attributes are blocked by our strict CSP (script-src 'self'), so the
+ * browser silently ignores them. Templates instead emit
+ *   <img data-onerror="hide">
+ * or
+ *   <img data-onerror="parent-class" data-onerror-class="no-thumb">
+ * and this single capture-phase listener handles every load failure.
+ * Error events don't bubble, so {capture: true} is required to catch
+ * them at the document level.
+ */
+function _initImgErrorDelegator() {
+  document.addEventListener('error', (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLImageElement)) return;
+    const action = target.dataset.onerror;
+    if (!action) return;
+    if (action === 'hide') {
+      target.style.display = 'none';
+    } else if (action === 'parent-class') {
+      const cls = target.dataset.onerrorClass;
+      if (cls && target.parentElement) target.parentElement.classList.add(cls);
+    }
+  }, true);
+}
+if (typeof document !== 'undefined') _initImgErrorDelegator();
+
+/**
  * Timer Manager - Centralized timer management to prevent memory leaks
  * Usage:
  *   TimerManager.setInterval('ai-monitor-cam1', callback, 3000);
