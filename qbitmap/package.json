@@ -10,7 +10,7 @@
     "test": "node --test tests/unit/*.test.js"
   },
   "devDependencies": {
-    "vite": "^8.0.2",
+    "vite": "^8.0.10",
     "vite-plugin-pwa": "^0.21.1",
     "workbox-cacheable-response": "^7.3.0",
     "workbox-expiration": "^7.3.0",
