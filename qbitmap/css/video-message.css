@@ -2720,3 +2720,31 @@
   .vmsg-photo-overlay-prev { left: 8px; }
   .vmsg-photo-overlay-next { right: 8px; }
 }
+
+/* ============================================
+   Spiderfy markers (cluster fan-out for overlapping messages)
+   Outer .vmsg-spiderfy-marker is positioned via maplibregl.Marker's own
+   translate3d transform — never set transform on it. Animate the inner
+   wrapper instead.
+   ============================================ */
+.vmsg-spiderfy-marker {
+  cursor: pointer;
+}
+.vmsg-spiderfy-marker-inner {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+  opacity: 0;
+  transform: scale(0.4);
+  transform-origin: center center;
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: opacity, transform;
+}
+.vmsg-spiderfy-marker--in .vmsg-spiderfy-marker-inner {
+  opacity: 1;
+  transform: scale(1);
+}
+.vmsg-spiderfy-marker:hover .vmsg-spiderfy-marker-inner {
+  transform: scale(1.12);
+}
+.vmsg-spiderfy-marker-inner svg {
+  display: block;
+}

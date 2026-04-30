@@ -3,6 +3,7 @@ import { Logger, escapeHtml } from "../utils.js";
 import { AuthSystem } from "../auth.js";
 import * as AppState from '../state.js';
 import { buildMessagePopupProps } from './props.js';
+import { Spiderfy } from './spiderfy.js';
 
 const MapLayerMixin = {
   initMapLayer() {
@@ -25,12 +26,18 @@ const MapLayerMixin = {
         const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 
         // ---- Video messages source & layers ----
+        // clusterMaxZoom extended to 22 + tighter radius (35px) so
+        // genuinely-overlapping markers (e.g. two cafe tables) cluster
+        // even at the highest zoom and can be spiderfied. Source maxzoom
+        // must be strictly greater than clusterMaxZoom (default is 18,
+        // which silently breaks supercluster's index).
         map.addSource('video-messages', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
           cluster: true,
-          clusterMaxZoom: 17,
-          clusterRadius: 60
+          clusterMaxZoom: 22,
+          clusterRadius: 35,
+          maxzoom: 24
         });
 
         map.addLayer({
@@ -88,8 +95,9 @@ const MapLayerMixin = {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
           cluster: true,
-          clusterMaxZoom: 17,
-          clusterRadius: 60
+          clusterMaxZoom: 22,
+          clusterRadius: 35,
+          maxzoom: 24
         });
 
         map.addLayer({
@@ -143,15 +151,15 @@ const MapLayerMixin = {
           }
         });
 
+        // ---- Spiderfy setup (handles overlap when zoom-to-expand can't
+        // separate the cluster, e.g. two messages from the same cafe table) ----
+        Spiderfy.setup(map, this);
+
         // ---- Event handlers for video layers ----
         map.on('click', 'video-message-clusters', (e) => {
-          const features = map.queryRenderedFeatures(e.point, { layers: ['video-message-clusters'] });
-          if (!features.length) return;
-          const clusterId = features[0].properties.cluster_id;
-          map.getSource('video-messages').getClusterExpansionZoom(clusterId, (err, zoom) => {
-            if (err) return;
-            map.easeTo({ center: features[0].geometry.coordinates, zoom });
-          });
+          const f = e.features && e.features[0];
+          if (!f) return;
+          Spiderfy.tryHandleClusterClick(map, 'video-messages', f.properties.cluster_id, f.geometry.coordinates);
         });
 
         map.on('click', 'video-messages', (e) => {
@@ -161,13 +169,9 @@ const MapLayerMixin = {
 
         // ---- Event handlers for photo layers ----
         map.on('click', 'photo-message-clusters', (e) => {
-          const features = map.queryRenderedFeatures(e.point, { layers: ['photo-message-clusters'] });
-          if (!features.length) return;
-          const clusterId = features[0].properties.cluster_id;
-          map.getSource('photo-messages').getClusterExpansionZoom(clusterId, (err, zoom) => {
-            if (err) return;
-            map.easeTo({ center: features[0].geometry.coordinates, zoom });
-          });
+          const f = e.features && e.features[0];
+          if (!f) return;
+          Spiderfy.tryHandleClusterClick(map, 'photo-messages', f.properties.cluster_id, f.geometry.coordinates);
         });
 
         map.on('click', 'photo-messages', (e) => {
