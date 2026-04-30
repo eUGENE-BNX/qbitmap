@@ -278,6 +278,31 @@
   margin-left: auto;
 }
 
+/* Mobile: detach from vehicle marker and center on screen so the popup
+   never falls off the viewport on small displays. We override MapLibre's
+   inline transform (which positions popups relative to map coords) with
+   a fixed-position transform — the tip is hidden since there's no longer
+   a meaningful anchor. */
+@media (max-width: 768px) {
+  .maplibregl-popup.tesla-vehicle-popup {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    max-width: calc(100vw - 24px) !important;
+    z-index: 100;
+  }
+
+  .tesla-vehicle-popup .maplibregl-popup-tip {
+    display: none;
+  }
+
+  .tesla-vehicle-popup .maplibregl-popup-content {
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+  }
+}
+
 /* Keep logo-t class for virtual key modal */
 .tesla-popup-logo-t {
   display: inline-flex;
