@@ -17,7 +17,11 @@ const H3Grid = {
   _enabled: false,
   _currentResolution: null,
   _debounceTimer: null,
-  _hexagonData: [],
+  // Estimated cell count in the padded viewport at the current resolution.
+  // TRON trails uses this as a "viewport too large → bail" gate. We never
+  // need the actual cell IDs (no layer renders the full grid), so we don't
+  // materialize the array — saves a polygonToCells call per viewport change.
+  _hexagonCount: 0,
   _ownershipData: [],
   _ownershipMap: null,
   _fogRingData: [],
@@ -196,7 +200,7 @@ const H3Grid = {
         this._ownershipFetchController = null;
       }
       if (this._overlay) this._overlay.setProps({ layers: [] });
-      this._hexagonData = [];
+      this._hexagonCount = 0;
       this._ownershipData = [];
       this._ownershipMap = null;
       this._fogRingData = [];
@@ -251,7 +255,7 @@ const H3Grid = {
     // zoom-in past the threshold forces a fresh compute instead of being
     // short-circuited by the PERF-06 fast-path against stale bounds.
     if (zoom < this.MIN_HEX_ZOOM) {
-      this._hexagonData = [];
+      this._hexagonCount = 0;
       this._ownershipData = [];
       this._ownershipMap = null;
       this._fogRingData = [];
@@ -263,7 +267,7 @@ const H3Grid = {
       }
       this._renderLayer();
       if (H3TronTrails._enabled) {
-        H3TronTrails.onHexDataChanged([], null);
+        H3TronTrails.onHexDataChanged(0, null);
         H3TronTrails.onOwnershipChanged([]);
       }
       return;
@@ -275,10 +279,9 @@ const H3Grid = {
     const ne = bounds.getNorthEast();
 
     // [PERF-06] Fast path: if the new (unpadded) view is still inside the
-    // padded region we computed last time AND the resolution is unchanged,
-    // the hexagons already in _hexagonData cover the visible area and the
-    // ownership fetch we did for that region is still valid. Skip the
-    // whole polygonToCells + fetch + relayer work.
+    // padded region we cached last time AND the resolution is unchanged,
+    // the ownership fetch we did for that region is still valid. Skip the
+    // count estimate + ownership refetch.
     const cached = this._lastPaddedBounds;
     if (
       cached &&
@@ -295,33 +298,35 @@ const H3Grid = {
     const latPad = (ne.lat - sw.lat) * 0.15;
     const lngPad = (ne.lng - sw.lng) * 0.15;
 
-    const polygon = [
-      [sw.lat - latPad, sw.lng - lngPad],
-      [ne.lat + latPad, sw.lng - lngPad],
-      [ne.lat + latPad, ne.lng + lngPad],
-      [sw.lat - latPad, ne.lng + lngPad],
-      [sw.lat - latPad, sw.lng - lngPad]
-    ];
+    // Estimate cell count from viewport area / average cell area at the
+    // current resolution. Cheaper than polygonToCells (which we used to
+    // call here only to count its result) and accurate enough for the
+    // "viewport too big, skip TRON" gate downstream.
+    const EARTH_R = 6371008.8; // mean radius m
+    const padSwLat = sw.lat - latPad;
+    const padSwLng = sw.lng - lngPad;
+    const padNeLat = ne.lat + latPad;
+    const padNeLng = ne.lng + lngPad;
+    const centerLatRad = ((padSwLat + padNeLat) / 2) * Math.PI / 180;
+    const dLatRad = (padNeLat - padSwLat) * Math.PI / 180;
+    const dLngRad = (padNeLng - padSwLng) * Math.PI / 180;
+    const heightM = Math.abs(dLatRad * EARTH_R);
+    const widthM = Math.abs(dLngRad * EARTH_R * Math.cos(centerLatRad));
+    const areaM2 = heightM * widthM;
+    const cellAreaM2 = h3.getHexagonAreaAvg(resolution, 'm2');
+    const estimatedCount = Math.ceil(areaM2 / cellAreaM2);
 
-    let cells;
-    try {
-      cells = h3.polygonToCells(polygon, resolution);
-    } catch (e) {
-      Logger.error('[H3Grid] polygonToCells error:', e);
+    if (estimatedCount > 50000) {
+      Logger.warn('[H3Grid] Too many cells (estimated):', estimatedCount);
       return;
     }
 
-    if (cells.length > 50000) {
-      Logger.warn('[H3Grid] Too many cells:', cells.length);
-      return;
-    }
-
-    this._hexagonData = cells.map(idx => ({ h3Index: idx }));
+    this._hexagonCount = estimatedCount;
     this._currentResolution = resolution;
 
-    // [PERF-06] Record the padded bounds + resolution that produced
-    // _hexagonData. The next _computeAndRender will short-circuit if the
-    // view still fits inside this region at the same resolution.
+    // [PERF-06] Record the padded bounds + resolution we just computed
+    // for. The next _computeAndRender will short-circuit if the view
+    // still fits inside this region at the same resolution.
     this._lastPaddedBounds = {
       swLat: sw.lat - latPad,
       swLng: sw.lng - lngPad,
@@ -330,9 +335,9 @@ const H3Grid = {
     };
     this._lastResolution = resolution;
 
-    // Notify TRON trails of new hex data
+    // Notify TRON trails of new hex count
     if (H3TronTrails._enabled) {
-      H3TronTrails.onHexDataChanged(this._hexagonData, resolution);
+      H3TronTrails.onHexDataChanged(this._hexagonCount, resolution);
     }
 
     // Fetch ownership data (fog rings + owned cells rendered after fetch).

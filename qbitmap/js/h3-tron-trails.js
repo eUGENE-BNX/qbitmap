@@ -88,8 +88,8 @@ const H3TronTrails = {
       if (!this._enabled) return; // state flipped during await
       this._attachListeners();
       this._canvas.style.display = 'block';
-      if (H3Grid._hexagonData.length > 0) {
-        this.onHexDataChanged(H3Grid._hexagonData, H3Grid._currentResolution);
+      if (H3Grid._hexagonCount > 0) {
+        this.onHexDataChanged(H3Grid._hexagonCount, H3Grid._currentResolution);
       }
       // Start ad timer (8-14s random delay)
       clearTimeout(this._adTimer);
@@ -107,11 +107,13 @@ const H3TronTrails = {
     }
   },
 
-  // Called when hex grid cells change (viewport move)
-  onHexDataChanged(hexagonData, resolution) {
+  // Called when hex grid count changes (viewport move). Only the count
+  // is consumed — the full cell list is never enumerated since H3Grid
+  // estimates rather than materializing the array.
+  onHexDataChanged(hexagonCount, resolution) {
     if (!this._enabled) return;
 
-    if (hexagonData.length > 3000) {
+    if (hexagonCount > 3000) {
       this._stopLoop();
       this._clearCanvas();
       return;
