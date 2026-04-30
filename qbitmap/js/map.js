@@ -44,7 +44,7 @@ const style = {
     glyphs: "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
     sprite: "https://protomaps.github.io/basemaps-assets/sprites/v4/light",
     sources: {
-        [sourceId]: { type: "vector", url: `${location.origin}/tiles/20260331.json` },
+        [sourceId]: { type: "vector", url: `${location.origin}/tiles/20260430.json` },
         "atasehir-satellite": {
             type: "raster",
             url: "https://qbitmap.com/tiles/Atasehir.json",
