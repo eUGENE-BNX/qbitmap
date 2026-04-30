@@ -24,6 +24,38 @@ const MyCamerasSystem = {
   isPickingLocation: false,
   editingCameraId: null,
   _isSubmitting: false,
+  _onvifTimers: {},
+
+  // ONVIF event indicator icons. Same SVG set as the previous map-overlay
+  // notifications, repurposed for the in-card indicator.
+  onvifEventIcons: {
+    'person-icon': `<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`,
+    'pet-icon': `<svg viewBox="0 0 24 24"><path d="M4.5 9.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zm5-2a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zm5 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zm5 2a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM12 11.5c-2.5 0-4.5 2-4.5 4.5 0 1.5.5 2.5 1 3.5.5 1 1.5 2 2 2.5.5.5 1 .5 1.5.5s1 0 1.5-.5c.5-.5 1.5-1.5 2-2.5.5-1 1-2 1-3.5 0-2.5-2-4.5-4.5-4.5z"/></svg>`,
+    'vehicle-icon': `<svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>`,
+    'warning-icon': `<svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>`,
+    'motion-icon': `<svg viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>`
+  },
+
+  handleOnvifEvent(payload) {
+    if (!payload?.eventState) return;
+    const eventTypeToIcon = {
+      motion: 'motion-icon', human: 'person-icon', pet: 'pet-icon',
+      vehicle: 'vehicle-icon', line_crossing: 'warning-icon', tamper: 'warning-icon'
+    };
+    const iconKey = eventTypeToIcon[payload.eventType];
+    if (!iconKey) return;
+
+    const slots = document.querySelectorAll(`[data-onvif-indicator="${CSS.escape(payload.deviceId)}"]`);
+    slots.forEach(slot => {
+      slot.innerHTML = this.onvifEventIcons[iconKey];
+      slot.className = `onvif-event-indicator active event-${payload.eventType}`;
+      clearTimeout(this._onvifTimers[payload.deviceId]);
+      this._onvifTimers[payload.deviceId] = setTimeout(() => {
+        slot.classList.remove('active');
+        slot.innerHTML = '';
+      }, 3000);
+    });
+  },
 
   init() {
     this.createDashboard();
@@ -38,6 +70,7 @@ const MyCamerasSystem = {
     window.addEventListener('sidemenu:open', (e) => {
       if (e.detail?.id !== 'my-cameras' && this.isOpen) this.close();
     });
+    window.addEventListener('onvif:event', (e) => this.handleOnvifEvent(e.detail));
 
     Logger.log('[MyCameras] Dashboard initialized');
   },

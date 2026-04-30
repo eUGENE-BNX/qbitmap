@@ -19,6 +19,7 @@ const DashboardMixin = {
         <div class="camera-header">
           <div class="camera-status ${statusClass}"></div>
           <span class="camera-name">${escapeHtml(camera.name)}</span>
+          ${isWhep && camera.onvif_camera_id ? `<span class="onvif-event-indicator" data-onvif-indicator="${escapeHtml(camera.device_id)}" aria-hidden="true"></span>` : ''}
           <span class="camera-device-id">${cameraTypeLabel}</span>
         </div>
         <div class="camera-info">
