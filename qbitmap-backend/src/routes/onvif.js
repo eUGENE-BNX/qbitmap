@@ -546,7 +546,11 @@ async function onvifRoutes(fastify, options) {
     },
     preHandler: [
       async (request, reply) => {
-        const clientIp = request.ip;
+        // Backend listens only behind Caddy, which sits behind Cloudflare; the
+        // socket peer is always Caddy and X-Forwarded-For terminates at the
+        // Cloudflare edge. The original client IP arrives in cf-connecting-ip,
+        // set by Cloudflare and forwarded by Caddy — trust it for the allowlist.
+        const clientIp = request.headers['cf-connecting-ip'] || request.ip;
         if (!WEBHOOK_ALLOWED_IPS.includes(clientIp)) {
           logger.warn({ clientIp }, 'Unauthorized webhook source');
           return reply.code(403).send({ error: 'Unauthorized webhook source' });
