@@ -27,7 +27,7 @@ const H3TronTrails = {
 
   // Runners
   _runners: [],
-  _maxTrailLength: 30,
+  _maxTrailLength: 12,
   _baseRunnerCount: 0,
   _maxRunnerCount: 0,
   _spawnTimer: 0,
@@ -161,10 +161,14 @@ const H3TronTrails = {
 
   _onMapMove() {
     if (!this._enabled) return;
-    // Reproject all runner path points
+    // Reproject all runner path points + drop the existing trail.
+    // Trail points are stored in pixel space; without clearing them, a
+    // pan/zoom leaves stale pixel positions that visually stretch into
+    // a long smear once new (post-move) trail points start appearing.
     for (const runner of this._runners) {
       if (!runner.alive || !runner.pathCells) continue;
       this._projectRunnerPath(runner);
+      runner.trail = [];
     }
   },
 

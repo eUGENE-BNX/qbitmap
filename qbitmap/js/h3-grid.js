@@ -109,9 +109,15 @@ const H3Grid = {
     }
   },
 
+  // Hex overlay only renders at zoom >= MIN_HEX_ZOOM. Below that the
+  // _computeAndRender guard short-circuits before this map is even
+  // consulted; the < MIN_HEX_ZOOM entries stay for parity with the
+  // backend ZOOM_TO_RESOLUTION table.
+  MIN_HEX_ZOOM: 14,
   ZOOM_RESOLUTION_MAP: [
-    { minZoom: 19, resolution: 13 },
-    { minZoom: 17, resolution: 12 },
+    { minZoom: 21, resolution: 14 },
+    { minZoom: 20, resolution: 13 },
+    { minZoom: 18, resolution: 12 },
     { minZoom: 16, resolution: 11 },
     { minZoom: 14, resolution: 10 },
     { minZoom: 13, resolution: 9 },
@@ -240,6 +246,29 @@ const H3Grid = {
 
     const bounds = this._map.getBounds();
     const zoom = Math.floor(this._map.getZoom());
+
+    // Below MIN_HEX_ZOOM: hide the entire overlay. Clear caches so a later
+    // zoom-in past the threshold forces a fresh compute instead of being
+    // short-circuited by the PERF-06 fast-path against stale bounds.
+    if (zoom < this.MIN_HEX_ZOOM) {
+      this._hexagonData = [];
+      this._ownershipData = [];
+      this._ownershipMap = null;
+      this._fogRingData = [];
+      this._lastPaddedBounds = null;
+      this._lastResolution = null;
+      if (this._ownershipFetchController) {
+        this._ownershipFetchController.abort();
+        this._ownershipFetchController = null;
+      }
+      this._renderLayer();
+      if (H3TronTrails._enabled) {
+        H3TronTrails.onHexDataChanged([], null);
+        H3TronTrails.onOwnershipChanged([]);
+      }
+      return;
+    }
+
     const resolution = this._getResolution(zoom);
 
     const sw = bounds.getSouthWest();
@@ -306,16 +335,9 @@ const H3Grid = {
       H3TronTrails.onHexDataChanged(this._hexagonData, resolution);
     }
 
-    // Fetch ownership data (fog rings + owned cells rendered after fetch)
-    // Skip at low zoom — too large an area, backend rejects and data is meaningless
-    if (zoom >= 6) {
-      this._fetchOwnership(sw.lat - latPad, sw.lng - lngPad, ne.lat + latPad, ne.lng + lngPad, zoom);
-    } else {
-      this._ownershipData = [];
-      this._ownershipMap = null;
-      this._fogRingData = [];
-      this._renderLayer();
-    }
+    // Fetch ownership data (fog rings + owned cells rendered after fetch).
+    // Zoom is guaranteed >= MIN_HEX_ZOOM by the early-return guard above.
+    this._fetchOwnership(sw.lat - latPad, sw.lng - lngPad, ne.lat + latPad, ne.lng + lngPad, zoom);
   },
 
   async _fetchOwnership(swLat, swLng, neLat, neLng, zoom) {

@@ -3,8 +3,9 @@ const pool = require('./db-pool');
 const cache = require('./cache');
 
 const ZOOM_TO_RESOLUTION = [
-  [19, 13],
-  [17, 12],
+  [21, 14],
+  [20, 13],
+  [18, 12],
   [16, 11],
   [14, 10],
   [13, 9],
