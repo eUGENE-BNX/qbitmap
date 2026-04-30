@@ -28,85 +28,9 @@ function start() {
     }
   });
 
-  // Weekly vehicle info sync — every Sunday at 03:00
-  cron.schedule('0 3 * * 0', async () => {
-    try {
-      await syncVehicleInfo();
-    } catch (err) {
-      logger.error({ err }, 'Weekly vehicle info sync failed');
-    }
-  });
-
-  // TPMS now comes via Fleet Telemetry — no REST poll needed
+  // car_version + odometer come via Fleet Telemetry — no weekly REST sync
 
   logger.info('Tesla token refresh service started');
-}
-
-async function syncVehicleInfo() {
-  const [accounts] = await db.pool.execute(
-    `SELECT a.id, a.user_id, t.access_token FROM tesla_accounts a
-     JOIN tesla_tokens t ON t.tesla_account_id = a.id WHERE t.expires_at > NOW()`
-  );
-
-  for (const acct of accounts) {
-    try {
-      const accessToken = decrypt(acct.access_token);
-
-      // Discover region
-      let apiBase = config.tesla.apiBase;
-      try {
-        const rr = await fetchWithTimeout('https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/users/region', {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }, 10000);
-        if (rr.ok) {
-          const rd = await rr.json();
-          if (rd.response?.fleet_api_base_url) apiBase = rd.response.fleet_api_base_url;
-        }
-      } catch { /* use default */ }
-
-      // Get vehicles
-      const vRes = await fetchWithTimeout(`${apiBase}/api/1/vehicles`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }, 15000);
-      if (!vRes.ok) continue;
-      const vData = await vRes.json();
-
-      for (const v of (vData.response || [])) {
-        // Get vehicle_data for config + state
-        try {
-          const vdRes = await fetchWithTimeout(
-            `${apiBase}/api/1/vehicles/${v.id}/vehicle_data?endpoints=vehicle_config%3Bvehicle_state`,
-            { headers: { Authorization: `Bearer ${accessToken}` } },
-            15000
-          );
-          if (!vdRes.ok) continue;
-          const vd = await vdRes.json();
-          const vc = vd.response?.vehicle_config;
-          const vs = vd.response?.vehicle_state;
-
-          await db.upsertTeslaVehicle({
-            teslaAccountId: acct.id,
-            vehicleId: String(v.id),
-            vin: v.vin,
-            displayName: vs?.vehicle_name || v.display_name || v.vin,
-            model: inferModel(v.vin) || vc?.car_type,
-            carType: vc?.car_type || null,
-            color: vc?.exterior_color || null,
-            wheelType: vc?.wheel_type || null,
-            carVersion: vs?.car_version || null,
-            // Tesla returns odometer in miles — store as km
-            odometer: vs?.odometer != null ? vs.odometer * 1.60934 : null,
-          });
-
-          logger.info({ vin: v.vin, color: vc?.exterior_color, version: vs?.car_version }, 'Vehicle info synced');
-        } catch (e) {
-          logger.warn({ vin: v.vin, err: e.message }, 'Vehicle info sync failed');
-        }
-      }
-    } catch (err) {
-      logger.error({ err, accountId: acct.id }, 'Account vehicle sync failed');
-    }
-  }
 }
 
 async function syncTpms() {
@@ -164,12 +88,6 @@ async function syncTpms() {
   }
 }
 
-function inferModel(vin) {
-  if (!vin || vin.length < 5) return null;
-  const models = { 'S': 'Model S', '3': 'Model 3', 'X': 'Model X', 'Y': 'Model Y' };
-  return models[vin.charAt(3)] || null;
-}
-
 async function refreshToken(tokenRow) {
   const refreshTokenPlain = decrypt(tokenRow.refresh_token);
 
@@ -210,4 +128,4 @@ function stop() {
   }
 }
 
-module.exports = { start, stop, syncTpms, syncVehicleInfo };
+module.exports = { start, stop, syncTpms };

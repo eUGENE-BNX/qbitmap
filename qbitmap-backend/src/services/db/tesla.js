@@ -79,7 +79,7 @@ DatabaseService.prototype.upsertTeslaVehicle = async function({ teslaAccountId, 
   );
 };
 
-DatabaseService.prototype.updateVehicleTelemetry = async function({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry, odometer, tpmsFl, tpmsFr, tpmsRl, tpmsRr }) {
+DatabaseService.prototype.updateVehicleTelemetry = async function({ vin, lat, lng, soc, gear, bearing, speed, insideTemp, outsideTemp, estRange, chargeLimit, locked, sentry, odometer, tpmsFl, tpmsFr, tpmsRl, tpmsRr, carVersion }) {
   const fields = [];
   const values = [];
   if (lat != null) { fields.push('last_lat = ?'); values.push(lat); }
@@ -99,6 +99,7 @@ DatabaseService.prototype.updateVehicleTelemetry = async function({ vin, lat, ln
   if (tpmsFr != null) { fields.push('last_tpms_fr = ?'); values.push(tpmsFr); }
   if (tpmsRl != null) { fields.push('last_tpms_rl = ?'); values.push(tpmsRl); }
   if (tpmsRr != null) { fields.push('last_tpms_rr = ?'); values.push(tpmsRr); }
+  if (carVersion != null) { fields.push('car_version = ?'); values.push(carVersion); }
   if (fields.length === 0) return;
 
   fields.push('last_telemetry_at = NOW()', 'is_online = 1', 'updated_at = NOW()');
