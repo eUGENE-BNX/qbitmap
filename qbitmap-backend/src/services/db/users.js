@@ -119,11 +119,18 @@ DatabaseService.prototype.getUsersWithVisibleLocation = async function() {
 };
 
 DatabaseService.prototype.getUserCameras = async function(userId) {
+  // ONVIF link can live in either cameras.onvif_camera_id (legacy) or
+  // camera_onvif_links.onvif_camera_id (current). Coalesce so the API
+  // exposes a single truth — UI uses this to show ONVIF status + the
+  // event indicator slot on the card.
   const [rows] = await this.pool.execute(`
-    SELECT id, device_id, name, lng, lat, is_public, created_at, camera_type, whep_url, mediamtx_path, onvif_camera_id, audio_muted
-    FROM cameras
-    WHERE user_id = ?
-    ORDER BY created_at DESC
+    SELECT c.id, c.device_id, c.name, c.lng, c.lat, c.is_public, c.created_at,
+           c.camera_type, c.whep_url, c.mediamtx_path, c.audio_muted,
+           COALESCE(c.onvif_camera_id, col.onvif_camera_id) AS onvif_camera_id
+    FROM cameras c
+    LEFT JOIN camera_onvif_links col ON col.qbitmap_camera_id = c.id
+    WHERE c.user_id = ?
+    ORDER BY c.created_at DESC
   `, [userId]);
   return rows;
 };
