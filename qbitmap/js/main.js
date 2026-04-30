@@ -37,6 +37,7 @@ import { onDomReady } from './utils.js';
 
 // UI
 import './modal.js';
+import './help-menu.js';
 
 // PWA (service worker + install prompt). Dynamic import so the module
 // stays out of the critical path and dev builds don't break when the

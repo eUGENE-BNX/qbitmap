@@ -3,7 +3,7 @@
   position: fixed;
   top: 10px;
   left: 10px;
-  z-index: 1000;
+  z-index: 1100;
 }
 
 
@@ -87,6 +87,75 @@
   .qbitmap-logo-control {
     padding: 0 6px;
   }
+}
+
+/* Header help button + dropdown menu */
+.header-help {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.header-help-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: white;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  color: #888;
+  cursor: pointer;
+  transition: box-shadow 0.2s, color 0.2s, background 0.2s;
+}
+
+.header-help-btn:hover {
+  color: #1a1a1a;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.header-help-btn.active {
+  color: #1a1a1a;
+  background: #f1f3f4;
+}
+
+.header-help-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  padding: 6px 0;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+  z-index: 1001;
+}
+
+.header-help-menu.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.header-help-item {
+  display: block;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #3c4043;
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.header-help-item:hover {
+  background: #f1f3f4;
+  color: #1a1a1a;
 }
 
 /* Right side controls container */
@@ -338,12 +407,13 @@
 /* Responsive */
 @media (max-width: 480px) {
   .user-name {
-    font-size: 11px;
+    font-size: 13px;
     max-width: 80px;
   }
 
   .user-button {
-    padding: 4px 8px;
+    height: 40px;
+    padding: 0 10px;
   }
 
   .login-button {
