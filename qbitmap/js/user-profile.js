@@ -258,7 +258,7 @@ const UserProfileSystem = {
     const outsideTemp = v(vehicle.outsideTemp) != null ? Math.round(vehicle.outsideTemp) : null;
     const locked = v(vehicle.locked);
     const sentry = v(vehicle.sentry);
-    const carVersion = v(vehicle.carVersion);
+    const carVersion = (() => { const x = v(vehicle.carVersion); return x ? String(x).trim() || null : null; })();
     const odometer = v(vehicle.odometer) ? Math.round(vehicle.odometer).toLocaleString('tr-TR') : null;
     const speed = Math.round(vehicle.speed || 0);
 

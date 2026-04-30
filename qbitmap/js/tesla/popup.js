@@ -52,7 +52,7 @@ export const TeslaPopup = {
     const name = escapeHtml(p.displayName || 'Tesla');
     const model = escapeHtml(p.model || 'Tesla');
     const color = v(p.color);
-    const carVersion = v(p.carVersion);
+    const carVersion = (() => { const x = v(p.carVersion); return x ? String(x).trim() || null : null; })();
     const odometer = v(p.odometer) ? Math.round(p.odometer).toLocaleString('tr-TR') : null;
     const estRange = v(p.estRange) ? Math.round(p.estRange) : null;
     const insideTemp = v(p.insideTemp) != null ? Math.round(p.insideTemp) : null;
