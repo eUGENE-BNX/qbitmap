@@ -801,120 +801,12 @@ const AIMonitoringMixin = {
     }
   },
 
-  // ==================== ONVIF Event Handlers ====================
-
-  /**
-   * Handle ONVIF event from WebSocket
-   */
+  // ONVIF events are rendered by MyCamerasSystem on the camera-list card,
+  // not on the map. This bridge keeps the WS routing path stable while
+  // avoiding a circular import — MyCamerasSystem listens on window.
   handleOnvifEvent(payload) {
-    const { deviceId, eventType, eventState } = payload;
-    Logger.log('[ONVIF] Event received:', deviceId, eventType, eventState);
-
-    if (eventState) {
-      switch (eventType) {
-        case 'motion':
-          this.triggerCameraBlink(deviceId);
-          this.showEventNotification(deviceId, 'motion-icon', 'Motion');
-          break;
-        case 'human':
-          this.showEventNotification(deviceId, 'person-icon', 'Human');
-          break;
-        case 'pet':
-          this.showEventNotification(deviceId, 'pet-icon', 'Pet');
-          break;
-        case 'vehicle':
-          this.showEventNotification(deviceId, 'vehicle-icon', 'Vehicle');
-          break;
-        case 'line_crossing':
-          this.showEventNotification(deviceId, 'warning-icon', 'Line Crossing');
-          break;
-        case 'tamper':
-          this.showEventNotification(deviceId, 'warning-icon', 'Tamper');
-          break;
-      }
-    }
-  },
-
-  /**
-   * Trigger camera icon blink effect for motion detection
-   */
-  triggerCameraBlink(deviceId) {
-    const camera = this.cameras.find(c => c.device_id === deviceId);
-    if (!camera) return;
-
-    const markerId = `camera-${camera.device_id}`;
-    const markerElement = document.getElementById(markerId);
-
-    if (markerElement) {
-      markerElement.classList.add('camera-blink');
-      setTimeout(() => {
-        markerElement.classList.remove('camera-blink');
-      }, 3000);
-    }
-  },
-
-  /**
-   * SVG icons for ONVIF events
-   */
-  eventIcons: {
-    'person-icon': `<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`,
-    'pet-icon': `<svg viewBox="0 0 24 24"><path d="M4.5 9.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zm5-2a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zm5 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zm5 2a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM12 11.5c-2.5 0-4.5 2-4.5 4.5 0 1.5.5 2.5 1 3.5.5 1 1.5 2 2 2.5.5.5 1 .5 1.5.5s1 0 1.5-.5c.5-.5 1.5-1.5 2-2.5.5-1 1-2 1-3.5 0-2.5-2-4.5-4.5-4.5z"/></svg>`,
-    'vehicle-icon': `<svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>`,
-    'warning-icon': `<svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>`,
-    'motion-icon': `<svg viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>`
-  },
-
-  /**
-   * Show event notification with icon near camera
-   */
-  showEventNotification(deviceId, iconClass, message) {
-    const camera = this.cameras.find(c => c.device_id === deviceId);
-    if (!camera || !camera.lng || !camera.lat || !this.map) return;
-
-    const notificationId = `onvif-notification-${deviceId}`;
-
-    // Remove existing notification
-    const existingNotification = document.getElementById(notificationId);
-    if (existingNotification) {
-      existingNotification.remove();
-    }
-
-    const svgIcon = this.eventIcons[iconClass] || this.eventIcons['warning-icon'];
-
-    const notificationEl = document.createElement('div');
-    notificationEl.id = notificationId;
-    notificationEl.className = `onvif-notification ${iconClass}`;
-    notificationEl.innerHTML = `<div class="notification-icon">${svgIcon}</div>`;
-
-    try {
-      const point = this.map.project([camera.lng, camera.lat]);
-      const mapContainer = this.map.getContainer();
-      const mapRect = mapContainer.getBoundingClientRect();
-
-      // Calculate position relative to map
-      let left = mapRect.left + point.x + 25;
-      let top = mapRect.top + point.y - 25;
-
-      // Clamp to screen bounds
-      left = Math.max(10, Math.min(left, window.innerWidth - 50));
-      top = Math.max(10, Math.min(top, window.innerHeight - 50));
-
-      notificationEl.style.left = left + 'px';
-      notificationEl.style.top = top + 'px';
-
-      document.body.appendChild(notificationEl);
-    } catch (err) {
-      return;
-    }
-
-    // Remove after 5 seconds
-    setTimeout(() => {
-      if (notificationEl.parentNode) {
-        notificationEl.remove();
-      }
-    }, 5000);
-
-    Logger.log(`[ONVIF] Notification shown: ${message} for ${deviceId}`);
+    Logger.log('[ONVIF] Event received:', payload?.deviceId, payload?.eventType, payload?.eventState);
+    window.dispatchEvent(new CustomEvent('onvif:event', { detail: payload }));
   }
 };
 

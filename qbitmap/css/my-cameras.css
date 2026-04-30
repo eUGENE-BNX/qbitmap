@@ -516,14 +516,41 @@
   font-size: 15px;
   font-weight: 500;
   color: #202124;
-  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .camera-device-id {
   font-size: 12px;
   color: #5f6368;
   font-family: monospace;
+  margin-left: auto;
 }
+
+.camera-card .onvif-event-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.camera-card .onvif-event-indicator svg { width: 14px; height: 14px; }
+.camera-card .onvif-event-indicator.active {
+  opacity: 1;
+  animation: onvifPulse 0.6s ease-in-out 4;
+}
+.camera-card .onvif-event-indicator.event-human          svg { fill: #3b82f6; }
+.camera-card .onvif-event-indicator.event-pet            svg { fill: #f59e0b; }
+.camera-card .onvif-event-indicator.event-vehicle        svg { fill: #10b981; }
+.camera-card .onvif-event-indicator.event-motion         svg { fill: #8b5cf6; }
+.camera-card .onvif-event-indicator.event-line_crossing  svg,
+.camera-card .onvif-event-indicator.event-tamper         svg { fill: #ef4444; }
+@keyframes onvifPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
 
 .camera-info {
   display: flex;
