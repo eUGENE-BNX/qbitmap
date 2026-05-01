@@ -44,7 +44,7 @@ const TELEMETRY_CONFIG_FIELDS = {
   TpmsPressureRl: { interval_seconds: 600 },
   TpmsPressureRr: { interval_seconds: 600 },
   Odometer: { interval_seconds: 3600 },
-  SoftwareUpdateVersion: { interval_seconds: 21600 },
+  Version: { interval_seconds: 21600 },
 };
 
 function sendToProxy(path, accessToken, body) {
