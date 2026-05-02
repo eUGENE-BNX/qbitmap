@@ -2,7 +2,7 @@
   "zones": [
     {
       "id": "zone-01",
-      "name": "Zone 01",
+      "name": "Active Zone 1",
       "color": [255, 195, 170],
       "polygon": [
         [40.992727, 29.118705],
@@ -13,7 +13,7 @@
     },
     {
       "id": "zone-02",
-      "name": "Zone 02",
+      "name": "Active Zone 2",
       "color": [170, 230, 200],
       "polygon": [
         [40.992613, 29.095466],
@@ -24,7 +24,7 @@
     },
     {
       "id": "zone-03",
-      "name": "Zone 03",
+      "name": "Active Zone 3",
       "color": [130, 200, 255],
       "polygon": [
         [40.975216, 29.096689],
@@ -35,7 +35,7 @@
     },
     {
       "id": "zone-04",
-      "name": "Zone 04",
+      "name": "Active Zone 4",
       "color": [180, 170, 255],
       "polygon": [
         [41.022391, 29.123769],

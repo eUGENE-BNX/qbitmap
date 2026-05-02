@@ -35,6 +35,7 @@ const H3GameZones = {
   _zones: [],
   _cellData: [],
   _animId: null,
+  _tooltip: null,
 
   init(map) {
     this._map = map;
@@ -44,6 +45,30 @@ const H3GameZones = {
   async _ensureReady() {
     if (this._ready) return;
     await loadDeckAndH3();
+
+    const tip = document.createElement('div');
+    tip.className = 'active-zone-tooltip';
+    tip.style.cssText = [
+      'position:fixed',
+      'display:none',
+      'pointer-events:none',
+      'z-index:9999',
+      'padding:10px 16px',
+      'border-radius:12px',
+      'background:rgba(20,24,36,0.78)',
+      'color:#fff',
+      'font:600 13px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
+      'letter-spacing:0.3px',
+      'border:1px solid rgba(255,255,255,0.10)',
+      'backdrop-filter:blur(16px)',
+      '-webkit-backdrop-filter:blur(16px)',
+      'box-shadow:0 8px 32px rgba(0,0,0,0.45)',
+      'white-space:nowrap',
+      'transition:opacity 0.15s ease',
+    ].join(';');
+    document.body.appendChild(tip);
+    this._tooltip = tip;
+
     this._overlay = new deck.MapboxOverlay({
       interleaved: true,
       layers: [],
@@ -112,11 +137,12 @@ const H3GameZones = {
     const periodSpan = BREATH_MAX_MS - BREATH_MIN_MS;
     for (const z of this._zones) {
       const color = z.color || [255, 185, 100];
+      const zoneName = z.name || z.id;
       const push = (h, ringDist) => {
         const hash = this._cellHash(h);
         const phase = (hash & 0xffff) / 0xffff;
         const period = BREATH_MIN_MS + (((hash >>> 16) & 0xffff) / 0xffff) * periodSpan;
-        out.push({ h3Index: h, ringDist, color, phase, period });
+        out.push({ h3Index: h, ringDist, color, phase, period, zoneName });
       };
       for (const h of z.inner) push(h, 0);
       for (const [h, d] of z.ringMap) push(h, d);
@@ -136,6 +162,7 @@ const H3GameZones = {
     } else {
       this._stopAnimation();
       if (this._overlay) this._overlay.setProps({ layers: [] });
+      if (this._tooltip) this._tooltip.style.display = 'none';
     }
   },
 
@@ -170,7 +197,8 @@ const H3GameZones = {
       filled: true,
       stroked: true,
       extruded: false,
-      pickable: false,
+      pickable: true,
+      onHover: (info) => this._onHover(info),
       getHexagon: d => d.h3Index,
       getFillColor: d => {
         const baseA = RING_OPACITY[d.ringDist] * 255;
@@ -191,6 +219,18 @@ const H3GameZones = {
       },
     });
     this._overlay.setProps({ layers: [layer] });
+  },
+
+  _onHover(info) {
+    if (!this._tooltip) return;
+    if (info && info.object) {
+      this._tooltip.textContent = info.object.zoneName;
+      this._tooltip.style.left = (info.x + 14) + 'px';
+      this._tooltip.style.top = (info.y + 14) + 'px';
+      this._tooltip.style.display = 'block';
+    } else {
+      this._tooltip.style.display = 'none';
+    }
   },
 
   _cellHash(s) {
