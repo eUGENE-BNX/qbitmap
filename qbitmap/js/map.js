@@ -176,7 +176,6 @@ class LayersDropdownControl {
         const items = [
             { id: 'h3-grid', label: 'Qbitmap' },
             { id: 'h3-trails', label: 'Qbit Search' },
-            { id: 'game-zones', label: 'Oyun Bölgeleri' },
             { id: 'city-cameras', label: 'Şehir Kameraları' },
             { id: 'user-cameras', label: 'Kameralar' },
             { id: 'video-messages', label: 'Video Mesajlar' },
@@ -211,9 +210,6 @@ class LayersDropdownControl {
 
             // Set initial active state for default-on layers
             if (['video-messages', 'photo-messages', 'city-cameras', 'user-cameras'].includes(item.id)) {
-                toggle.classList.add('active');
-            }
-            if (item.id === 'game-zones' && layers.gameZonesVisible) {
                 toggle.classList.add('active');
             }
 
@@ -314,13 +310,6 @@ class LayersDropdownControl {
                 toggle.classList.toggle('active', layers.h3TrailsVisible);
                 H3TronTrails.setEnabled(layers.h3TrailsVisible)
                     .catch((err) => Logger.warn('[Map] H3 trails toggle failed', err));
-                break;
-            case 'game-zones':
-                layers.gameZonesVisible = !layers.gameZonesVisible;
-                localStorage.setItem('qbitmap_zones', layers.gameZonesVisible);
-                toggle.classList.toggle('active', layers.gameZonesVisible);
-                H3GameZones.setEnabled(layers.gameZonesVisible)
-                    .catch((err) => Logger.warn('[Map] Game zones toggle failed', err));
                 break;
             case 'vehicles':
                 layers.vehiclesVisible = !layers.vehiclesVisible;
@@ -477,6 +466,73 @@ class LayersDropdownControl {
 const layersControl = new LayersDropdownControl();
 map.addControl(layersControl, 'top-right');
 
+// Game Zones — dedicated icon button below the Layers dropdown.
+// Pressing it enables an "exclusive" mode: snapshot all currently-active
+// layers, close them, show only game zones. Pressing again restores the
+// snapshot (the user's prior state — not factory defaults), so toggling
+// in/out of focus mode never destroys their preferences.
+let _gameZonesPriorLayers = null;
+let _gameZonesControl = null;
+
+function setGameZonesActive(enabled) {
+    if (enabled === layers.gameZonesVisible) return;
+
+    if (enabled) {
+        _gameZonesPriorLayers = Object.keys(layersControl._toggles).filter(
+            id => layersControl._toggles[id].classList.contains('active')
+        );
+        for (const id of _gameZonesPriorLayers) {
+            layersControl._toggleLayer(id);
+        }
+    }
+
+    layers.gameZonesVisible = enabled;
+    localStorage.setItem('qbitmap_zones', enabled);
+    H3GameZones.setEnabled(enabled).catch(
+        (err) => Logger.warn('[Map] Game zones toggle failed', err)
+    );
+    if (_gameZonesControl) _gameZonesControl.setActive(enabled);
+
+    if (!enabled && _gameZonesPriorLayers) {
+        for (const id of _gameZonesPriorLayers) {
+            layersControl._toggleLayer(id);
+        }
+        _gameZonesPriorLayers = null;
+    }
+}
+
+class GameZonesToggleControl {
+    onAdd(map) {
+        this._container = document.createElement('div');
+        this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group active-zones-wrapper';
+
+        this._button = document.createElement('button');
+        this._button.className = 'satellite-toggle-btn';
+        this._button.type = 'button';
+        this._button.title = 'Active Zones';
+        this._button.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7"/><polygon points="12,7 17,9.5 17,14.5 12,17 7,14.5 7,9.5"/></svg>';
+        if (layers.gameZonesVisible) this._button.classList.add('active');
+
+        this._button.addEventListener('click', () => {
+            setGameZonesActive(!layers.gameZonesVisible);
+        });
+
+        this._container.appendChild(this._button);
+        return this._container;
+    }
+
+    setActive(active) {
+        if (this._button) this._button.classList.toggle('active', active);
+    }
+
+    onRemove() {
+        this._container.parentNode?.removeChild(this._container);
+    }
+}
+
+_gameZonesControl = new GameZonesToggleControl();
+map.addControl(_gameZonesControl, 'top-right');
+
 let _videoLayerVisible = false;
 let _buildings3DVisible = false;
 let _videoMessagesVisible = true;
@@ -586,8 +642,11 @@ map.on("load", async () => {
         if (layersControl) layersControl.syncToggleState('h3-grid', true);
     }
     if (layers.gameZonesVisible) {
-        H3GameZones.setEnabled(true).catch((err) => Logger.warn('[Map] Game zones enable failed', err));
-        if (layersControl) layersControl.syncToggleState('game-zones', true);
+        // Reset flag so setGameZonesActive(true) actually runs the
+        // snapshot+close+enable sequence (it short-circuits when the
+        // requested state matches current state).
+        layers.gameZonesVisible = false;
+        setGameZonesActive(true);
     }
     if (layers.teslaVehiclesVisible) {
         import('/js/tesla/index.js').then(m => m.TeslaSystem.show({ silent: true }));
