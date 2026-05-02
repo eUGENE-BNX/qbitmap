@@ -324,15 +324,16 @@ const PopupCoreMixin = {
       }
     }
 
-    // Double-click on frame to toggle zoom
-    if (frameContainer) {
+    // Double-click on frame to toggle zoom (skip on mobile — popup is already at max size there)
+    const isMobile = window.matchMedia?.('(max-width: 768px)').matches;
+    if (frameContainer && !isMobile) {
       frameContainer.ondblclick = () => this.cycleZoom(deviceId);
       frameContainer.style.cursor = 'zoom-in';
     }
 
-    // Double-click on header to go to zoom-2 (only for WHEP cameras)
+    // Double-click on header to go to zoom-2 (only for WHEP cameras, desktop only)
     const header = popupEl.querySelector('.camera-popup-header');
-    if (header && popupData.isWhep) {
+    if (header && popupData.isWhep && !isMobile) {
       header.ondblclick = (e) => {
         // Prevent if clicking on buttons
         if (e.target.closest('.camera-popup-buttons')) return;
