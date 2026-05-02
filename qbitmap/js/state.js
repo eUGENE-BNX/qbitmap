@@ -36,6 +36,7 @@ export const layers = {
   teslaCamLiveVisible: false,
   pastBroadcastsVisible: false,
   usdtVisible: false,
+  gameZonesVisible: localStorage.getItem('qbitmap_zones') === 'true',
 };
 
 // Map mode state

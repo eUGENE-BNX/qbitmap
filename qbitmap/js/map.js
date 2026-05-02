@@ -6,6 +6,7 @@ import { Analytics } from './analytics.js';
 import { addLabels } from './labels.js';
 import { H3Grid } from './h3-grid.js';
 import { H3TronTrails } from './h3-tron-trails.js';
+import { H3GameZones } from './h3-game-zones.js';
 import { CameraSystem } from './camera-system/index.js';
 import { setMap, layers, satelliteMode, setSatelliteMode } from './state.js';
 import { LocationService } from './services/location-service.js';
@@ -175,6 +176,7 @@ class LayersDropdownControl {
         const items = [
             { id: 'h3-grid', label: 'Qbitmap' },
             { id: 'h3-trails', label: 'Qbit Search' },
+            { id: 'game-zones', label: 'Oyun Bölgeleri' },
             { id: 'city-cameras', label: 'Şehir Kameraları' },
             { id: 'user-cameras', label: 'Kameralar' },
             { id: 'video-messages', label: 'Video Mesajlar' },
@@ -209,6 +211,9 @@ class LayersDropdownControl {
 
             // Set initial active state for default-on layers
             if (['video-messages', 'photo-messages', 'city-cameras', 'user-cameras'].includes(item.id)) {
+                toggle.classList.add('active');
+            }
+            if (item.id === 'game-zones' && layers.gameZonesVisible) {
                 toggle.classList.add('active');
             }
 
@@ -309,6 +314,13 @@ class LayersDropdownControl {
                 toggle.classList.toggle('active', layers.h3TrailsVisible);
                 H3TronTrails.setEnabled(layers.h3TrailsVisible)
                     .catch((err) => Logger.warn('[Map] H3 trails toggle failed', err));
+                break;
+            case 'game-zones':
+                layers.gameZonesVisible = !layers.gameZonesVisible;
+                localStorage.setItem('qbitmap_zones', layers.gameZonesVisible);
+                toggle.classList.toggle('active', layers.gameZonesVisible);
+                H3GameZones.setEnabled(layers.gameZonesVisible)
+                    .catch((err) => Logger.warn('[Map] Game zones toggle failed', err));
                 break;
             case 'vehicles':
                 layers.vehiclesVisible = !layers.vehiclesVisible;
@@ -564,6 +576,7 @@ map.on("load", async () => {
     // Initialize H3 Grid layer (deck.gl + h3-js load lazily on setEnabled)
     H3Grid.init(map);
     H3TronTrails.init(map);
+    H3GameZones.init(map);
 
     // Restore persisted layer states. setEnabled is now async because it
     // pulls deck.gl + h3-js off the wire on first toggle; we don't await
@@ -571,6 +584,10 @@ map.on("load", async () => {
     if (layers.h3GridVisible) {
         H3Grid.setEnabled(true).catch((err) => Logger.warn('[Map] H3 grid enable failed', err));
         if (layersControl) layersControl.syncToggleState('h3-grid', true);
+    }
+    if (layers.gameZonesVisible) {
+        H3GameZones.setEnabled(true).catch((err) => Logger.warn('[Map] Game zones enable failed', err));
+        if (layersControl) layersControl.syncToggleState('game-zones', true);
     }
     if (layers.teslaVehiclesVisible) {
         import('/js/tesla/index.js').then(m => m.TeslaSystem.show({ silent: true }));
