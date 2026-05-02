@@ -841,7 +841,7 @@
 /* Mobile: smaller camera popups */
 @media (max-width: 768px) {
   .camera-popup-content {
-    zoom: 0.7;
+    zoom: 1.1;
   }
 
   .camera-frame-container {
@@ -895,6 +895,7 @@
   .camera-title-line1 .camera-viewers {
     font-size: 12px;
   }
+
 }
 
 @media (max-width: 700px) {
@@ -981,7 +982,7 @@
    ekstra butonları gizle, header daralsın → gap kapansın. Video küçük sabit kalsın. */
 @media (orientation: landscape) and (max-height: 500px) {
   .camera-popup-content {
-    zoom: 0.7;
+    zoom: 1.1;
   }
 
   /* Uzun ismi initials ile değiştir (Alp Özdemir → AO) */
@@ -2241,5 +2242,22 @@
 }
 .camera-ptz-overlay .ptz-home.active {
   transform: translate(-50%, -50%) scale(0.9);
+}
+
+@media (max-width: 768px), (orientation: landscape) and (max-height: 500px) {
+  .camera-ptz-overlay .ptz-pad {
+    width: 58px;
+    height: 58px;
+  }
+  .camera-ptz-overlay .ptz-btn {
+    width: 17px;
+    height: 17px;
+    font-size: 8px;
+  }
+  .camera-ptz-overlay .ptz-home {
+    width: 13px;
+    height: 13px;
+    font-size: 9px;
+  }
 }
 

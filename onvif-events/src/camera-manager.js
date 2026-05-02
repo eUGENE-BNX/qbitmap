@@ -35,6 +35,23 @@ function clamp(v, lo, hi) {
 // wedged — events stopped flowing until the service was manually restarted.
 const RECONNECT_BACKOFF_MS = [1000, 2000, 5000, 15000, 60000];
 
+// Subscription liveness watchdog. The PullPoint subscription set up by
+// agsh/onvif can die silently without firing 'eventsError' (observed on
+// 2026-04-30: the prod service ran 8 days, accepted PTZ commands, but no
+// camera fired any 'event' for that whole window — restart immediately
+// re-armed the subscriptions). 99f57cb correctly removed the
+// resubscribe-on-error loop because it leaked subscriptions on transient
+// Tapo socket-hang-ups, but the silent-death failure mode it didn't address
+// needs a separate signal: any incoming 'event' OR 'eventsError' keeps the
+// camera alive; long silence means the subscription is wedged.
+//
+// Tapo C236 fires 'eventsError' on its keep-alive cycle every ~10s, so a
+// healthy Tapo updates lastSignalAt 30+ times within STALE_THRESHOLD_MS.
+// 5 minutes is conservative for that, generous enough for non-Tapo cameras
+// that may emit a signal less frequently.
+const STALE_THRESHOLD_MS = 5 * 60_000;
+const WATCHDOG_INTERVAL_MS = 60_000;
+
 // Upper bound on how long a single continuousMove can run without an explicit
 // stop. ONVIF `Timeout` + JS-side dead-man timer both enforce this so a stuck
 // client or dropped WebSocket cannot leave the motor moving indefinitely.
@@ -49,6 +66,8 @@ class CameraManager {
     this.cameras = new Map();
     // Map<"cameraId:eventType", lastEventTime> for debouncing
     this.lastEventTimes = new Map();
+    this._watchdogTimer = null;
+    this._startWatchdog();
   }
 
   /**
@@ -88,7 +107,8 @@ class CameraManager {
               reconnectAttempt: 0,
               reconnectTimer: null,
               ptzStopTimer: null,
-              destroyed: false
+              destroyed: false,
+              lastSignalAt: null
             });
 
             if (cam.username && plainPassword) {
@@ -159,7 +179,8 @@ class CameraManager {
       reconnectAttempt: 0,
       reconnectTimer: null,
       ptzStopTimer: null,
-      destroyed: false
+      destroyed: false,
+      lastSignalAt: null
     };
 
     this.cameras.set(id, camera);
@@ -229,6 +250,9 @@ class CameraManager {
         console.log(`[ONVIF] Connected to ${cameraId}`);
         camera.cam = cam;
         camera.connected = true;
+        // Baseline signal so the watchdog gives this fresh subscription
+        // STALE_THRESHOLD_MS to start emitting before being judged stale.
+        camera.lastSignalAt = Date.now();
 
         // Detect PTZ: any profile with a PTZConfiguration means the camera
         // advertises pan/tilt/zoom. Fallback to defaultProfile.token so the
@@ -328,7 +352,10 @@ class CameraManager {
     // with "not connected" during the reconnect window.
     console.log(`[ONVIF] Subscribing to events for ${cameraId}...`);
 
-    cam.on('event', (event) => this.handleEvent(cameraId, event));
+    cam.on('event', (event) => {
+      camera.lastSignalAt = Date.now();
+      this.handleEvent(cameraId, event);
+    });
 
     cam.on('eventsError', (err) => {
       // agsh/onvif keeps its single PullPoint subscription alive internally
@@ -339,7 +366,9 @@ class CameraManager {
       // → _eventRequest() on top of the still-running subscription, which
       // leaks subscriptions and produces a runaway storm of SOAP faults
       // (observed: ~180K faults accumulated in 2 hours before this fix).
-      // Just rate-limit the log so the journal doesn't fill up.
+      // Just rate-limit the log so the journal doesn't fill up — the
+      // subscription liveness watchdog handles the silent-death case.
+      camera.lastSignalAt = Date.now();
       const msg = (err && err.message) || 'unknown';
       const now = Date.now();
       const key = `evterr:${cameraId}:${msg}`;
@@ -349,6 +378,45 @@ class CameraManager {
         console.log(`[ONVIF] ${cameraId} event error (Tapo quirk, benign): ${msg}`);
       }
     });
+  }
+
+  /**
+   * Run a periodic check across every connected camera. If a camera has not
+   * emitted any 'event' or 'eventsError' for STALE_THRESHOLD_MS, the
+   * underlying PullPoint subscription is presumed dead and a full reconnect
+   * is forced via the existing scheduleReconnect path. This is the watchdog
+   * for the silent-death failure mode that 99f57cb explicitly does not
+   * handle (it only handles the chatty error case).
+   */
+  _startWatchdog() {
+    if (this._watchdogTimer) return;
+    this._watchdogTimer = setInterval(() => this._checkSubscriptions(), WATCHDOG_INTERVAL_MS);
+    // Don't keep the event loop alive solely for this timer — the HTTP server
+    // is the keep-alive owner, and on shutdown we want this to go quietly.
+    if (this._watchdogTimer.unref) this._watchdogTimer.unref();
+    console.log(`[ONVIF] Subscription watchdog started (interval=${WATCHDOG_INTERVAL_MS}ms, stale=${STALE_THRESHOLD_MS}ms)`);
+  }
+
+  _checkSubscriptions() {
+    const now = Date.now();
+    for (const [cameraId, camera] of this.cameras) {
+      if (camera.destroyed) continue;
+      if (!camera.connected) continue;
+      if (camera.connecting) continue;
+      if (!camera.cam) continue;
+      if (camera.lastSignalAt == null) continue;
+
+      const idle = now - camera.lastSignalAt;
+      if (idle > STALE_THRESHOLD_MS) {
+        console.warn(`[ONVIF] ${cameraId} subscription stale (${Math.round(idle / 1000)}s silent) — forcing reconnect`);
+        // Mark disconnected so scheduleReconnect → connect cleans up.
+        camera.connected = false;
+        // Reset so the next watchdog tick (in 60s) doesn't immediately
+        // re-trigger if reconnect is still in flight.
+        camera.lastSignalAt = now;
+        this.scheduleReconnect(cameraId, 'watchdog-stale');
+      }
+    }
   }
 
   /**

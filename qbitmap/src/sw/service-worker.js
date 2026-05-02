@@ -127,7 +127,7 @@ registerRoute(
 );
 
 // MapLibre style.json / tile index JSON — small, cache-bust via new
-// filename on each map refresh (currently /tiles/20260331.json etc).
+// filename on each map refresh (currently /tiles/20260430.json etc).
 registerRoute(
   ({ url }) =>
     url.pathname.startsWith('/tiles/') && url.pathname.endsWith('.json'),

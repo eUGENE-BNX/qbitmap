@@ -202,6 +202,14 @@
   box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
 }
 
+/* Active Zones toggle extracted from panel - direct child of right-side-controls */
+.right-side-controls > .active-zones-wrapper {
+  margin: 0;
+  border-radius: 4px;
+  overflow: visible;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+}
+
 /* Right side button (shared style for broadcast, camera-switch, resolution, etc.) */
 .mic-button-right {
   width: 29px;

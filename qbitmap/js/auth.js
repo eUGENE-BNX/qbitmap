@@ -368,6 +368,12 @@ const AuthSystem = {
       if (layersCtrl) {
         container.insertBefore(layersCtrl, panel);
       }
+
+      // Extract Active Zones toggle below the layers dropdown
+      const activeZonesCtrl = panel.querySelector('.active-zones-wrapper');
+      if (activeZonesCtrl) {
+        container.insertBefore(activeZonesCtrl, panel);
+      }
     }
 
     // --- Auth-specific buttons ---
