@@ -6,7 +6,7 @@
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 const { getVllmUrl } = require('../utils/ai-config');
 const logger = require('../utils/logger').child({ module: 'health-checker' });
-const { services } = require('../config');
+const { services, server } = require('../config');
 
 const QBITMAP_HOST = services.qbitmapHost;
 const MEDIAMTX_HOST = services.mediamtxHost;
@@ -22,24 +22,66 @@ const MEDIAMTX_API = services.mediamtxApi;
 // Service configurations
 const SERVICES = [
   {
+    // Probe Caddy on loopback — qbitmap.com / stream.qbitmap.com are
+    // fronted by Cloudflare, whose bot challenge 403s the Node fetch UA.
+    // Host header makes Caddy match the qbitmap.com vhost; the 308 from
+    // its HTTP→HTTPS redirect is the expected response on port 80.
     id: 'qbitmap-web',
     name: 'QBitmap Web',
     description: 'Caddy Web Server',
     host: QBITMAP_HOST,
-    url: 'https://qbitmap.com/',
+    url: 'http://127.0.0.1/',
     method: 'HEAD',
     timeout: 5000,
-    icon: 'globe'
+    icon: 'globe',
+    headers: { Host: 'qbitmap.com' },
+    acceptCodes: [200, 301, 308]
   },
   {
     id: 'backend-api',
     name: 'Backend API',
     description: 'Main API Server',
     host: QBITMAP_HOST,
-    url: 'https://stream.qbitmap.com/health',
+    url: `http://127.0.0.1:${server.port}/health`,
     method: 'GET',
     timeout: 5000,
     icon: 'server'
+  },
+  {
+    id: 'rtc-gateway-whep',
+    name: 'RTC Gateway',
+    description: 'WebRTC WHEP Server',
+    host: MEDIAMTX_HOST,
+    url: `${MEDIAMTX_WHEP_BASE}/`,
+    method: 'GET',
+    timeout: 5000,
+    icon: 'broadcast',
+    acceptCodes: [200, 301, 404] // WHEP endpoint returns 404 on root but service is up
+  },
+  {
+    id: 'ai-service',
+    name: 'AI Service',
+    description: 'vLLM Vision Server',
+    host: '', // resolved dynamically from ai-config
+    url: '',  // resolved dynamically from ai-config
+    method: 'GET',
+    timeout: 10000,
+    icon: 'brain',
+    dynamic: true
+  },
+  {
+    // Tesla Fleet Telemetry — the Tesla-provided ingest container that
+    // accepts vehicle telemetry over mTLS on :4443 and exposes a plain
+    // HTTP status port (configured via `status_port` in
+    // /opt/fleet-telemetry/config.json) which answers "ok\n" on /status.
+    id: 'tesla-telemetry',
+    name: 'Tesla Telemetry',
+    description: 'Fleet Telemetry Ingest',
+    host: QBITMAP_HOST,
+    url: 'http://127.0.0.1:8085/status',
+    method: 'GET',
+    timeout: 5000,
+    icon: 'car'
   },
   {
     id: 'onvif-service',
@@ -62,17 +104,6 @@ const SERVICES = [
     icon: 'video'
   },
   {
-    id: 'rtc-gateway-whep',
-    name: 'RTC Gateway',
-    description: 'WebRTC WHEP Server',
-    host: MEDIAMTX_HOST,
-    url: `${MEDIAMTX_WHEP_BASE}/`,
-    method: 'GET',
-    timeout: 5000,
-    icon: 'broadcast',
-    acceptCodes: [200, 301, 404] // WHEP endpoint returns 404 on root but service is up
-  },
-  {
     id: 'mediamtx-api',
     name: 'Media API',
     description: 'Media Server API',
@@ -82,17 +113,6 @@ const SERVICES = [
     timeout: 5000,
     icon: 'api',
     acceptCodes: [200, 401] // 401 means auth required but service is up
-  },
-  {
-    id: 'ai-service',
-    name: 'AI Service',
-    description: 'vLLM Vision Server',
-    host: '', // resolved dynamically from ai-config
-    url: '',  // resolved dynamically from ai-config
-    method: 'GET',
-    timeout: 10000,
-    icon: 'brain',
-    dynamic: true
   },
   {
     id: 'face-recognition',
@@ -149,7 +169,16 @@ async function checkService(service) {
 
     const response = await fetchWithTimeout(
       service.url,
-      { method: service.method },
+      {
+        method: service.method,
+        headers: service.headers || {},
+        // 'manual' so a redirect from a probed endpoint counts as the
+        // response we evaluate against acceptCodes — otherwise fetch
+        // follows it and the next hop's failure (e.g. Cloudflare
+        // bot-challenging the Node UA on https://qbitmap.com/) masks the
+        // fact that the directly-probed service answered fine.
+        redirect: service.redirect || 'manual'
+      },
       service.timeout
     );
 

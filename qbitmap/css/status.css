@@ -192,229 +192,6 @@ body {
   gap: 24px;
 }
 
-/* Graph Section */
-.graph-section {
-  width: 100%;
-}
-
-.graph-container {
-  position: relative;
-  width: 100%;
-  height: 500px;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-}
-
-/* Graph inner grid */
-.graph-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.connections-svg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.nodes-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 2;
-}
-
-.packets-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 3;
-}
-
-/* Service Node */
-.service-node {
-  position: absolute;
-  width: 140px;
-  height: 95px;
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  transform: translate(-50%, -50%);
-  box-shadow: var(--shadow-sm);
-}
-
-.service-node:hover {
-  transform: translate(-50%, -50%) scale(1.05);
-  box-shadow: var(--shadow-md);
-  border-color: var(--border-color-hover);
-}
-
-/* Online Node */
-.service-node.online {
-  border-color: rgba(34, 197, 94, 0.3);
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
-}
-
-.service-node.online:hover {
-  border-color: var(--accent-green);
-  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.15);
-}
-
-/* Status indicator dot for online nodes */
-.service-node.online .status-dot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 8px;
-  height: 8px;
-  background: var(--accent-green);
-  border-radius: 50%;
-  animation: dotPulse 2s ease-in-out infinite;
-}
-
-@keyframes dotPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.85); }
-}
-
-/* Offline Node */
-.service-node.offline {
-  border-color: rgba(239, 68, 68, 0.3);
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1);
-}
-
-.service-node.offline:hover {
-  border-color: var(--accent-red);
-  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.15);
-}
-
-/* Degraded Node */
-.service-node.degraded {
-  border-color: rgba(245, 158, 11, 0.3);
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);
-}
-
-.service-node.degraded:hover {
-  border-color: var(--accent-yellow);
-  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.15);
-}
-
-.service-node .node-icon {
-  width: 28px;
-  height: 28px;
-  margin-bottom: 8px;
-}
-
-.service-node.online .node-icon {
-  color: var(--accent-green);
-}
-
-.service-node.offline .node-icon {
-  color: var(--accent-red);
-}
-
-.service-node.degraded .node-icon {
-  color: var(--accent-yellow);
-}
-
-.service-node .node-name {
-  font-size: 11px;
-  font-weight: 600;
-  text-align: center;
-  max-width: 120px;
-  line-height: 1.3;
-  color: var(--text-primary);
-}
-
-.service-node .node-response {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  margin-top: 4px;
-  padding: 2px 8px;
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-}
-
-.service-node.online .node-response {
-  color: var(--accent-green);
-  background: rgba(34, 197, 94, 0.1);
-}
-
-.service-node.offline .node-response {
-  color: var(--accent-red);
-  background: rgba(239, 68, 68, 0.1);
-}
-
-/* Connection Lines (SVG) */
-.connection-line {
-  fill: none;
-  stroke: var(--border-color);
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  transition: all var(--transition-normal);
-}
-
-.connection-line.online {
-  stroke: var(--accent-green);
-  stroke-width: 2;
-  stroke-opacity: 0.5;
-}
-
-.connection-line.offline {
-  stroke: var(--accent-red);
-  stroke-width: 1.5;
-  stroke-opacity: 0.3;
-  stroke-dasharray: 4 8;
-}
-
-.connection-line.partial {
-  stroke: var(--accent-yellow);
-  stroke-width: 1.5;
-  stroke-opacity: 0.5;
-}
-
-/* Animated flow on online connections */
-.connection-line.online.flow-active {
-  stroke-dasharray: 8 12;
-  stroke-opacity: 0.6;
-  animation: dashFlow var(--flow-speed, 30s) linear infinite;
-}
-
-@keyframes dashFlow {
-  to {
-    stroke-dashoffset: -200;
-  }
-}
-
 /* Summary Section */
 .summary-section {
   display: grid;
@@ -479,149 +256,213 @@ body {
 }
 
 .services-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
+/* Single-row service card: icon | name | host | response | pulse | badge */
 .service-card {
+  position: relative;
+  overflow: hidden; /* clip the sweep band — see ::before below */
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 16px 20px;
-  display: flex;
+  padding: 10px 16px;
+  display: grid;
+  grid-template-columns: 32px minmax(140px, 1fr) minmax(140px, 1.2fr) 70px 18px 88px;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   box-shadow: var(--shadow-sm);
+  border-left-width: 3px;
 }
 
 .service-card:hover {
+  background: var(--bg-card-hover);
   box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
 }
 
-.service-card.online {
-  border-left: 3px solid var(--accent-green);
+/* Random "alive" sweep band. The ::before is a faint vertical strip
+   parked off the left edge; .sweep adds a one-shot keyframe that
+   translates it across the card. JS schedules .sweep with a randomized
+   3-10s gap per card (scheduleSweeps), so rows shimmer out of phase
+   and the page reads as "every service is breathing on its own." */
+.service-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40%;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(34, 197, 94, 0.08) 50%,
+    transparent 100%
+  );
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.service-card.online:hover {
-  border-color: var(--accent-green);
+.service-card.sweep::before {
+  animation: cardSweep 1.6s cubic-bezier(0.25, 0.1, 0.25, 1) 1;
 }
 
-.service-card.offline {
-  border-left: 3px solid var(--accent-red);
+@keyframes cardSweep {
+  0%   { transform: translateX(0);     opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(360%);  opacity: 0; }
 }
 
-.service-card.offline:hover {
-  border-color: var(--accent-red);
+/* Offline cards never sweep — they're not alive. Degraded keeps the
+   sweep but tinted yellow so the band still feels colour-coded. */
+.service-card.offline::before { display: none; }
+.service-card.degraded::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(245, 158, 11, 0.10) 50%,
+    transparent 100%
+  );
 }
 
-.service-card.degraded {
-  border-left: 3px solid var(--accent-yellow);
-}
+/* Keep card content above the sweep band. */
+.service-card > * { position: relative; z-index: 1; }
 
-.service-card.degraded:hover {
-  border-color: var(--accent-yellow);
-}
+.service-card.online      { border-left-color: var(--accent-green); }
+.service-card.offline     { border-left-color: var(--accent-red); }
+.service-card.degraded    { border-left-color: var(--accent-yellow); }
 
 .service-card-icon {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-sm);
   background: var(--bg-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
 }
 
 .service-card-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
 }
 
-.service-card.online .service-card-icon {
-  background: rgba(34, 197, 94, 0.1);
-}
-
-.service-card.online .service-card-icon svg {
-  color: var(--accent-green);
-}
-
-.service-card.offline .service-card-icon {
-  background: rgba(239, 68, 68, 0.1);
-}
-
-.service-card.offline .service-card-icon svg {
-  color: var(--accent-red);
-}
-
-.service-card.degraded .service-card-icon {
-  background: rgba(245, 158, 11, 0.1);
-}
-
-.service-card.degraded .service-card-icon svg {
-  color: var(--accent-yellow);
-}
-
-.service-card-info {
-  flex: 1;
-  min-width: 0;
-}
+.service-card.online   .service-card-icon { background: rgba(34, 197, 94, 0.1); }
+.service-card.online   .service-card-icon svg { color: var(--accent-green); }
+.service-card.offline  .service-card-icon { background: rgba(239, 68, 68, 0.1); }
+.service-card.offline  .service-card-icon svg { color: var(--accent-red); }
+.service-card.degraded .service-card-icon { background: rgba(245, 158, 11, 0.1); }
+.service-card.degraded .service-card-icon svg { color: var(--accent-yellow); }
 
 .service-card-name {
   font-weight: 600;
   font-size: 14px;
-  margin-bottom: 2px;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .service-card-host {
   font-size: 12px;
   font-family: var(--font-mono);
   color: var(--text-muted);
-}
-
-.service-card-status {
-  text-align: right;
-}
-
-.service-card-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.service-card.online .service-card-badge {
-  background: rgba(34, 197, 94, 0.1);
-  color: var(--accent-green);
-}
-
-.service-card.offline .service-card-badge {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--accent-red);
-}
-
-.service-card.degraded .service-card-badge {
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--accent-yellow);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .service-card-response {
   font-size: 12px;
   font-family: var(--font-mono);
   color: var(--text-secondary);
-  margin-top: 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
-.service-card.online .service-card-response {
-  color: var(--accent-green);
+.service-card.online .service-card-response { color: var(--accent-green); }
+
+/* Liveness pulse: a small dot with an expanding ring re-armed on each
+   refresh by JS (firePulses). Visible only on online cards — offline
+   shows a static dot, no ring. */
+.service-card-pulse {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  position: relative;
+  z-index: 1;
+}
+
+.pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.service-card.online   .pulse-dot { background: var(--accent-green); box-shadow: 0 0 6px rgba(34, 197, 94, 0.5); }
+.service-card.offline  .pulse-dot { background: var(--accent-red); }
+.service-card.degraded .pulse-dot { background: var(--accent-yellow); }
+
+/* Soft idle breathing on online dot — runs continuously between pings
+   so the card never looks frozen. */
+.service-card.online .pulse-dot {
+  animation: pulseBreathe 2.4s ease-in-out infinite;
+}
+
+@keyframes pulseBreathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.65; transform: scale(0.85); }
+}
+
+/* Ring wave fired by JS once per data refresh (.ping class added on
+   every render). Restart trick relies on layout flush in firePulses(). */
+.service-card.online .pulse-ring.ping {
+  animation: pulseRing 1.4s cubic-bezier(0.2, 0.8, 0.4, 1) 1;
+  background: rgba(34, 197, 94, 0.45);
+}
+
+@keyframes pulseRing {
+  0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.65; }
+  80%  { transform: translate(-50%, -50%) scale(3.6); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(3.6); opacity: 0; }
+}
+
+.service-card-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
+  justify-self: end;
+}
+
+.service-card.online   .service-card-badge { background: rgba(34, 197, 94, 0.1);  color: var(--accent-green); }
+.service-card.offline  .service-card-badge { background: rgba(239, 68, 68, 0.1);  color: var(--accent-red); }
+.service-card.degraded .service-card-badge { background: rgba(245, 158, 11, 0.1); color: var(--accent-yellow); }
 
 /* Footer */
 .status-footer {
@@ -834,31 +675,24 @@ body {
     order: -1;
   }
 
-  .graph-container {
-    height: 400px;
-  }
-
-  .service-node {
-    width: 100px;
-    height: 70px;
-  }
-
-  .service-node .node-icon {
-    width: 24px;
-    height: 24px;
-  }
-
-  .service-node .node-name {
-    font-size: 9px;
-  }
-
   .summary-section {
     grid-template-columns: 1fr;
   }
 
-  .services-list {
-    grid-template-columns: 1fr;
+  /* Drop the host column on narrow screens — name + response + pulse +
+     badge stays on one line, host shifts to a second line under name. */
+  .service-card {
+    grid-template-columns: 28px 1fr 56px 14px 72px;
+    gap: 2px 10px;
+    padding: 10px 12px;
   }
+
+  .service-card-icon     { grid-column: 1; grid-row: 1 / 3; width: 28px; height: 28px; }
+  .service-card-name     { grid-column: 2; grid-row: 1; }
+  .service-card-host     { grid-column: 2; grid-row: 2; }
+  .service-card-response { grid-column: 3; grid-row: 1 / 3; }
+  .service-card-pulse    { grid-column: 4; grid-row: 1 / 3; }
+  .service-card-badge    { grid-column: 5; grid-row: 1 / 3; }
 
   .status-footer {
     flex-direction: column;
@@ -872,13 +706,3 @@ body {
   }
 }
 
-@media (max-width: 480px) {
-  .graph-container {
-    height: 350px;
-  }
-
-  .service-node {
-    width: 90px;
-    height: 60px;
-  }
-}

@@ -1,7 +1,5 @@
 import { QBitmapConfig } from '../config.js';
 import { Logger } from '../utils.js';
-import { StatusGraph } from './graph.js';
-import { StatusAnimations } from './animations.js';
 
 /**
  * StatusSystem - Main status page controller
@@ -55,10 +53,6 @@ const StatusSystem = {
   cacheElements() {
     this.elements = {
       overallStatus: document.getElementById('overall-status'),
-      graphContainer: document.getElementById('graph-container'),
-      nodesContainer: document.getElementById('nodes-container'),
-      connectionsSvg: document.getElementById('connections-svg'),
-      packetsContainer: document.getElementById('packets-container'),
       servicesList: document.getElementById('services-list'),
       onlineCount: document.getElementById('online-count'),
       offlineCount: document.getElementById('offline-count'),
@@ -162,12 +156,8 @@ const StatusSystem = {
   render(data) {
     this.renderOverallStatus(data.overall);
     this.renderSummary(data.summary);
-    this.renderGraph();
     this.renderServicesList();
     this.renderLastUpdate();
-
-    // Trigger animations
-    StatusAnimations.startPacketAnimations(this.services, this.connections);
   },
 
   /**
@@ -218,13 +208,6 @@ const StatusSystem = {
   },
 
   /**
-   * Render network graph
-   */
-  renderGraph() {
-    StatusGraph.render(this.services, this.connections, this.elements);
-  },
-
-  /**
    * Render services list
    */
   renderServicesList() {
@@ -233,19 +216,15 @@ const StatusSystem = {
 
     container.innerHTML = this.services.map(service => `
       <div class="service-card ${service.status}" data-service-id="${service.id}">
-        <div class="service-card-icon">
-          ${this.getServiceIcon(service.icon)}
+        <div class="service-card-icon">${this.getServiceIcon(service.icon)}</div>
+        <div class="service-card-name">${service.name}</div>
+        <div class="service-card-host">${service.host}</div>
+        <div class="service-card-response">${service.responseTime != null ? `${service.responseTime}ms` : '--'}</div>
+        <div class="service-card-pulse" aria-hidden="true">
+          <span class="pulse-dot"></span>
+          <span class="pulse-ring"></span>
         </div>
-        <div class="service-card-info">
-          <div class="service-card-name">${service.name}</div>
-          <div class="service-card-host">${service.host}</div>
-        </div>
-        <div class="service-card-status">
-          <span class="service-card-badge">${service.status}</span>
-          <div class="service-card-response">
-            ${service.responseTime ? `${service.responseTime}ms` : '--'}
-          </div>
-        </div>
+        <div class="service-card-badge">${service.status}</div>
       </div>
     `).join('');
 
@@ -259,7 +238,58 @@ const StatusSystem = {
         }
       });
     });
+
+    // Liveness ping: each render is triggered by a fresh poll, so re-arm
+    // the pulse-ring animation on every online card so the "alive" wave
+    // visually fires once per refresh cycle, in sync with real data.
+    this.firePulses(container);
+
+    // Independent random sweeps per online card. Re-render rebuilds the
+    // DOM (innerHTML reset) which orphans any prior timers, so we cancel
+    // them here too instead of letting them tick onto detached nodes.
+    this.scheduleSweeps(container);
   },
+
+  /**
+   * Re-trigger the pulse-ring keyframe on every online service card.
+   * Removing+forcing reflow+adding the .ping class restarts the CSS
+   * animation; without the reflow the browser collapses the toggle.
+   */
+  firePulses(container) {
+    container.querySelectorAll('.service-card.online .service-card-pulse').forEach(el => {
+      el.classList.remove('ping');
+      // Force layout flush so toggling the class re-runs the animation.
+      void el.offsetWidth;
+      el.classList.add('ping');
+    });
+  },
+
+  /**
+   * Per-card random "alive" sweep. Each online card schedules its own
+   * shimmer with a random gap (3-10s) so rows fire out of phase — this
+   * is the visual signal the user asked for: independent activity per
+   * service rather than a synchronized hospital-monitor feel.
+   */
+  scheduleSweeps(container) {
+    if (this.sweepTimers) this.sweepTimers.forEach(clearTimeout);
+    this.sweepTimers = [];
+
+    container.querySelectorAll('.service-card.online').forEach(card => {
+      const tick = () => {
+        if (!card.isConnected) return;
+        card.classList.remove('sweep');
+        // Reflow trick — same reason as firePulses: without it the
+        // browser coalesces the toggle and the keyframe doesn't replay.
+        void card.offsetWidth;
+        card.classList.add('sweep');
+        const next = 3000 + Math.random() * 7000;
+        this.sweepTimers.push(setTimeout(tick, next));
+      };
+      // Stagger first fire so cards desync immediately on load.
+      this.sweepTimers.push(setTimeout(tick, Math.random() * 4000));
+    });
+  },
+
 
   /**
    * Render last update timestamp
@@ -306,7 +336,8 @@ const StatusSystem = {
       api: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
       brain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 0-4 4v2H6a4 4 0 0 0 0 8h2v2a4 4 0 0 0 8 0v-2h2a4 4 0 0 0 0-8h-2V6a4 4 0 0 0-4-4z"/><circle cx="12" cy="12" r="2"/></svg>',
       face: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>',
-      phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
+      phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+      car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M5 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM23 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM3 17v-4l2-5h14l2 5v4M7 8V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v2"/></svg>'
     };
 
     return icons[iconName] || icons.server;
@@ -393,7 +424,10 @@ const StatusSystem = {
    */
   destroy() {
     this.stopAutoRefresh();
-    StatusAnimations.stopAllAnimations();
+    if (this.sweepTimers) {
+      this.sweepTimers.forEach(clearTimeout);
+      this.sweepTimers = [];
+    }
   }
 };
 
